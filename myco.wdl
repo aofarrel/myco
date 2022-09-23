@@ -5,6 +5,40 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/rm_
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 
 
+task depth {
+	input {
+		File sam
+
+		# runtime attributes
+		Int addldisk = 250
+		Int cpu      = 16
+		Int retries  = 1
+		Int memory   = 32
+		Int preempt  = 1
+	}
+	String basestem_sam = basename(sam, ".sam")
+
+	command <<<
+	samtools sort -u ~{sam} > sorted_~{basestem_sam}.sam
+	samtools depth -as ~{sam} > depth_~{basestem_sam}
+	>>>
+
+	runtime {
+		cpu: cpu
+		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:latest"
+		disks: "local-disk " + finalDiskSize + " HDD"
+		maxRetries: "${retries}"
+		memory: "${memory} GB"
+		preemptible: "${preempt}"
+	}
+
+	output {
+		depth = glob("depth_*")[0]
+	}
+
+}
+
+
 workflow myco {
 	input:
 		File tarball_raw_ref
