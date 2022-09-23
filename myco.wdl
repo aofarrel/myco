@@ -41,11 +41,18 @@ task depth {
 
 workflow myco {
 	input:
-		File tarball_raw_ref
-		File tarball_decontaminated_ref
-		File tarball_H37Rv_ref
-		Array[String] samples
-		Array[Array[File]] fastqs
+		#File tarball_raw_ref
+		#File tarball_decontaminated_ref
+		#File tarball_H37Rv_ref
+		#Array[String] samples
+		#Array[Array[File]] fastqs
+		Array[File] sam
+
+	scatter(zip(samples, fastqs))
+		call depth {
+			input:
+				sam = sam
+		}
 	
 }
 
