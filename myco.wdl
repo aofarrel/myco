@@ -8,6 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/var
 task depth {
 	input {
 		File sam
+		Int min_coverage = 1
 
 		# runtime attributes
 		Int addldisk = 250
@@ -16,11 +17,12 @@ task depth {
 		Int memory   = 32
 		Int preempt  = 1
 	}
-	String basestem_sam = basename(sam, ".sam")
+	String basestem = basename(sam, ".sam")
 
 	command <<<
-	samtools sort -u ~{sam} > sorted_~{basestem_sam}.sam
-	samtools depth -as ~{sam} > depth_~{basestem_sam}
+	samtools sort -u ~{sam} > sorted_~{basestem}.sam
+	bedtools genomecov -ibam sorted_u_SAMEA2534421.sam -bga | awk '$4 < ~{min_coverage}' > low_coverage.bga
+	bedtools maskfasta
 	>>>
 
 	runtime {
