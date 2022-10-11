@@ -3,64 +3,53 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/map_reads.wdl" as clckwrk_map_reads
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/rm_contam.wdl" as clckwrk_rm_contam
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-
-
-task depth {
-	input {
-		File sam
-		Int min_coverage = 1
-
-		# runtime attributes
-		Int addldisk = 250
-		Int cpu      = 16
-		Int retries  = 1
-		Int memory   = 32
-		Int preempt  = 1
-	}
-	String basestem = basename(sam, ".sam")
-
-	command <<<
-	samtools sort -u ~{sam} > sorted_~{basestem}.sam
-	bedtools genomecov -ibam sorted_u_SAMEA2534421.sam -bga | awk '$4 < ~{min_coverage}' > low_coverage.bga
-	bedtools maskfasta
-	>>>
-
-	runtime {
-		cpu: cpu
-		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:latest"
-		disks: "local-disk " + finalDiskSize + " HDD"
-		maxRetries: "${retries}"
-		memory: "${memory} GB"
-		preemptible: "${preempt}"
-	}
-
-	output {
-		depth = glob("depth_*")[0]
-	}
-
-}
-
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
+import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
 
 workflow myco {
-	input:
-		#File tarball_raw_ref
-		#File tarball_decontaminated_ref
-		#File tarball_H37Rv_ref
-		#Array[String] samples
-		#Array[Array[File]] fastqs
-		Array[File] sam
+	input {
+		File tarball_decontaminated_ref
+		File tarball_H37Rv_ref
+		File contamination_metadata_tsv
+		Array[String] SRA_accessions
+		Int min_coverage = 1
+	}
 
-	scatter(zip(samples, fastqs))
-		call depth {
+	scatter(SRA_accession in SRA_accessions) {
+
+		call sranwrp.pull_from_SRA_directly {
 			input:
-				sam = sam
-		}
-	
-}
+				sra_accession = SRA_accession
 
-parameter_meta {
-	"tarball_decontaminated_ref": "Indexed decontamination reference; output of clockwork reference_prepare"
-	"tarball_H37Rv_ref": "Indexed H37Rv reference; output of clockwork reference_prepare"
-	"fastqs": "An array of arrays. Each inner array represents one sample's FASTQs."
-	"samples": "Sample names. Each sample corresponds to an inner array in the fastqs array at the same index."
+		} # output: pull_from_SRA_directly.fastqs
+
+		call clckwrk_map_reads.map_reads {
+			input:
+				sample_name = SRA_accession,
+				tarball_ref_fasta_and_index = tarball_decontaminated_ref,
+				ref_fasta_filename = "ref.fa",
+				reads_files = pull_from_SRA_directly.fastqs
+
+		} # output: map_reads.mapped_reads
+
+		call clckwrk_rm_contam.remove_contam {
+			input:
+				bam_in = map_reads.mapped_reads,
+				metadata_tsv = contamination_metadata_tsv
+		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
+
+		call masker.make_mask_file {
+			input:
+				sam = map_reads.mapped_reads,
+				min_coverage = min_coverage
+		}
+
+		call clckwrk_var_call.variant_call_one_sample {
+			input:
+				sample_name = map_reads.mapped_reads,
+				ref_dir = tarball_H37Rv_ref,
+				reads_files = [remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2]
+		}
+	}
+	
 }
