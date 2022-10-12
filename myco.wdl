@@ -1,8 +1,8 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/map_reads.wdl" as clckwrk_map_reads
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/rm_contam.wdl" as clckwrk_rm_contam
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/1.0.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/rm_contam.wdl" as clckwrk_rm_contam
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
 
