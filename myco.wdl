@@ -12,7 +12,7 @@ workflow myco {
 		File tarball_H37Rv_ref
 		File contamination_metadata_tsv
 		Array[String] SRA_accessions
-		Int min_coverage = 1
+		Int min_coverage
 	}
 
 	scatter(SRA_accession in SRA_accessions) {
@@ -32,11 +32,18 @@ workflow myco {
 
 		} # output: map_reads.mapped_reads
 
-		call clckwrk_rm_contam.remove_contam {
-			input:
-				bam_in = map_reads.mapped_reads,
-				metadata_tsv = contamination_metadata_tsv
-		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
+# this doesn't seem to be working on SRA reads, or at least not SRR7070043
+# possible leads:
+# * the samtools sort was done improperly/should not have been done
+# * ref genome actually is needed (ie not just metadata tsv)
+# * reads already decontaminated
+# * https://github.com/iqbal-lab-org/clockwork/blob/e4209b96a25d705ebbdbfda29dc3cf198ef81c3e/python/clockwork/contam_remover.py#L175
+# * https://github.com/iqbal-lab-org/clockwork/issues/77
+#		call clckwrk_rm_contam.remove_contam {
+#			input:
+#				bam_in = map_reads.mapped_reads,
+#				metadata_tsv = contamination_metadata_tsv
+#		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
 
 		call masker.make_mask_file {
 			input:
@@ -48,7 +55,8 @@ workflow myco {
 			input:
 				sample_name = map_reads.mapped_reads,
 				ref_dir = tarball_H37Rv_ref,
-				reads_files = [remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2]
+				reads_files = pull_from_SRA_directly.fastqs
+				#reads_files = [remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2]
 		}
 	}
 	
