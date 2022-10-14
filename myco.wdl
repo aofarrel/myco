@@ -39,11 +39,12 @@ workflow myco {
 # * reads already decontaminated
 # * https://github.com/iqbal-lab-org/clockwork/blob/e4209b96a25d705ebbdbfda29dc3cf198ef81c3e/python/clockwork/contam_remover.py#L175
 # * https://github.com/iqbal-lab-org/clockwork/issues/77
-#		call clckwrk_rm_contam.remove_contam {
-#			input:
-#				bam_in = map_reads.mapped_reads,
-#				metadata_tsv = contamination_metadata_tsv
-#		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
+		call clckwrk_rm_contam.remove_contam {
+			input:
+				bam_in = map_reads.mapped_reads,
+				tarball_metadata_tsv = tarball_decontaminated_ref,
+				filename_metadata_tsv = "remove_contam_metadata.tsv"
+		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
 
 		call masker.make_mask_file {
 			input:
