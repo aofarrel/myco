@@ -20,9 +20,10 @@ workflow myco {
 		call sranwrp.pull_from_SRA_directly {
 			input:
 				sra_accession = SRA_accession
+		}
 	} # output: pull_from_SRA_directly.fastqs
 
-	scatter(data in zip(SRA_accession, pull_from_SRA_directly.fastqs)) {
+	scatter(data in zip(SRA_accessions, pull_from_SRA_directly.fastqs)) {
 		call clckwrk_map_reads.map_reads {
 			input:
 				sample_name = data.left,
