@@ -10,55 +10,36 @@ import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by
 
 workflow myco {
 	input {
-		#File tarball_decontaminated_ref
-		#File tarball_H37Rv_ref
-		#File? contamination_metadata_tsv
-		#Array[String] SRA_accessions
-		Array[String] ENA_accessions
+		Array[String] SRA_accessions
 		Int min_coverage
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
 
-	File tarball_decontaminated_ref = ClockworkRefPrepTB.tar_indexd_dcontm_ref
-	File tarball_H37Rv_ref = ClockworkRefPrepTB.tar_indexd_H37Rv_ref
-
-	#scatter(SRA_accession in SRA_accessions) {
-		#call sranwrp.pull_from_SRA_directly {
-		#	input:
-		#		sra_accession = SRA_accession
-		#} # output: pull_from_SRA_directly.fastqs
-	scatter(ENA_accession in ENA_accessions) {
-		call ena.enaDataGet {
+	scatter(SRA_accession in SRA_accessions) {
+		call sranwrp.pull_from_SRA_directly {
 			input:
-				sample = ENA_accession
-		} # output: enaDataGet.fastqs
+				sra_accession = SRA_accession
+	} # output: pull_from_SRA_directly.fastqs
 
+	scatter(data in zip(SRA_accession, pull_from_SRA_directly.fastqs)) {
 		call clckwrk_map_reads.map_reads {
 			input:
-				#sample_name = SRA_accession,
-				sample_name = ENA_accession,
-				tarball_ref_fasta_and_index = tarball_decontaminated_ref,
+				sample_name = data.left,
+				reads_files = data.right,
+				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa",
-				reads_files = enaDataGet.fastqs
-				#reads_files = pull_from_SRA_directly.fastqs
+				reads_files = pull_from_SRA_directly.fastqs
+		}
 
-		} # output: map_reads.mapped_reads
+	} # output: map_reads.mapped_reads
 
-# this doesn't seem to be working on SRA reads, or at least not SRR7070043
-# possible leads:
-# * the samtools sort was done improperly/should not have been done
-# * ref genome actually is needed (ie not just metadata tsv)
-# * reads already decontaminated
-# * https://github.com/iqbal-lab-org/clockwork/blob/e4209b96a25d705ebbdbfda29dc3cf198ef81c3e/python/clockwork/contam_remover.py#L175
-# * https://github.com/iqbal-lab-org/clockwork/issues/77
-
-# TODO: replace with single file TSV if possible as that is much faster to localize
-		call clckwrk_rm_contam.remove_contam {
+	scatter(sam_file in map_reads.mapped_reads) {
+		# TODO: replace with single file TSV if possible as that is much faster to localize
+		call clckwrk_rm_contam.remove_contam as remove_contamination {
 			input:
-				bam_in = map_reads.mapped_reads,
-				tarball_metadata_tsv = tarball_decontaminated_ref,
-				filename_metadata_tsv = "remove_contam_metadata.tsv"
+				bam_in = sam_file,
+				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
 
 		call masker.make_mask_file {
@@ -69,11 +50,9 @@ workflow myco {
 
 		call clckwrk_var_call.variant_call_one_sample {
 			input:
-				sample_name = map_reads.mapped_reads,
-				ref_dir = tarball_H37Rv_ref,
-				#reads_files = pull_from_SRA_directly.fastqs
-				reads_files = [remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2]
+				sample_name = sam_file,
+				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
 		}
 	}
-	
 }
