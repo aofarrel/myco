@@ -26,22 +26,12 @@ workflow myco {
 	scatter(data in zip(SRA_accessions, pull_from_SRA_directly.fastqs)) {
 		call clckwrk_map_reads.map_reads {
 			input:
+				unsorted_sam = true,
 				sample_name = data.left,
 				reads_files = data.right,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa",
-				reads_files = pull_from_SRA_directly.fastqs
-		}
-
-	} # output: map_reads.mapped_reads
-
-	scatter(sam_file in map_reads.mapped_reads) {
-		# TODO: replace with single file TSV if possible as that is much faster to localize
-		call clckwrk_rm_contam.remove_contam as remove_contamination {
-			input:
-				bam_in = sam_file,
-				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
+				ref_fasta_filename = "ref.fa"
+		} # output: map_reads.mapped_reads
 
 		call masker.make_mask_file {
 			input:
@@ -49,9 +39,16 @@ workflow myco {
 				min_coverage = min_coverage
 		}
 
+		# TODO: replace with single file TSV if possible as that is much faster to localize
+		call clckwrk_rm_contam.remove_contam as remove_contamination {
+			input:
+				bam_in = map_reads.mapped_reads,
+				metadata_tsv = ClockworkRefPrepTB.remove_contam_tsv,
+		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
+
 		call clckwrk_var_call.variant_call_one_sample {
 			input:
-				sample_name = sam_file,
+				sample_name = map_reads.mapped_reads,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
 		}
