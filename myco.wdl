@@ -7,6 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/ta
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
+import "https://raw.githubusercontent.com/aofarrel/tb_tree/add-wdl/pipelines/make_diff.wdl" as diff
 
 workflow myco {
 	input {
@@ -23,6 +24,7 @@ workflow myco {
 		}
 	} # output: pull_from_SRA_directly.fastqs
 
+	# TODO: Test if this can just be nested in the above scatter instead of being its own scatter
 	scatter(data in zip(SRA_accessions, pull_from_SRA_directly.fastqs)) {
 		call clckwrk_map_reads.map_reads {
 			input:
@@ -43,14 +45,19 @@ workflow myco {
 		call clckwrk_rm_contam.remove_contam as remove_contamination {
 			input:
 				bam_in = map_reads.mapped_reads,
-				metadata_tsv = ClockworkRefPrepTB.remove_contam_tsv,
+				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
 		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
 
-		call clckwrk_var_call.variant_call_one_sample {
+		call clckwrk_var_call.variant_call_one_sample as varcall {
 			input:
 				sample_name = map_reads.mapped_reads,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
+		} # output: varcall.vcf_final_call_set
+
+		call diff.make_diff {
+			input:
+				vcf = varcall.vcf_final_call_set
 		}
 	}
 }
