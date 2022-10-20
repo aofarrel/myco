@@ -55,9 +55,13 @@ workflow myco {
 				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
 		} # output: varcall.vcf_final_call_set
 
-		call diff.make_diff {
+		call diff.make_diff as diffmaker {
 			input:
 				vcf = varcall.vcf_final_call_set
 		}
+	}
+
+	output {
+		Array[File] diffs = diffmaker.diff
 	}
 }
