@@ -4,7 +4,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/wo
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/map_reads.wdl" as clckwrk_map_reads
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/rm_contam.wdl" as clckwrk_rm_contam
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/handle_odd_numbers/tasks/pull_from_SRA.wdl" as sranwrp
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
 import "https://raw.githubusercontent.com/aofarrel/tb_tree/add-wdl/pipelines/make_diff.wdl" as diff
@@ -46,7 +46,7 @@ workflow myco {
 			input:
 				bam_in = map_reads.mapped_reads,
 				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
-		} # output: remove_contam.decontaminated_fastq_1, remove_contam.decontaminated_fastq_2
+		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
 		call clckwrk_var_call.variant_call_one_sample as varcall {
 			input:
@@ -62,6 +62,12 @@ workflow myco {
 	}
 
 	output {
+		# outputting everything for debugging purposes
+		Array[File] sams  = map_reads.mapped_reads
+		Array[File] masks = make_mask_file.mask_file
+		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
+		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
+		Array[File] minos = varcall.vcf_final_call_set
 		Array[File] diffs = diffmaker.diff
 	}
 }
