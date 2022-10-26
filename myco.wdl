@@ -4,7 +4,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/wo
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/map_reads.wdl" as clckwrk_map_reads
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/rm_contam.wdl" as clckwrk_rm_contam
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/handle_odd_numbers/tasks/pull_from_SRA.wdl" as sranwrp
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/handle-odd-numbers/tasks/pull_from_SRA.wdl" as sranwrp
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
 import "https://raw.githubusercontent.com/aofarrel/tb_tree/add-wdl/pipelines/make_diff.wdl" as diff
@@ -23,9 +23,10 @@ workflow myco {
 				sra_accession = SRA_accession
 		}
 	} # output: pull_from_SRA_directly.fastqs
+	Array[Array[File]] pulled_fastqs = select_all(pull_from_SRA_directly.fastqs)
+	Array[String]      accessions    = select_all(pull_from_SRA_directly.sra_accession_out)
 
-	# TODO: Test if this can just be nested in the above scatter instead of being its own scatter
-	scatter(data in zip(SRA_accessions, pull_from_SRA_directly.fastqs)) {
+	scatter(data in zip(accessions, pulled_fastqs)) {
 		call clckwrk_map_reads.map_reads {
 			input:
 				unsorted_sam = true,
