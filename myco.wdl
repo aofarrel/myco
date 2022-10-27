@@ -65,7 +65,7 @@ workflow myco {
 	output {
 		# outputting everything for debugging purposes
 		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
-		Array[File] reads_mapped_to_H37Rv = 
+		Array[File] reads_mapped_to_H37Rv = varcall.mapped_to_ref
 		Array[File] masks = make_mask_file.mask_file
 		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
 		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
