@@ -27,34 +27,34 @@ workflow myco {
 	Array[String]      accessions    = select_all(pull_from_SRA_directly.sra_accession_out)
 
 	scatter(data in zip(accessions, pulled_fastqs)) {
-		call clckwrk_map_reads.map_reads {
+		call clckwrk_map_reads.map_reads as map_reads_for_decontam {
 			input:
 				unsorted_sam = true,
 				sample_name = data.left,
 				reads_files = data.right,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa"
-		} # output: map_reads.mapped_reads
-
-		call masker.make_mask_file {
-			input:
-				sam = map_reads.mapped_reads,
-				min_coverage = min_coverage
-		}
+		} # output: map_reads_for_decontam.mapped_reads
 
 		# TODO: replace with single file TSV if possible as that is much faster to localize
 		call clckwrk_rm_contam.remove_contam as remove_contamination {
 			input:
-				bam_in = map_reads.mapped_reads,
+				bam_in = map_reads_for_decontam.mapped_reads,
 				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
 		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
 		call clckwrk_var_call.variant_call_one_sample as varcall {
 			input:
-				sample_name = map_reads.mapped_reads,
+				sample_name = map_reads_for_decontam.mapped_reads,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
 		} # output: varcall.vcf_final_call_set
+
+		call masker.make_mask_file {
+			input:
+				sam = varcall.mapped_to_ref,
+				min_coverage = min_coverage
+		}
 
 		call diff.make_diff as diffmaker {
 			input:
@@ -64,7 +64,8 @@ workflow myco {
 
 	output {
 		# outputting everything for debugging purposes
-		Array[File] sams  = map_reads.mapped_reads
+		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
+		Array[File] reads_mapped_to_H37Rv = 
 		Array[File] masks = make_mask_file.mask_file
 		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
 		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
