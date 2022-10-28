@@ -24,14 +24,12 @@ workflow myco {
 		}
 	} # output: pull_from_SRA_directly.fastqs
 	Array[Array[File]] pulled_fastqs = select_all(pull_from_SRA_directly.fastqs)
-	Array[String]      accessions    = select_all(pull_from_SRA_directly.sra_accession_out)
 
-	scatter(data in zip(accessions, pulled_fastqs)) {
+	scatter(pulled_fastqs) {
 		call clckwrk_map_reads.map_reads as map_reads_for_decontam {
 			input:
 				unsorted_sam = true,
-				sample_name = data.left,
-				reads_files = data.right,
+				reads_files = pulled_fastqs,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa"
 		} # output: map_reads_for_decontam.mapped_reads
@@ -48,7 +46,7 @@ workflow myco {
 				sample_name = map_reads_for_decontam.mapped_reads,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
-		} # output: varcall.vcf_final_call_set
+		} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
 
 		call masker.make_mask_file {
 			input:
