@@ -21,15 +21,20 @@ workflow myco {
 		call sranwrp.pull_from_SRA_directly {
 			input:
 				sra_accession = SRA_accession
+		} # output: pull_from_SRA_directly.fastqs
+		
+		if(length(pull_from_SRA_directly.fastqs)>1) {
+				Array[File] paired_fastqs=select_all(pull_from_SRA_directly.fastqs)
 		}
-	} # output: pull_from_SRA_directly.fastqs
-	Array[Array[File]] pulled_fastqs = select_all(pull_from_SRA_directly.fastqs)
+	}
+	
+	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 
-	scatter(pulled_fastqs) {
+	scatter(pulled_fastq in pulled_fastqs) {
 		call clckwrk_map_reads.map_reads as map_reads_for_decontam {
 			input:
 				unsorted_sam = true,
-				reads_files = pulled_fastqs,
+				reads_files = pulled_fastq,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa"
 		} # output: map_reads_for_decontam.mapped_reads
