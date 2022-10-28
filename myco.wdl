@@ -52,7 +52,7 @@ workflow myco {
 
 		call masker.make_mask_file {
 			input:
-				sam = varcall.mapped_to_ref,
+				bam = varcall.mapped_to_ref,
 				min_coverage = min_coverage
 		}
 
