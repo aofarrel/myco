@@ -1,10 +1,10 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/map_reads.wdl" as clckwrk_map_reads
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/rm_contam.wdl" as clckwrk_rm_contam
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/sort-by-name/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/handle-odd-numbers/tasks/pull_from_SRA.wdl" as sranwrp
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/map_reads.wdl" as clckwrk_map_reads
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/rm_contam.wdl" as clckwrk_rm_contam
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-debugging-task/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
 import "https://raw.githubusercontent.com/aofarrel/tb_tree/add-wdl/pipelines/make_diff.wdl" as diff
@@ -46,33 +46,43 @@ workflow myco {
 				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
 		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
-		call clckwrk_var_call.variant_call_one_sample as varcall {
+		call clckwrk_var_call.variant_call_one_sample_cool as varcall {
 			input:
 				sample_name = map_reads_for_decontam.mapped_reads,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
 		} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
 
+	}
+
+	Array[File] minos_vcfs=select_all(varcall.vcf_final_call_set)
+	Array[File] bams_to_ref=select_all(varcall.mapped_to_ref)
+
+	scatter(bam_to_ref in bams_to_ref) {
 		call masker.make_mask_file {
 			input:
-				bam = varcall.mapped_to_ref,
+				bam = bam_to_ref,
 				min_coverage = min_coverage
 		}
+	}
 
+
+	scatter(minos_vcf in minos_vcfs) {
 		call diff.make_diff as diffmaker {
 			input:
-				vcf = varcall.vcf_final_call_set
+				vcf = minos_vcf
 		}
 	}
 
 	output {
 		# outputting everything for debugging purposes
 		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
-		Array[File] reads_mapped_to_H37Rv = varcall.mapped_to_ref
+		Array[File] reads_mapped_to_H37Rv = bams_to_ref
 		Array[File] masks = make_mask_file.mask_file
 		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
 		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
-		Array[File] minos = varcall.vcf_final_call_set
+		Array[File] minos = minos_vcfs
 		Array[File] diffs = diffmaker.diff
+		Array[File?] debug_error = varcall.debug_error
 	}
 }
