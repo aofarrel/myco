@@ -13,6 +13,7 @@ workflow myco {
 	input {
 		Array[String] SRA_accessions
 		Int min_coverage
+		Boolean? skip_decontamination = false
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -30,33 +31,47 @@ workflow myco {
 	
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 
-	scatter(pulled_fastq in pulled_fastqs) {
-		call clckwrk_map_reads.map_reads as map_reads_for_decontam {
-			input:
-				unsorted_sam = true,
-				reads_files = pulled_fastq,
-				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa"
-		} # output: map_reads_for_decontam.mapped_reads
+	if(!skip_decontamination) {
+		scatter(pulled_fastq in pulled_fastqs) {
+			call clckwrk_map_reads.map_reads as map_reads_for_decontam {
+				input:
+					unsorted_sam = true,
+					reads_files = pulled_fastq,
+					tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
+					ref_fasta_filename = "ref.fa"
+			} # output: map_reads_for_decontam.mapped_reads
 
-		# TODO: replace with single file TSV if possible as that is much faster to localize
-		call clckwrk_rm_contam.remove_contam as remove_contamination {
-			input:
-				bam_in = map_reads_for_decontam.mapped_reads,
-				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
-		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
+			# TODO: replace with single file TSV if possible as that is much faster to localize
+			call clckwrk_rm_contam.remove_contam as remove_contamination {
+				input:
+					bam_in = map_reads_for_decontam.mapped_reads,
+					tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
+			} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
-		call clckwrk_var_call.variant_call_one_sample_cool as varcall {
-			input:
-				sample_name = map_reads_for_decontam.mapped_reads,
-				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
-		} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
+			call clckwrk_var_call.variant_call_one_sample_cool as varcall {
+				input:
+					sample_name = map_reads_for_decontam.mapped_reads,
+					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+					reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
+			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
 
+		}
 	}
 
-	Array[File] minos_vcfs=select_all(varcall.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(varcall.mapped_to_ref)
+	if(skip_decontamination) {
+		scatter(pulled_fastq in pulled_fastqs) {
+			call clckwrk_var_call.variant_call_one_sample_cool as varcall_no_decontam {
+				input:
+					sample_name = map_reads_for_decontam.mapped_reads,
+					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+					reads_files = pulled_fastq
+			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
+
+		}
+	}
+
+	Array[File] minos_vcfs=select_all(select_first([varcall_no_decontam.vcf_final_call_set, varcall.vcf_final_call_set])
+	Array[File] bams_to_ref=select_all(select_first([varcall_no_decontam.mapped_to_ref, varcall.mapped_to_ref)
 
 	scatter(bam_to_ref in bams_to_ref) {
 		call masker.make_mask_file {
