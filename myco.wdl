@@ -13,7 +13,7 @@ workflow myco {
 	input {
 		Array[String] SRA_accessions
 		Int min_coverage
-		Boolean? skip_decontamination = false
+		Boolean skip_decontamination = false
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -62,7 +62,7 @@ workflow myco {
 		scatter(pulled_fastq in pulled_fastqs) {
 			call clckwrk_var_call.variant_call_one_sample_cool as varcall_no_decontam {
 				input:
-					sample_name = map_reads_for_decontam.mapped_reads,
+					sample_name = basename(pulled_fastq[0], ".fq"),
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = pulled_fastq
 			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
@@ -70,8 +70,8 @@ workflow myco {
 		}
 	}
 
-	Array[File] minos_vcfs=select_all(select_first([varcall_no_decontam.vcf_final_call_set, varcall.vcf_final_call_set])
-	Array[File] bams_to_ref=select_all(select_first([varcall_no_decontam.mapped_to_ref, varcall.mapped_to_ref)
+	Array[File] minos_vcfs=select_all(select_first([varcall_no_decontam.vcf_final_call_set, varcall.vcf_final_call_set]))
+	Array[File] bams_to_ref=select_all(select_first([varcall_no_decontam.mapped_to_ref, varcall.mapped_to_ref]))
 
 	scatter(bam_to_ref in bams_to_ref) {
 		call masker.make_mask_file {
@@ -91,13 +91,13 @@ workflow myco {
 
 	output {
 		# outputting everything for debugging purposes
-		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
+		Array[File]? reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
 		Array[File] reads_mapped_to_H37Rv = bams_to_ref
 		Array[File] masks = make_mask_file.mask_file
-		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
-		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
+		Array[File]? dcnfq1= remove_contamination.decontaminated_fastq_1
+		Array[File]? dcnfq2= remove_contamination.decontaminated_fastq_2
 		Array[File] minos = minos_vcfs
 		Array[File] diffs = diffmaker.diff
-		Array[File?] debug_error = varcall.debug_error
+		Array[File?] debug_error = select_first([varcall.debug_error, varcall_no_decontam.debug_error])
 	}
 }
