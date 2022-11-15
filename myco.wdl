@@ -7,7 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-de
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
-import "https://raw.githubusercontent.com/aofarrel/tb_tree/add-wdl/pipelines/make_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 
 workflow myco {
 	input {
@@ -64,13 +64,13 @@ workflow myco {
 				bam = bam_to_ref,
 				min_coverage = min_coverage
 		}
-	}
 
-
-	scatter(minos_vcf in minos_vcfs) {
-		call diff.make_diff as diffmaker {
-			input:
-				vcf = minos_vcf
+		scatter(minos_vcf in minos_vcfs) {
+			call diff.make_diff as diffmaker {
+				input:
+					vcf = minos_vcf,
+					tbmf = make_mask_file.mask_file
+			}
 		}
 	}
 
@@ -82,7 +82,7 @@ workflow myco {
 		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
 		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
 		Array[File] minos = minos_vcfs
-		Array[File] diffs = diffmaker.diff
+		Array[Array[File]] diffs = diffmaker.diff
 		Array[File?] debug_error = varcall.debug_error
 	}
 }
