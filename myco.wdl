@@ -26,9 +26,7 @@ workflow myco {
 	scatter(biosample_accession in get_sample_IDs.accessions) {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
-				biosample_accession = biosample_accession,
-				disk_size = disk_size,
-				preempt = preempt
+				biosample_accession = biosample_accession
 		} # output: pull.fastqs
 
 		if(length(pull.fastqs)>1) {

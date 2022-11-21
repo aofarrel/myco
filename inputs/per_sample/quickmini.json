@@ -1,0 +1,7 @@
+{
+  "myco.biosample_accessions": "./samples.txt",
+  "myco.min_coverage": 30,
+  "myco.ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw": "/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.download.tar",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.H37Rv.tar",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.remove_contam.tar"
+}
