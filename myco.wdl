@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-debugging-task/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/map_reads.wdl" as clckwrk_map_reads
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/fix-sample-name/tasks/map_reads.wdl" as clckwrk_map_reads
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/rm_contam.wdl" as clckwrk_rm_contam
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-debugging-task/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/bioproject_stuff/tasks/pull_fastqs.wdl" as sranwrp_pull
@@ -13,6 +13,7 @@ import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl
 workflow myco {
 	input {
 		File biosample_accessions
+		File typical_tb_masked_regions
 		Int min_coverage
 	}
 
@@ -65,19 +66,14 @@ workflow myco {
 	Array[File] minos_vcfs=select_all(varcall.vcf_final_call_set)
 	Array[File] bams_to_ref=select_all(varcall.mapped_to_ref)
 
-	scatter(bam_to_ref in bams_to_ref) {
-		call masker.make_mask_file {
-			input:
-				bam = bam_to_ref,
-				min_coverage = min_coverage
-		}
 
-		scatter(minos_vcf in minos_vcfs) {
-			call diff.make_diff as diffmaker {
-				input:
-					vcf = minos_vcf,
-					tbmf = make_mask_file.mask_file
-			}
+	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
+		call diff.make_mask_and_diff {
+			input:
+				bam = vcfs_and_bams.left,
+				vcf = vcfs_and_bams.right,
+				min_coverage = min_coverage,
+				tbmf = typical_tb_masked_regions
 		}
 	}
 
@@ -85,11 +81,11 @@ workflow myco {
 		# outputting everything for debugging purposes
 		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
 		Array[File] reads_mapped_to_H37Rv = bams_to_ref
-		Array[File] masks = make_mask_file.mask_file
 		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
 		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
 		Array[File] minos = minos_vcfs
-		Array[Array[File]] diffs = diffmaker.diff
-		Array[File?] debug_error = varcall.debug_error
+		Array[File] masks = make_mask_and_diff.mask_file
+		Array[File] diffs = make_mask_and_diff.diff
+		Array[File?] debug_error_varcall = varcall.debug_error
 	}
 }
