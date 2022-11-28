@@ -1,7 +1,5 @@
 # myco 🍄
- Draft repository that will someday do things.
+myco is a WIP pipeline built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
 
-## Inputs
- Inputs are explained in the WDL's parameter_meta. Note that fastqs and samples are indexed by the order they are input -- put a given sample at the same index as its files, because the task that works on these things takes the dot-product of both arrays.
-
- ![diagram explaining that that string at index 0 of the sample array needs to correspond with the array of files at index 0 of the array of file arrays](./doc/fastqs_and_samples.png)
+## Running myco
+The currenly recommended way to run myco is on Terra, a cloud-computing resource which uses Google as its backend. However, it also runs as-is on local machines. See [running_myco.md](./running_myco.md) for instructions.
