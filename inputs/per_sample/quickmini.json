@@ -1,5 +1,5 @@
 {
-  "myco.biosample_accessions": "./samples.txt",
+  "myco.biosample_accessions": "./edgecase_samples.txt",
   "myco.min_coverage": 30,
   "myco.tbmf": "/Users/ash/Documents/aaa_test_files/tb/Hicksetal2018_genomicRegionsRemoved.bed",
   "myco.ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw": "/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.download.tar",

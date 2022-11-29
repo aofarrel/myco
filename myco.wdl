@@ -1,9 +1,9 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/map_reads.wdl" as clckwrk_map_reads
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/rm_contam.wdl" as clckwrk_rm_contam
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-debugging-task/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/map_reads.wdl" as clckwrk_map_reads
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/rm_contam.wdl" as clckwrk_rm_contam
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
@@ -54,7 +54,7 @@ workflow myco {
 				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
 		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
-		call clckwrk_var_call.variant_call_one_sample_cool as varcall {
+		call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
 			input:
 				sample_name = map_reads_for_decontam.mapped_reads,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
