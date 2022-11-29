@@ -96,11 +96,11 @@ workflow myco {
 		# outputting everything for debugging purposes
 		Array[File]? reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
 		Array[File] reads_mapped_to_H37Rv = bams_to_ref
-		Array[File] masks = make_mask_file.mask_file
 		Array[File]? dcnfq1= remove_contamination.decontaminated_fastq_1
 		Array[File]? dcnfq2= remove_contamination.decontaminated_fastq_2
 		Array[File] minos = minos_vcfs
-		Array[File] diffs = diffmaker.diff
+		Array[File] masks = make_mask_and_diff.mask_file
+		Array[File] diffs = make_mask_and_diff.diff
 		Array[File?] debug_error = select_first([varcall.debug_error, varcall_no_decontam.debug_error])
 	}
 }
