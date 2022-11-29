@@ -1,33 +1,41 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-debugging-task/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/map_reads.wdl" as clckwrk_map_reads
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/rm_contam.wdl" as clckwrk_rm_contam
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/add-var-call-debugging-task/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_from_SRA.wdl" as sranwrp
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/map_reads.wdl" as clckwrk_map_reads
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/rm_contam.wdl" as clckwrk_rm_contam
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
-import "https://raw.githubusercontent.com/aofarrel/tb_tree/add-wdl/pipelines/make_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 
 workflow myco {
 	input {
-		Array[String] SRA_accessions
+		File biosample_accessions
+		File typical_tb_masked_regions
 		Int min_coverage
 		Boolean skip_decontamination = false
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
 
-	scatter(SRA_accession in SRA_accessions) {
-		call sranwrp.pull_from_SRA_directly {
-			input:
-				sra_accession = SRA_accession
-		} # output: pull_from_SRA_directly.fastqs
-		
-		if(length(pull_from_SRA_directly.fastqs)>1) {
-				Array[File] paired_fastqs=select_all(pull_from_SRA_directly.fastqs)
-		}
+	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
+		input:
+			accessions_file = biosample_accessions
 	}
+
+	scatter(biosample_accession in get_sample_IDs.accessions) {
+		call sranwrp_pull.pull_fq_from_biosample as pull {
+			input:
+				biosample_accession = biosample_accession
+		} # output: pull.fastqs
+
+		if(length(pull.fastqs)>1) {
+    		Array[File] paired_fastqs=select_all(pull.fastqs)
+  		}
+	}
+
 	
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 
@@ -48,7 +56,7 @@ workflow myco {
 					tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
 			} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
-			call clckwrk_var_call.variant_call_one_sample_cool as varcall {
+			call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
 				input:
 					sample_name = map_reads_for_decontam.mapped_reads,
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
@@ -60,7 +68,7 @@ workflow myco {
 
 	if(skip_decontamination) {
 		scatter(pulled_fastq in pulled_fastqs) {
-			call clckwrk_var_call.variant_call_one_sample_cool as varcall_no_decontam {
+			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_no_decontam {
 				input:
 					sample_name = basename(pulled_fastq[0], ".fq"),
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
@@ -73,19 +81,14 @@ workflow myco {
 	Array[File] minos_vcfs=select_all(select_first([varcall_no_decontam.vcf_final_call_set, varcall.vcf_final_call_set]))
 	Array[File] bams_to_ref=select_all(select_first([varcall_no_decontam.mapped_to_ref, varcall.mapped_to_ref]))
 
-	scatter(bam_to_ref in bams_to_ref) {
-		call masker.make_mask_file {
-			input:
-				bam = bam_to_ref,
-				min_coverage = min_coverage
-		}
-	}
 
-
-	scatter(minos_vcf in minos_vcfs) {
-		call diff.make_diff as diffmaker {
+	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
+		call diff.make_mask_and_diff {
 			input:
-				vcf = minos_vcf
+				bam = vcfs_and_bams.left,
+				vcf = vcfs_and_bams.right,
+				min_coverage = min_coverage,
+				tbmf = typical_tb_masked_regions
 		}
 	}
 
