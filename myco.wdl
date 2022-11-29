@@ -15,6 +15,7 @@ workflow myco {
 		File biosample_accessions
 		File typical_tb_masked_regions
 		Int min_coverage
+		Boolean skip_decontamination = false
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -38,33 +39,47 @@ workflow myco {
 	
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 
-	scatter(pulled_fastq in pulled_fastqs) {
-		call clckwrk_map_reads.map_reads as map_reads_for_decontam {
-			input:
-				unsorted_sam = true,
-				reads_files = pulled_fastq,
-				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa"
-		} # output: map_reads_for_decontam.mapped_reads
+	if(!skip_decontamination) {
+		scatter(pulled_fastq in pulled_fastqs) {
+			call clckwrk_map_reads.map_reads as map_reads_for_decontam {
+				input:
+					unsorted_sam = true,
+					reads_files = pulled_fastq,
+					tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
+					ref_fasta_filename = "ref.fa"
+			} # output: map_reads_for_decontam.mapped_reads
 
-		# TODO: replace with single file TSV if possible as that is much faster to localize
-		call clckwrk_rm_contam.remove_contam as remove_contamination {
-			input:
-				bam_in = map_reads_for_decontam.mapped_reads,
-				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
-		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
+			# TODO: replace with single file TSV if possible as that is much faster to localize
+			call clckwrk_rm_contam.remove_contam as remove_contamination {
+				input:
+					bam_in = map_reads_for_decontam.mapped_reads,
+					tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
+			} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
 
-		call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
-			input:
-				sample_name = map_reads_for_decontam.mapped_reads,
-				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
-		} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
+			call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
+				input:
+					sample_name = map_reads_for_decontam.mapped_reads,
+					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+					reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
+			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
 
+		}
 	}
 
-	Array[File] minos_vcfs=select_all(varcall.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(varcall.mapped_to_ref)
+	if(skip_decontamination) {
+		scatter(pulled_fastq in pulled_fastqs) {
+			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_no_decontam {
+				input:
+					sample_name = basename(pulled_fastq[0], ".fq"),
+					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+					reads_files = pulled_fastq
+			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
+
+		}
+	}
+
+	Array[File] minos_vcfs=select_all(select_first([varcall_no_decontam.vcf_final_call_set, varcall.vcf_final_call_set]))
+	Array[File] bams_to_ref=select_all(select_first([varcall_no_decontam.mapped_to_ref, varcall.mapped_to_ref]))
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
@@ -79,13 +94,13 @@ workflow myco {
 
 	output {
 		# outputting everything for debugging purposes
-		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
+		Array[File]? reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
 		Array[File] reads_mapped_to_H37Rv = bams_to_ref
-		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
-		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
+		Array[File]? dcnfq1= remove_contamination.decontaminated_fastq_1
+		Array[File]? dcnfq2= remove_contamination.decontaminated_fastq_2
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File] diffs = make_mask_and_diff.diff
-		Array[File?] debug_error_varcall = varcall.debug_error
+		Array[File?] debug_error = select_first([varcall.debug_error, varcall_no_decontam.debug_error])
 	}
 }
