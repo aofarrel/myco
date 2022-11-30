@@ -1,12 +1,13 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/map_reads.wdl" as clckwrk_map_reads
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/rm_contam.wdl" as clckwrk_rm_contam
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+#import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/combo_decontam/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "../clockwork-wdl/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/tasks/map_reads.wdl" as clckwrk_map_reads
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/tasks/rm_contam.wdl" as clckwrk_rm_contam
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/enaBrowserTools-wdl/0.0.4/tasks/enaDataGet.wdl" as ena
 import "https://raw.githubusercontent.com/aofarrel/mask-by-coverage/main/mask-by-coverage.wdl" as masker
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 
@@ -39,26 +40,19 @@ workflow myco {
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 
 	scatter(pulled_fastq in pulled_fastqs) {
-		call clckwrk_map_reads.map_reads as map_reads_for_decontam {
+		call clckwrk_combonation.combined_decontamination_single as decontaminate_single_task {
 			input:
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa"
-		} # output: map_reads_for_decontam.mapped_reads
-
-		# TODO: replace with single file TSV if possible as that is much faster to localize
-		call clckwrk_rm_contam.remove_contam as remove_contamination {
-			input:
-				bam_in = map_reads_for_decontam.mapped_reads,
-				tarball_metadata_tsv = ClockworkRefPrepTB.tar_indexd_dcontm_ref
-		} # output: remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2
+		}
 
 		call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
 			input:
-				sample_name = map_reads_for_decontam.mapped_reads,
+				sample_name = decontaminate_single_task.sample_name,
 				ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-				reads_files = [remove_contamination.decontaminated_fastq_1, remove_contamination.decontaminated_fastq_2]
+				reads_files = [decontaminate_single_task.decontaminated_fastq_1, decontaminate_single_task.decontaminated_fastq_2]
 		} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
 
 	}
@@ -79,10 +73,10 @@ workflow myco {
 
 	output {
 		# outputting everything for debugging purposes
-		Array[File] reads_mapped_to_decontam  = map_reads_for_decontam.mapped_reads
+		Array[File] reads_mapped_to_decontam  = decontaminate_single_task.mapped_reads
 		Array[File] reads_mapped_to_H37Rv = bams_to_ref
-		Array[File] dcnfq1= remove_contamination.decontaminated_fastq_1
-		Array[File] dcnfq2= remove_contamination.decontaminated_fastq_2
+		Array[File] dcnfq1= decontaminate_single_task.decontaminated_fastq_1
+		Array[File] dcnfq2= decontaminate_single_task.decontaminated_fastq_2
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File] diffs = make_mask_and_diff.diff
