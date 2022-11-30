@@ -1,8 +1,8 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-#import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/combo_decontam/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "../clockwork-wdl/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/combo_decontam/tasks/combined_decontamination.wdl" as clckwrk_combonation
+#import "../clockwork-wdl/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/tasks/map_reads.wdl" as clckwrk_map_reads
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/tasks/rm_contam.wdl" as clckwrk_rm_contam
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
