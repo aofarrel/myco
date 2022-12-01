@@ -4,17 +4,17 @@
 
 ### On Terra
 These instructions assume you already have an account on Terra and [a billing project set up](https://support.terra.bio/hc/en-us/articles/360026182251-How-to-set-up-billing-in-Terra).
-1. Go to myco's page on Dockstore
-2. Click the button on the right hand side to import into Terra
-3. Select which Terra workspace you wish to import into, or select a new one
-4. Go to the workflow tab, select myco, and run your workflow
+1. [Go to myco's page on Dockstore](https://dockstore.org/workflows/github.com/aofarrel/myco/myco:main?tab=info)
+2. On the right hand side of the Dockstore entry, select Terra under the heading "Launch with" ![screenshot of launch with UI in Dockstore](doc/launch_with.png)
+3. Select which Terra workspace you wish to import into, or create a new one -- you'll then be taken to Terra
+4. In Terra, go to the workflow tab (it's on the top below the bright green header bar), select myco, and run your workflow
 
-Note: It is also possible to run myco by simply copy-pasting the WDL via the Broad Methods Repository, but doing this will not transfer over git versioning, nor will your copy of the workflow keep up-to-date automatically.
+Note: It is also possible to run myco by copy-pasting the WDL via the Broad Methods Repository, but doing this will not transfer over git versioning, nor will your copy of the workflow keep up-to-date automatically.
 
 ### On a local machine (ie: your laptop)
-[miniwdl](https://github.com/chanzuckerberg/miniwdl) generally works best for running myco locally, as it seems to handle local resources better than Cromwell (ie, doesn't crash the Docker daemon). Since this WDL uses mv commands on input files, you'll need to use the --copy-input-files option.
+[miniwdl](https://github.com/chanzuckerberg/miniwdl) generally works best for running myco locally, as it seems to handle local resources better than Cromwell (ie, doesn't crash the Docker daemon). Since this WDL uses mv commands on input files, you'll need to use the --copy-input-files option (and if you're debugging, you may want to throw in --verbose too).
 
-`miniwdl run myco.wdl --copy-input-files -i input/per_sample/quickmini.json`
+`miniwdl run myco.wdl -i input/per_sample/quickmini.json --copy-input-files`
 
 Cromwell is what Terra uses on the backend, so if you want are debugging for Terra, I recommend using the Docktore CLI or latest version of Cromwell.
 
