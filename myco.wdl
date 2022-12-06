@@ -80,11 +80,15 @@ workflow myco {
 				ref_fasta_filename = "ref.fa"
 		} # output: decontaminate_many_samples.tarballs_of_decontaminated_reads
 
-		scatter(tarball in decontaminate_many_samples.tarballs_of_decontaminated_reads) {
+		# this should not be necessary but there is a weird bug where the decontamination ref
+		# is getting passed in
+		Array[File] decon_reads = decontaminate_many_samples.tarballs_of_decontaminated_reads
+
+		scatter(why_is_this_not_working in decon_reads) {
 			call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-					tarball_of_reads_files = tarball
+					tarball_of_reads_files = why_is_this_not_working
 			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
 		}
 
