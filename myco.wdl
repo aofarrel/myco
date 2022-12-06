@@ -51,12 +51,12 @@ workflow myco {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = [decontaminate_one_sample.decontaminated_fastq_1, decontaminate_one_sample.decontaminated_fastq_2]
-			} # output: varcall_with_tarballs.vcf_final_call_set, varcall_with_tarballs.mapped_to_ref
+			} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
 
 		}
 
-		Array[File] minos_vcfs_=select_all(varcall_with_tarballs.vcf_final_call_set)
-		Array[File] bams_to_ref_=select_all(varcall_with_tarballs.mapped_to_ref)
+		Array[File] minos_vcfs_=select_all(varcall_with_array.vcf_final_call_set)
+		Array[File] bams_to_ref_=select_all(varcall_with_array.mapped_to_ref)
 
 
 		scatter(vcfs_and_bams in zip(bams_to_ref_, minos_vcfs_)) {
@@ -79,21 +79,17 @@ workflow myco {
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa"
 		} # output: decontaminate_many_samples.tarballs_of_decontaminated_reads
-
-		# this should not be necessary but there is a weird bug where the decontamination ref
-		# is getting passed in
-		Array[File] decon_reads = decontaminate_many_samples.tarballs_of_decontaminated_reads
-
-		scatter(why_is_this_not_working in decon_reads) {
+		
+		scatter(one_sample in decontaminate_many_samples.tarballs_of_decontaminated_reads) {
 			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_tarballs {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-					tarball_of_reads_files = why_is_this_not_working
-			} # output: varcall.vcf_final_call_set, varcall.mapped_to_ref
+					tarball_of_reads_files = one_sample
+			} # output: varcall_with_tarballs.vcf_final_call_set, varcall_with_tarballs.mapped_to_ref
 		}
 
-		Array[File] minos_vcfs=select_all(varcall.vcf_final_call_set)
-		Array[File] bams_to_ref=select_all(varcall.mapped_to_ref)
+		Array[File] minos_vcfs=select_all(varcall_with_tarballs.vcf_final_call_set)
+		Array[File] bams_to_ref=select_all(varcall_with_tarballs.mapped_to_ref)
 
 
 		scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
@@ -117,6 +113,6 @@ workflow myco {
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
-		Array[Array[File?]] debug_error_varcall = select_all([varcall.debug_error, varcall_with_tarballs.debug_error])
+		Array[Array[File?]] debug_error_varcall = select_all([varcall_with_array.debug_error, varcall_with_tarballs.debug_error])
 	}
 }
