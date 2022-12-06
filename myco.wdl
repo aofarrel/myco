@@ -47,7 +47,7 @@ workflow myco {
 					ref_fasta_filename = "ref.fa"
 			}
 
-			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_tarballs {
+			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_array {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = [decontaminate_one_sample.decontaminated_fastq_1, decontaminate_one_sample.decontaminated_fastq_2]
@@ -85,7 +85,7 @@ workflow myco {
 		Array[File] decon_reads = decontaminate_many_samples.tarballs_of_decontaminated_reads
 
 		scatter(why_is_this_not_working in decon_reads) {
-			call clckwrk_var_call.variant_call_one_sample_verbose as varcall {
+			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_tarballs {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					tarball_of_reads_files = why_is_this_not_working
