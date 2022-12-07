@@ -5,7 +5,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.2.0/tasks/com
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.2.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/improve-pull/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.0/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/Stuart-WDL/segment_scatter/segfault.wdl" as segment
+import "https://raw.githubusercontent.com/aofarrel/Stuart-WDL/segment_scatter/segfault.wdl" as seg
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 
 workflow myco {
@@ -14,7 +14,7 @@ workflow myco {
 		File typical_tb_masked_regions
 		Int min_coverage
 		Boolean less_scattering = true
-		Int? n_segments
+		Int n_segments = 10
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -72,15 +72,26 @@ workflow myco {
 
 	if(less_scattering) {
 		Array[File] tarball_paired_fastqs=select_all(pull.tarball_fastqs)
-		call clckwrk_combonation.combined_decontamination_multiple as decontaminate_many_samples {
+
+		call seg.segfault {
 			input:
-				unsorted_sam = true,
-				tarballs_of_read_files = tarball_paired_fastqs,
-				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa"
-		} # output: decontaminate_many_samples.tarballs_of_decontaminated_reads
+				inputs = tarball_paired_fastqs,
+				n_segments = n_segments
+		} # output: segfault.segments
+
+		scatter(segment in segfault.segments) {
+			call clckwrk_combonation.combined_decontamination_multiple as decontaminate_many_samples {
+				input:
+					unsorted_sam = true,
+					tarballs_of_read_files = segment,
+					tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
+					ref_fasta_filename = "ref.fa"
+			} # output: decontaminate_many_samples.tarballs_of_decontaminated_reads
+		}
+
+		Array[File] decontaminated_reads = flatten(decontaminate_many_samples.tarballs_of_decontaminated_reads)
 		
-		scatter(one_sample in decontaminate_many_samples.tarballs_of_decontaminated_reads) {
+		scatter(one_sample in decontaminated_reads) {
 			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_tarballs {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
