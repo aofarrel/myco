@@ -12,7 +12,8 @@ workflow myco {
 		File biosample_accessions
 		File typical_tb_masked_regions
 		Int min_coverage
-		Boolean less_scattering = true
+		Boolean tar_outputs = true
+		Boolean less_scattering = false
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -26,7 +27,7 @@ workflow myco {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
-				tar_outputs = less_scattering
+				tar_outputs = tar_outputs
 		} # output: pull.fastqs OR pulltarball_fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
