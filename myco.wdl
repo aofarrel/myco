@@ -36,7 +36,7 @@ workflow myco {
 	}
 
 	if(!less_scattering) {
-		Array[Array[File]] pulled_fastqs   = select_all(paired_fastqs)
+		Array[File] tarball_paired_fastqs=select_all(pull.tarball_fastqs)
 		scatter(pulled_fastq in pulled_fastqs) {
 			call clckwrk_combonation.combined_decontamination_single as decontaminate_one_sample {
 				input:
