@@ -28,16 +28,15 @@ workflow myco {
 			input:
 				biosample_accession = biosample_accession,
 				tar_outputs = tar_outputs
-		} # output: pull.fastqs OR pulltarball_fastqs
+		} # output: pull.fastqs OR pull.tarball_fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
   		}
-
 	}
 
 	if(!less_scattering) {
-		Array[File] tarball_paired_fastqs_=select_all(pull.tarball_fastqs)
-		scatter(pulled_fastq in tarball_paired_fastqs_) {
+		Array[Array[File]] pulled_fastqs   = select_all(paired_fastqs)
+		scatter(pulled_fastq in pulled_fastqs) {
 			call clckwrk_combonation.combined_decontamination_single as decontaminate_one_sample {
 				input:
 					unsorted_sam = true,
@@ -46,7 +45,7 @@ workflow myco {
 					ref_fasta_filename = "ref.fa"
 			}
 
-			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_array {
+			call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = [decontaminate_one_sample.decontaminated_fastq_1, decontaminate_one_sample.decontaminated_fastq_2]
@@ -112,6 +111,5 @@ workflow myco {
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
-		Array[Array[File?]] debug_error_varcall = select_all([varcall_with_array.debug_error, varcall_with_tarballs.debug_error])
 	}
 }
