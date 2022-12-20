@@ -1,9 +1,9 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.2/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.3/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.2/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/0.99.0/vcf_to_diff.wdl" as diff
 
@@ -12,7 +12,7 @@ workflow myco {
 		File biosample_accessions
 		File typical_tb_masked_regions
 		Int min_coverage
-		Boolean tar_outputs = true
+		Boolean tar_outputs = false
 		Boolean less_scattering = false
 	}
 
@@ -32,6 +32,11 @@ workflow myco {
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
   		}
+	}
+
+	call sranwrp_processing.cat_files as cat_reports {
+		input:
+			files = pull.results
 	}
 
 	if(!less_scattering) {
@@ -111,5 +116,6 @@ workflow myco {
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
+		File pull_report = cat_reports.outfile
 	}
 }
