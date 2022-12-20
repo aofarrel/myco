@@ -1,5 +1,11 @@
 # Running myco
 
+## Inputs
+* samples: Text file listing BioSample accessions to pull reads from. Each line should have only one accession. SRS, SAM, ERS, and integer inputs are all supported. [Here's a bunch of sample files you can use!](https://github.com/aofarrel/SRANWRP/tree/main/inputs/quick_tests)
+* min_coverage: Minimum coverage required to show up in the final diff file
+* typical_tb_masked_regions: Currently we're using [this mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/43ec21319209b23f648f32e4868bdf07cf09f2a0/R00000039_repregions.bed) but you could insert your own.
+* less_scattering: Set to `true` to prevent the decontamination process from executing as a scattered task. This is usually not recommend.
+
 ## Backends
 
 ### On Terra
@@ -18,16 +24,11 @@ You will need:
 * Docker Engine or Docker Desktop
   * if you are on a Linux machine, it is advised *not* to use Docker Desktop -- use Docker Engine instead
 
-miniwdl generally works best for running myco locally, as it seems to handle local resources better than Cromwell (ie, doesn't crash the Docker daemon). Since this WDL uses mv commands on input files, you'll need to use the --copy-input-files option (and if you're debugging, you may want to throw in --verbose too).
+miniwdl generally works best for running myco locally, as it seems to handle local resources better than Cromwell (ie, doesn't crash the Docker daemon). Since this WDL uses mv commands on input files, you **must** use the --copy-input-files option, or else you will get "device or resource busy" errors.
 
 `miniwdl run myco.wdl -i input/per_sample/quickmini.json --copy-input-files`
 
-Cromwell is what Terra uses on the backend, so if you want are debugging locally in preparation for a big Terra run, I recommend using the Docktore CLI or latest version of Cromwell.
+Cromwell is what Terra uses on the backend, so if you want are debugging locally in preparation for a big Terra run, I recommend using the Docktore CLI or latest version of Cromwell. These tools copy input files by default, so you can just run this workflow the same way you would any other.
 
 ### On an HPC
 Like most WDLs, myco uses a Docker image. However, many (not all) institutes do not allow Docker to run on their HPC systems for security reasons. Strictly speaking, [there are ways](https://docs.dockstore.org/en/stable/advanced-topics/docker-alternatives.html) to get around this limitation, but we cannot provide support for HPC users whose HPC administrators do not allow for running Docker images.
-
-## Inputs
-* samples: Text file listing BioSample accessions to pull reads from. Each line should have only one accession. SRS, SAM, ERS, and integer inputs are all supported. [Here's a bunch of sample files you can use!](https://github.com/aofarrel/SRANWRP/tree/main/inputs/quick_tests)
-* min_coverage: Minimum coverage required to show up in the final diff file
-* typical_tb_masked_regions: Currently we're using [this mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/43ec21319209b23f648f32e4868bdf07cf09f2a0/R00000039_repregions.bed) but you could insert your own.
