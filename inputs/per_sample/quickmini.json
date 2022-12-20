@@ -1,5 +1,5 @@
 {
-  "myco.biosample_accessions": "./inputs/per_sample/1_sample.txt",
+  "myco.biosample_accessions": "../SRANWRP/inputs/quick_tests/tricky.txt",
   "myco.min_coverage": 30,
   "myco.typical_tb_masked_regions": "/Users/ash/Documents/aaa_test_files/tb/Hicksetal2018_genomicRegionsRemoved.bed",
   "myco.ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw": "/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.download.tar",
