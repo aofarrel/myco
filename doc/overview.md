@@ -1,6 +1,9 @@
 # myco: An overview
 
-## [1] clockwork Reference Prepare
+![Flowchart of myco](myco_flowchart.jpg)
+
+
+## [1a] clockwork Reference Prepare
 Runs my implementation of [clockwork's reference preparation standards](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#get-and-index-reference-genomes):
 1. Download TB reference files
 2. Index the decontamination reference
@@ -27,32 +30,24 @@ This is a deterministic subworkflow, and Cromwell allows for cacheing of previou
 * ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref
 * ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref
 
-## [2] Extract BioSample accessions from input file
+## [1b] Extract BioSample accessions from input file
 The user is expected to input a text containing BioSample accessions. This task grabs all unique lines in that file and outputs an Array[String] of BioSample accessions.
 
-## scatter: each instance gets one BioSample accession
-
-### [3] Pull fastqs for the BioSample accession
+### [2] Pull fastqs for the BioSample accession
 This task pulls all fastqs for a given BioSample accession using [sra-tools](https://github.com/ncbi/sra-tools). One sample might have multiple accessions; all of them are pulled. Once pulled, my script attempts to remove everything that is not a set of paired fastqs. 
 
 For example, let's say this task got SAMN08436121. This has only one associated with it: SRR6650260. Pulling that yields three files: SRR6650260_1.fastq, SRR6650260_2.fastq, and SRR6650260.fastq. Only SRR6650260_1.fastq and SRR6650260_2.fastq will be returned.
 
-## leave the previous scatter
-There are some samples that return no valid fastqs. Because of that, we need to leave this scatter and use WDL built-in `select_all()` on our pull task's gathered output before continuing.
+## [3] Prepare a report of the results of the pull task
+There are some samples that return no valid fastqs. This task keep track of every sample's run accessions, and the result of trying to pull fastqs from each run accession.
 
 ## [4] Decontaminate
-Based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#decontaminate-the-reads), which runs clockwork map_reads and clockwork remove_contam. I have combined these two calls into one WDL task that can run on multiple samples at once.
+Based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#decontaminate-the-reads), which runs clockwork map_reads and clockwork remove_contam. I have combined these two calls into one WDL task that can run on multiple samples at once. The output is a group of decontaminated fastq files.
 
-Running on more than one sample at a time may not always be the most economical tradeoff, so testing is currently underway to determine if it is better to scatter this task, and if so, to what extent.
-
-## scatter: each instance gets a tarball representing one BioSample accession's decontaminated fastqs
+This task can be run either one-sample-at-a-time or all at once, depending on the input less_scattering.
 
 ### [5] Call variants
-Based on clockwork variant_call_single, which itself combines samtools, cotex, and minos.
-
-## leave the previous scatter
-
-## scatter: each instance gets one bam and one vcf from task 5
+Based on clockwork variant_call_single, which itself combines samtools, cotex, and minos. For each sample, the output is a single VCF file and a BAM file.
 
 ### [6] Mask the outputs and create diff files
-When feeding outputs into UShER, we want to make use of diff files. But first, a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and creates a diff file which can be used to make some happy little trees.
+When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and creates a diff file which can be used to make some happy little trees.
