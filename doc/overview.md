@@ -33,7 +33,7 @@ This is a deterministic subworkflow, and Cromwell allows for cacheing of previou
 ## [1b] Extract BioSample accessions from input file
 The user is expected to input a text containing BioSample accessions. This task grabs all unique lines in that file and outputs an Array[String] of BioSample accessions.
 
-### [2] Pull fastqs for the BioSample accession
+## [2] Pull fastqs for the BioSample accession
 This task pulls all fastqs for a given BioSample accession using [sra-tools](https://github.com/ncbi/sra-tools). One sample might have multiple accessions; all of them are pulled. Once pulled, my script attempts to remove everything that is not a set of paired fastqs. 
 
 For example, let's say this task got SAMN08436121. This has only one associated with it: SRR6650260. Pulling that yields three files: SRR6650260_1.fastq, SRR6650260_2.fastq, and SRR6650260.fastq. Only SRR6650260_1.fastq and SRR6650260_2.fastq will be returned.
@@ -46,8 +46,8 @@ Based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/
 
 This task can be run either one-sample-at-a-time or all at once, depending on the input less_scattering.
 
-### [5] Call variants
+## [5] Call variants
 Based on clockwork variant_call_single, which itself combines samtools, cotex, and minos. For each sample, the output is a single VCF file and a BAM file.
 
-### [6] Mask the outputs and create diff files
+## [6] Mask the outputs and create diff files
 When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and creates a diff file which can be used to make some happy little trees.
