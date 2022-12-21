@@ -11,8 +11,8 @@ workflow myco {
 	input {
 		File biosample_accessions
 		File typical_tb_masked_regions
-		Int min_coverage
-		Boolean tar_outputs = false
+		Int min_coverage = 10
+		Boolean tar_fqs = false
 		Boolean less_scattering = false
 	}
 
@@ -27,7 +27,7 @@ workflow myco {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
-				tar_outputs = tar_outputs
+				tar_outputs = tar_fqs
 		} # output: pull.fastqs OR pull.tarball_fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
