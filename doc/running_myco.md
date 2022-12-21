@@ -14,7 +14,7 @@
 ### On Terra
 These instructions assume you already have an account on [Terra](https://terra.bio/) and [a billing project set up](https://support.terra.bio/hc/en-us/articles/360026182251-How-to-set-up-billing-in-Terra).
 1. [Go to myco's page on Dockstore](https://dockstore.org/workflows/github.com/aofarrel/myco/myco:main?tab=info)
-2. On the right hand side of the Dockstore entry, select Terra under the heading "Launch with" ![screenshot of launch with UI in Dockstore](doc/launch_with.png)
+2. On the right hand side of the Dockstore entry, select Terra under the heading "Launch with" ![screenshot of launch with UI in Dockstore](./launch_with.png)
 3. Select which Terra workspace you wish to import into, or create a new one -- you'll then be taken to Terra
 4. In Terra, go to the workflow tab (it's on the top below the bright green header bar), select myco, and run your workflow
 

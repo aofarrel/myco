@@ -1,6 +1,6 @@
 # myco: An overview
 
-![Flowchart of myco](myco_flowchart.jpg)
+![Flowchart of myco](./myco_flowchart.png)
 
 
 ## [1a] clockwork Reference Prepare
