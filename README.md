@@ -8,4 +8,4 @@ myco imports almost all of its code from other repos. Please see those specific 
 
 
 ## Running myco
-The currently recommended way to run myco is on Terra, a cloud-computing resource which uses Google as its backend. However, it also runs as-is on local machines. See [running_myco.md](./running_myco.md) for instructions.
+The currently recommended way to run myco is on Terra, a cloud-computing resource which uses Google as its backend. However, it also runs as-is on local machines. See [running_myco.md](./docs/running_myco.md) for instructions.
