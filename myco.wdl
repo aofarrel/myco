@@ -108,11 +108,6 @@ workflow myco {
 	}
 
 	output {
-		# outputting everything for debugging purposes
-		Array[File]? reads_mapped_to_decontam  = select_first([decontaminate_one_sample.mapped_to_decontam, decontaminate_many_samples.mapped_to_decontam])
-		Array[File] reads_mapped_to_H37Rv = select_first([bams_to_ref, bams_to_ref_])
-		Array[File]? dcnfq1= decontaminate_one_sample.decontaminated_fastq_1
-		Array[File]? dcnfq2= decontaminate_one_sample.decontaminated_fastq_2
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
