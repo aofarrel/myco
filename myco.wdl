@@ -24,7 +24,9 @@ workflow myco {
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa"
+				ref_fasta_filename = "ref.fa",
+				subsample_cutoff = 450,
+				subsample_seed = 1965
 		}
 
 		call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
