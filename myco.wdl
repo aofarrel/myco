@@ -12,7 +12,8 @@ workflow myco {
 		Array[Array[File]] paired_fastqs
 		File typical_tb_masked_regions
 		Int min_coverage = 10
-		Boolean tar_fqs = false
+		Int subsample_cutoff = -1
+		Int subsample_seed = 1965
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -25,8 +26,8 @@ workflow myco {
 				reads_files = pulled_fastq,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa",
-				subsample_cutoff = 450,
-				subsample_seed = 1965
+				subsample_cutoff = subsample_cutoff,
+				subsample_seed = subsample_seed
 		}
 
 		call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
