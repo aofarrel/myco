@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/0.99.0/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/0.99.1/vcf_to_diff.wdl" as diff
 
 workflow myco {
 	input {
