@@ -1,5 +1,7 @@
 # myco: An overview
 
+For information on running myco, [see here](./running_myco.md).
+
 ![Flowchart of myco](./myco_flowchart.png)
 
 
@@ -33,12 +35,12 @@ This is a deterministic subworkflow, and Cromwell allows for cacheing of previou
 ## [1b] Extract BioSample accessions from input file
 The user is expected to input a text containing BioSample accessions. This task grabs all unique lines in that file and outputs an Array[String] of BioSample accessions.
 
-## [2] Pull fastqs for the BioSample accession
+## [2] Pull fastqs for the BioSample accession *(myco_sra.only)*
 This task pulls all fastqs for a given BioSample accession using [sra-tools](https://github.com/ncbi/sra-tools). One sample might have multiple accessions; all of them are pulled. Once pulled, my script attempts to remove everything that is not a set of paired fastqs. 
 
-For example, let's say this task got SAMN08436121. This has only one associated with it: SRR6650260. Pulling that yields three files: SRR6650260_1.fastq, SRR6650260_2.fastq, and SRR6650260.fastq. Only SRR6650260_1.fastq and SRR6650260_2.fastq will be returned.
+For example, let's say this task got SAMN08436121. This has only one run associated with it: SRR6650260. Pulling that yields three files: SRR6650260_1.fastq, SRR6650260_2.fastq, and SRR6650260.fastq. Only SRR6650260_1.fastq and SRR6650260_2.fastq will be returned.
 
-## [3] Prepare a report of the results of the pull task
+## [3] Prepare a report of the results of the pull task *(myco_sra.only)*
 There are some samples that return no valid fastqs. This task keep track of every sample's run accessions, and the result of trying to pull fastqs from each run accession.
 
 ## [4] Decontaminate
