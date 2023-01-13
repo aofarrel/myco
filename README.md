@@ -9,7 +9,7 @@ myco imports almost all of its code from other repos. Please see those specific 
 
 ## Which workflow should I use?
 If you already have a bunch of fastqs: myco.wdl  
-If you want to pull fastqs from SRA or ENA: myco_sra.wdl  
+If you want to pull fastqs from SRA: myco_sra.wdl  
 
 Note that pulling from SRA allows for more data validation than putting in fastqs directly. If using myco.wdl, please make sure your data:
 * is Illumina paired-end data  
