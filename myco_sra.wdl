@@ -5,6 +5,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/com
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.3/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.2/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/main/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/0.99.0/vcf_to_diff.wdl" as diff
 
 workflow myco {
@@ -14,6 +15,10 @@ workflow myco {
 		Int min_coverage = 10
 		Boolean tar_fqs = false
 		Boolean less_scattering = false
+
+		Boolean decorate_tree = false
+		File? input_tree
+		File? ref_genome
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -107,10 +112,20 @@ workflow myco {
 
 	}
 
+	if(decorate_tree) {
+		call build_treesWF.usher_sampled_diff_to_taxonium as taxman {
+			input:
+				diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff]),
+				i = input_tree,
+				ref = ref_genome
+		}
+	}
+
 	output {
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
 		File pull_report = cat_reports.outfile
+		File? tax_tree = taxman.taxonium_tree
 	}
 }
