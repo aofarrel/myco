@@ -5,7 +5,7 @@ myco imports almost all of its code from other repos. Please see those specific 
 * Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)
 * Decontamination and calling variants: [clockwork-wdl](https://github.com/aofarrel/clockwork-wdl)
 * Turning VCFs into diff files: [parsevcf](https://github.com/lilymaryam/parsevcf)
-* Building UShER and Taxonium trees: []
+* Building UShER and Taxonium trees: [usher-sampled-wdl](https://github.com/aofarrel/usher-sampled-wdl)
 
 ## Which workflow should I use?
 If you already have a bunch of fastqs: myco.wdl  
@@ -20,4 +20,4 @@ Note that pulling from SRA allows for more data validation than putting in fastq
 
 
 ## Running myco
-The currently recommended way to run myco is on Terra, a cloud-computing resource which uses Google as its backend. However, it also runs as-is on local machines. See [running_myco.md](/doc/running_myco.md) for instructions.
+The currently recommended way to run myco is on Terra, a cloud-computing resource which uses Google as its backend. However, it also runs as-is on local machines. See [running_myco.md](/doc/running_myco.md) for myco-specific instructions, and [this guide](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md) if you're new to running WDLs in general.
