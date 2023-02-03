@@ -5,7 +5,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/com
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.3/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/keep-track-of-diff-names/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/main/usher_sampled.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/nextstrain/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.0.2/vcf_to_diff.wdl" as diff
 
 workflow myco {
