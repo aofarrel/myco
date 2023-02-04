@@ -12,14 +12,26 @@ workflow myco {
 	input {
 		File biosample_accessions
 		File typical_tb_masked_regions
-		Int min_coverage = 10
-		Boolean tar_fqs = false
-		Boolean less_scattering = false
-		Float bad_data_threshold = 0.05
 
+		Float   bad_data_threshold = 0.05
 		Boolean decorate_tree = false
-		File? input_tree
-		File? ref_genome
+		File?   input_tree
+		Boolean less_scattering = false
+		Int     min_coverage = 10
+		File?   ref_genome_for_tree_building
+		Boolean tar_fqs = false
+	}
+
+	parameter_meta {
+		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
+		typical_tb_masked_regions: "Mask file"
+		min_coverage: "Positions with coverage below this value will be masked in diff files"
+		tar_fqs: "(deprecated) Tarball fastqs after pulling them"
+		less_scattering: "(deprecated) Create less VMs by combining all decontamination jobs"
+		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
+		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
+		input_tree: "Base tree to use if decorate_tree = true"
+		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
