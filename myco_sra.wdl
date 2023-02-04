@@ -130,7 +130,7 @@ workflow myco {
 			input:
 				diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff]),
 				i = input_tree,
-				ref = ref_genome,
+				ref = ref_genome_for_tree_building,
 				coverage_reports = select_first([make_mask_and_diff.report, make_mask_and_diff_.report]),
 				bad_data_threshold = bad_data_threshold
 		}
