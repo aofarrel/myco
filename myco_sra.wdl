@@ -15,6 +15,7 @@ workflow myco {
 		Int min_coverage = 10
 		Boolean tar_fqs = false
 		Boolean less_scattering = false
+		Float bad_data_threshold = 0.05
 
 		Boolean decorate_tree = false
 		File? input_tree
@@ -117,7 +118,9 @@ workflow myco {
 			input:
 				diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff]),
 				i = input_tree,
-				ref = ref_genome
+				ref = ref_genome,
+				coverage_reports = select_first([make_mask_and_diff.report, make_mask_and_diff_.report]),
+				bad_data_threshold = bad_data_threshold
 		}
 	}
 
