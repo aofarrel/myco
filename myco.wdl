@@ -2,22 +2,23 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.2/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/main/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/0.99.1/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.6/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/nextstrain/usher_sampled.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastqs
 		File typical_tb_masked_regions
-		Int min_coverage = 10
+
+		Float   bad_data_threshold = 0.05
+		Boolean decorate_tree = false
+		File?   input_tree
+		Int     min_coverage = 10
+		File?   ref_genome_for_tree_building
 		Int subsample_cutoff = -1
 		Int subsample_seed = 1965
-
-		Boolean decorate_tree = false
-		File? input_tree
-		File? ref_genome
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -66,7 +67,9 @@ workflow myco {
 			input:
 				diffs = make_mask_and_diff_.diff,
 				i = input_tree,
-				ref = ref_genome
+				ref = ref_genome_for_tree_building,
+				coverage_reports = make_mask_and_diff_.report,
+				bad_data_threshold = bad_data_threshold
 		}
 	}
 

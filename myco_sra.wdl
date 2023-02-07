@@ -1,10 +1,10 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.3.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.3/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/keep-track-of-diff-names/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.6/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.6/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/nextstrain/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 
@@ -19,6 +19,8 @@ workflow myco {
 		Boolean less_scattering = false
 		Int     min_coverage = 10
 		File?   ref_genome_for_tree_building
+		Int     subsample_cutoff = 450
+		Int     subsample_seed = 1965
 		Boolean tar_fqs = false
 	}
 
@@ -32,6 +34,8 @@ workflow myco {
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		input_tree: "Base tree to use if decorate_tree = true"
 		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
+		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
+		subsample_seed: "Seed used for subsampling with seqtk"
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -45,7 +49,9 @@ workflow myco {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
-				tar_outputs = tar_fqs
+				tar_outputs = tar_fqs,
+				subsample_cutoff = subsample_cutoff,
+				subsample_seed = subsample_seed
 		} # output: pull.fastqs OR pull.tarball_fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
