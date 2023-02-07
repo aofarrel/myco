@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.4.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.6/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/nextstrain/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.0.4/vcf_to_diff.wdl" as diff
 
