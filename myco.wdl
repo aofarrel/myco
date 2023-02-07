@@ -21,6 +21,19 @@ workflow myco {
 		Int subsample_seed = 1965
 	}
 
+	parameter_meta {
+		paired_fastqs: "Nested array of paired fastqs, each inner array representing one samples' worth of paired fastqs"
+		typical_tb_masked_regions: "Mask file"
+		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
+		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
+		input_tree: "Base tree to use if decorate_tree = true"
+		less_scattering: "(deprecated) Create less VMs by combining all decontamination jobs"
+		min_coverage: "Positions with coverage below this value will be masked in diff files"
+		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
+		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
+		subsample_seed: "Seed used for subsampling with seqtk"
+	}
+
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
 
 	Array[Array[File]] pulled_fastqs   = select_all(paired_fastqs)
