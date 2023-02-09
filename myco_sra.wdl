@@ -74,11 +74,24 @@ workflow myco {
 					ref_fasta_filename = "ref.fa"
 			}
 
-			call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
-				input:
-					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-					reads_files = [decontaminate_one_sample.decontaminated_fastq_1, decontaminate_one_sample.decontaminated_fastq_2]
-			} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
+			if(defined(decontaminate_one_sample.decontaminated_fastq_1)) {
+	    		File real_decontaminated_fastq_1=select_first([
+	    			decontaminate_one_sample.decontaminated_fastq_1, 
+	    				biosample_accessions])
+	    		File real_decontaminated_fastq_2=select_first(
+	    			[decontaminate_one_sample.decontaminated_fastq_2, 
+	    				biosample_accessions])
+
+				call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
+					input:
+						ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+				} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
+			}
+
+			#if defined(decontaminate_one_sample.check_this_samples_fastqs) {
+				# call fastqc
+			#}
 
 		}
 
@@ -107,6 +120,7 @@ workflow myco {
 				ref_fasta_filename = "ref.fa"
 		} # output: decontaminate_many_samples.tarballs_of_decontaminated_reads
 		
+
 		scatter(one_sample in decontaminate_many_samples.tarballs_of_decontaminated_reads) {
 			call clckwrk_var_call.variant_call_one_sample_verbose as varcall_with_tarballs {
 				input:
