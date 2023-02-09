@@ -90,7 +90,7 @@ workflow myco {
 				} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
 			}
 
-			if defined(decontaminate_one_sample.check_this_samples_fastqs) {
+			if(defined(decontaminate_one_sample.check_this_samples_fastqs)) {
 				call fastqc.FastqcWF {
 					input:
 						fastqs = pulled_fastq
