@@ -7,6 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.6/tasks/pull_fas
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/nextstrain/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
 	input {
@@ -89,9 +90,12 @@ workflow myco {
 				} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
 			}
 
-			#if defined(decontaminate_one_sample.check_this_samples_fastqs) {
-				# call fastqc
-			#}
+			if defined(decontaminate_one_sample.check_this_samples_fastqs) {
+				call fastqc.FastqcWF {
+					input:
+						fastqs = pulled_fastq
+				}
+			}
 
 		}
 
