@@ -166,5 +166,6 @@ workflow myco {
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
 		File pull_report = cat_reports.outfile
 		File? tax_tree = taxman.taxonium_tree
+		Array[File]? fastqc = FastqcWF.reports
 	}
 }
