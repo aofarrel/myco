@@ -90,13 +90,6 @@ workflow myco {
 				} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
 			}
 
-			if(defined(decontaminate_one_sample.check_this_samples_fastqs)) {
-				call fastqc.FastqcWF {
-					input:
-						fastqs = pulled_fastq
-				}
-			}
-
 		}
 
 		Array[File] minos_vcfs_=select_all(varcall_with_array.vcf_final_call_set)
@@ -110,6 +103,13 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage = min_coverage,
 					tbmf = typical_tb_masked_regions
+			}
+		}
+
+		if(defined(decontaminate_one_sample.check_this_fastq_1)) {
+			call fastqc.FastqcWF {
+				input:
+					fastqs = select_all(decontaminate_one_sample.check_this_fastq_1)
 			}
 		}
 	}
