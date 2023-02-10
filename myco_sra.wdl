@@ -59,9 +59,9 @@ workflow myco {
   		}
 	}
 
-	call sranwrp_processing.cat_files as cat_reports {
+	call sranwrp_processing.cat_strings as cat_reports {
 		input:
-			files = pull.results
+			strings = pull.results
 	}
 
 	if(!less_scattering) {
