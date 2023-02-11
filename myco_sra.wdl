@@ -1,12 +1,12 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/69f6ee52f1aaf4a3bb1c58fdef23bcd1c9ad4ef0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/a4a76b20850914af397ce51e8b35e0aa6867ecb9/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/063e1ce428fb0ac6e8f23915ece05cd9333ecbfc/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/c602b2f1f8e01af42a4e4abfa39e4972bff3fa6a/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/dfde0303104f5cb078adbba814f45f8059311478/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/b0a0c376b64fa8c8184d0741f180dfae36de9f62/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/f53d563bfa7e08167ac0a56c8fc4b2442f3b9df8/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/70a082190d7727cd9074c6e17e921d8a75588ceb/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
