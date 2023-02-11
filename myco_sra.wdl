@@ -1,12 +1,12 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/5eea87e176b93eb70099402cfd522619ce9a0577/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2e874ea79f5852c5cc5252a0b8b3aa8241f4aebd/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/read-string/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/142c7e88c1e3161588653b1bcbe2022a8c5d54cd/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/69f6ee52f1aaf4a3bb1c58fdef23bcd1c9ad4ef0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/a4a76b20850914af397ce51e8b35e0aa6867ecb9/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/063e1ce428fb0ac6e8f23915ece05cd9333ecbfc/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/c602b2f1f8e01af42a4e4abfa39e4972bff3fa6a/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/f53d563bfa7e08167ac0a56c8fc4b2442f3b9df8/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1efbef78b83c9cba07349b544505e37c3a55b2d1/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/70a082190d7727cd9074c6e17e921d8a75588ceb/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -16,12 +16,16 @@ workflow myco {
 
 		Float   bad_data_threshold = 0.05
 		Boolean decorate_tree = false
+		Boolean fastqc_on_timeout = false
 		File?   input_tree
 		Boolean less_scattering = false
 		Int     min_coverage = 10
 		File?   ref_genome_for_tree_building
 		Int     subsample_cutoff = 450
 		Int     subsample_seed = 1965
+		Int     timeout_decontam_part1 =  20
+		Int     timeout_decontam_part2 =  15
+		Int     timeout_variant_caller = 120
 		Boolean tar_fqs = false
 	}
 
@@ -30,12 +34,15 @@ workflow myco {
 		typical_tb_masked_regions: "Mask file"
 		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
+		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		less_scattering: "(deprecated) Create less VMs by combining all decontamination jobs"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
 		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
+		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout)"
+		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to -1 to never timeout)"
 		tar_fqs: "(deprecated) Tarball fastqs after pulling them"
 	}
 
@@ -72,7 +79,9 @@ workflow myco {
 					unsorted_sam = true,
 					reads_files = pulled_fastq,
 					tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-					ref_fasta_filename = "ref.fa"
+					ref_fasta_filename = "ref.fa",
+					timeout_map_reads = timeout_decontam_part1,
+					timeout_decontam = timeout_decontam_part2
 			}
 
 			if(defined(decontaminate_one_sample.decontaminated_fastq_1)) {
@@ -86,7 +95,8 @@ workflow myco {
 				call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
 					input:
 						ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
-						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
+						timeout = timeout_variant_caller
 				} # output: varcall_with_array.vcf_final_call_set, varcall_with_array.mapped_to_ref
 			}
 
@@ -106,10 +116,12 @@ workflow myco {
 			}
 		}
 
-		if(defined(decontaminate_one_sample.check_this_fastq_1)) {
-			call fastqc.FastqcWF {
-				input:
-					fastqs = select_all(decontaminate_one_sample.check_this_fastq_1)
+		if(fastqc_on_timeout) {
+			if(defined(decontaminate_one_sample.check_this_fastq_1)) {
+				call fastqc.FastqcWF {
+					input:
+						fastqs = select_all(decontaminate_one_sample.check_this_fastq_1)
+				}
 			}
 		}
 	}
@@ -164,7 +176,6 @@ workflow myco {
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
-		File pull_report = cat_reports.outfile
 		File? tax_tree = taxman.taxonium_tree
 		Array[File]? fastqc_reports = FastqcWF.reports
 	}
