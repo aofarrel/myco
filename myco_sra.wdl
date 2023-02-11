@@ -31,7 +31,6 @@ workflow myco {
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		typical_tb_masked_regions: "Mask file"
 		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
@@ -43,7 +42,9 @@ workflow myco {
 		subsample_seed: "Seed used for subsampling with seqtk"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to -1 to never timeout)"
+		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to -1 to never timeout)"
 		tar_fqs: "(deprecated) Tarball fastqs after pulling them"
+		typical_tb_masked_regions: "Bed file of regions to mask when making diff files"
 	}
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
@@ -85,6 +86,10 @@ workflow myco {
 			}
 
 			if(defined(decontaminate_one_sample.decontaminated_fastq_1)) {
+			# This region only executes if decontaminated fastqs exist.
+			# We can use this to coerce File? into File by using a
+			# select_first() where the first element is the File? we know
+			# absolutely must exist, and the second element is bogus
 	    		File real_decontaminated_fastq_1=select_first([
 	    			decontaminate_one_sample.decontaminated_fastq_1, 
 	    				biosample_accessions])
