@@ -167,7 +167,7 @@ workflow myco {
 	}
 
 	if(decorate_tree) {
-		call build_treesWF.usher_sampled_diff_to_taxonium as taxman {
+		call build_treesWF.usher_sampled_diff_to_taxonium as trees {
 			input:
 				diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff]),
 				i = input_tree,
@@ -181,7 +181,7 @@ workflow myco {
 		Array[File] minos = select_first([minos_vcfs, minos_vcfs_])
 		Array[File] masks = select_first([make_mask_and_diff.mask_file, make_mask_and_diff_.mask_file])
 		Array[File] diffs = select_first([make_mask_and_diff.diff, make_mask_and_diff_.diff])
-		File? tax_tree = taxman.taxonium_tree
+		File? tax_tree = trees.taxonium_tree
 		Array[File]? fastqc_reports = FastqcWF.reports
 	}
 }
