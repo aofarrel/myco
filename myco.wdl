@@ -1,9 +1,9 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/f53d563bfa7e08167ac0a56c8fc4b2442f3b9df8/usher_sampled.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
@@ -78,11 +78,10 @@ workflow myco {
 	}
 
 	if(fastqc_on_timeout) {
-		if(defined(per_sample_decontam.check_this_fastq_1)) {
-			Array[File] slow_fastqs = select_all(per_sample_decontam.check_this_fastq_1)
+		if(length(per_sample_decontam.check_this_fastq)>1) {
 			call fastqc.FastqcWF {
 				input:
-					fastqs = slow_fastqs
+					fastqs = select_all(per_sample_decontam.check_this_fastq)
 			}
 		}
 	}

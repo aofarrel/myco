@@ -1,11 +1,11 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/dfde0303104f5cb078adbba814f45f8059311478/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/b0a0c376b64fa8c8184d0741f180dfae36de9f62/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/f53d563bfa7e08167ac0a56c8fc4b2442f3b9df8/usher_sampled.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
@@ -75,7 +75,7 @@ workflow myco {
 	if(!less_scattering) {
 		Array[Array[File]] pulled_fastqs   = select_all(paired_fastqs)
 		scatter(pulled_fastq in pulled_fastqs) {
-			call clckwrk_combonation.combined_decontamination_single as decontaminate_one_sample {
+			call clckwrk_combonation.combined_decontamination_single as per_sample_decontam {
 				input:
 					unsorted_sam = true,
 					reads_files = pulled_fastq,
@@ -85,16 +85,16 @@ workflow myco {
 					timeout_decontam = timeout_decontam_part2
 			}
 
-			if(defined(decontaminate_one_sample.decontaminated_fastq_1)) {
+			if(defined(per_sample_decontam.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist.
 			# We can use this to coerce File? into File by using a
 			# select_first() where the first element is the File? we know
 			# absolutely must exist, and the second element is bogus
 	    		File real_decontaminated_fastq_1=select_first([
-	    			decontaminate_one_sample.decontaminated_fastq_1, 
+	    			per_sample_decontam.decontaminated_fastq_1, 
 	    				biosample_accessions])
 	    		File real_decontaminated_fastq_2=select_first(
-	    			[decontaminate_one_sample.decontaminated_fastq_2, 
+	    			[per_sample_decontam.decontaminated_fastq_2, 
 	    				biosample_accessions])
 
 				call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
@@ -122,10 +122,10 @@ workflow myco {
 		}
 
 		if(fastqc_on_timeout) {
-			if(defined(decontaminate_one_sample.check_this_fastq_1)) {
+			if(length(per_sample_decontam.check_this_fastq)>1) {
 				call fastqc.FastqcWF {
 					input:
-						fastqs = select_all(decontaminate_one_sample.check_this_fastq_1)
+						fastqs = select_all(per_sample_decontam.check_this_fastq)
 				}
 			}
 		}
