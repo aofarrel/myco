@@ -2,7 +2,7 @@
 
 For information on running myco, [see here](./running_myco.md).
 
-![Flowchart of myco](./myco_flowchart.png)
+![Flowchart of myco_sra](./myco_sra_flowchart.png)
 
 
 ## [1a] clockwork Reference Prepare
