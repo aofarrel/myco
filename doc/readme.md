@@ -32,7 +32,7 @@ This is a deterministic subworkflow, and Cromwell allows for cacheing of previou
 * ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref
 * ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref
 
-## [1b] Extract BioSample accessions from input file
+## [1b] Extract BioSample accessions from input file *(myco_sra.only)*
 The user is expected to input a text containing BioSample accessions. This task grabs all unique lines in that file and outputs an Array[String] of BioSample accessions.
 
 ## [2] Pull fastqs for the BioSample accession *(myco_sra.only)*
@@ -45,8 +45,6 @@ There are some samples that return no valid fastqs. This task keep track of ever
 
 ## [4] Decontaminate
 Based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#decontaminate-the-reads), which runs clockwork map_reads and clockwork remove_contam. I have combined these two calls into one WDL task that can run on multiple samples at once. The output is a group of decontaminated fastq files.
-
-This task can be run either one-sample-at-a-time or all at once, depending on the input less_scattering.
 
 ## [5a] Call variants
 Based on clockwork variant_call_single, which itself combines samtools, cotex, and minos. For each sample, the output is a single VCF file and a BAM file.
