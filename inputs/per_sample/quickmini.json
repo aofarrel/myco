@@ -1,8 +1,8 @@
 {
-  "myco_sra.biosample_accessions": "../SRANWRP/inputs/quick_tests/tricky.txt",
-  "myco_sra.min_coverage": 10,
-  "myco_sra.typical_tb_masked_regions": "/Users/ash/Documents/aaa_test_files/tb/Hicksetal2018_genomicRegionsRemoved.bed",
-  "myco_sra.ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw": "/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.download.tar",
-  "myco_sra.ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.H37Rv.tar",
-  "myco_sra.ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.remove_contam.tar"
+  "myco.biosample_accessions": "../SRANWRP/inputs/quick_tests/tricky.txt",
+  "myco.min_coverage": 10,
+  "myco.typical_tb_masked_regions": "/Users/ash/Documents/aaa_test_files/tb/Hicksetal2018_genomicRegionsRemoved.bed",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw": "/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.download.tar",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.H37Rv.tar",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.remove_contam.tar"
 }
