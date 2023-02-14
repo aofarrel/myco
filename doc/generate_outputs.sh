@@ -1,3 +1,8 @@
+# This is very much a Works On My Machine sort of script!
+# To run this elsewhere, point to your own version of womtool,
+# change ghead to head (unless you're using Mac w/ coreutils),
+# and pip3 install git+https://github.com/Nicceboy/python-markdown-generator
+
 echo "grabbing inputs from myco_sra..."
 #java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco..."
@@ -5,10 +10,12 @@ echo "grabbing inputs from myco..."
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
-ghead -n -2 unique.txt | tail -n +2 | cut -c 9- > cleaned.txt # some shells can get away with head
-# sed hurts my head, so we're going to cheat and use Python.
+ghead -n -2 unique.txt | tail -n +2 | cut -c 9- > cleaned.txt
+
+# I know this can probably be done with sed, but I don't like sed
 python3 << CODE
 import re
+from markdowngenerator import MarkdownGenerator
 
 def extract_info(input_list):
 	vars = []
@@ -34,11 +41,17 @@ with open("cleaned.txt", "r") as f:
 
 workflow_level_lists = extract_info(workflow_level)
 i = 0
+print("variable \t type \t default")
 while i<len(workflow_level_lists[0]):
-	print(workflow_level_lists[0][i])
-	print(workflow_level_lists[1][i])
-	print(workflow_level_lists[2][i])
+	print(f"{workflow_level_lists[0][i]}\t\t{workflow_level_lists[1][i]}\t\t{workflow_level_lists[2][i]}")
 	i += 1
+
+with MarkdownGenerator(filename="inputs.md", enable_write=False) as doc:
+	table = [
+	            {"Column1": "col1row1 data", "Column2": "col2row1 data"},
+	            {"Column1": "col1row2 data", "Column2": "col2row2 data"},
+	        ]
+	doc.addTable(dictionary_list=table)
 
 # extract task name for the task_level before calling extract_info()
 
@@ -51,6 +64,6 @@ CODE
 #([A-Z])\w+\?? # grab types
 #default = ([a-z, A-Z, 0-9])+ # grab defaults
 
-
+rm sorted.txt unique.txt
 # rm raw.txt sorted.txt unique.txt cleaned.txt
 echo "done"
