@@ -56,7 +56,7 @@ workflow myco {
 				biosample_accession = biosample_accession,
 				subsample_cutoff = subsample_cutoff,
 				subsample_seed = subsample_seed
-		} # output: pull.fastqs OR pull.tarball_fastqs
+		} # output: pull.fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
   		}
