@@ -25,7 +25,6 @@ workflow myco {
 		Int     timeout_decontam_part1 =  20
 		Int     timeout_decontam_part2 =  15
 		Int     timeout_variant_caller = 120
-		Boolean tar_fqs = false
 	}
 
 	parameter_meta {
@@ -41,7 +40,6 @@ workflow myco {
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to -1 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to -1 to never timeout)"
-		tar_fqs: "(deprecated) Tarball fastqs after pulling them"
 		typical_tb_masked_regions: "Bed file of regions to mask when making diff files"
 	}
 
@@ -56,7 +54,6 @@ workflow myco {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
-				tar_outputs = tar_fqs,
 				subsample_cutoff = subsample_cutoff,
 				subsample_seed = subsample_seed
 		} # output: pull.fastqs OR pull.tarball_fastqs
