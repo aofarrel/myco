@@ -48,8 +48,14 @@ Based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/
 
 This task can be run either one-sample-at-a-time or all at once, depending on the input less_scattering.
 
-## [5] Call variants
+## [5a] Call variants
 Based on clockwork variant_call_single, which itself combines samtools, cotex, and minos. For each sample, the output is a single VCF file and a BAM file.
+
+## [5b] (optional) Run FastQC on slow samples
+If a sample times out in the decontamination step, it is usually due to an issue with the inputs. FastQC examines all inputs that timed out in the decontamination step, so you can see what might be going on.
 
 ## [6] Mask the outputs and create diff files
 When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and creates a diff file which can be used to make some happy little trees.
+
+## [7] (optional) Generate UShER, Taxonium, and NextStrain trees
+If decorate_trees = true, and an input tree is passed in, each sample will be placed on the tree by UShER. The resulting tree will then be converted to Taxonium format, allowing it to be viewed in taxonium. NextStrain subtree JSONs will also be generated.
