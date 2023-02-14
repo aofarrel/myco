@@ -1,0 +1,11 @@
+{
+  "myco.biosample_accessions": "../SRANWRP/inputs/quick_tests/tb_a3_5_random.txt",
+  "myco.min_coverage": 10,
+  "myco.typical_tb_masked_regions": "/Users/ash/Documents/aaa_test_files/tb/Hicksetal2018_genomicRegionsRemoved.bed",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw": "/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.download.tar",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.H37Rv.tar",
+  "myco.ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref":"/Users/ash/Documents/aaa_test_files/tb/bluepeter/Ref.remove_contam.tar",
+  "myco.ref_genome": "./inputs/tb_seq.fasta",
+  "myco.input_tree": "./inputs/trees/alldiffs_mask2ref.pb",
+  "myco.decorate_tree": true
+}
