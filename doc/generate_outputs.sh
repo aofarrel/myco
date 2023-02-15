@@ -4,9 +4,9 @@
 # and pip3 install git+https://github.com/Nicceboy/python-markdown-generator
 
 echo "grabbing inputs from myco_sra..."
-#java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
+java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco..."
-#java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
+java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
