@@ -53,11 +53,25 @@ workflow_level = extract_wf_info(workflow_level)
 task_level = extract_task_info(task_level)
 runtime = []
 not_runtime = []
-for variable in task_level:
-	if variable["name"] in ["addldisk", "cpu", "memory", "preempt"]:
-		runtime.append(variable)
+for input_variable in task_level:
+	# runtime variables
+	if input_variable["name"] == "addldisk":
+		input_variable["description"] = "Additional disk size, in GB, on top of auto-scaling disk size."
+		runtime.append(input_variable)
+	elif input_variable["name"] == "disk_size":
+		input_variable["description"] = "Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA."
+		runtime.append(input_variable)
+	elif input_variable["name"] == "cpu":
+		input_variable["description"] = "Number of CPUs (cores) to request from GCP."
+		runtime.append(input_variable)
+	elif input_variable["name"] == "memory":
+		input_variable["description"] = "Amount of memory, in GB, to request from GCP."
+		runtime.append(input_variable)
+	elif input_variable["name"] == "preempt":
+		input_variable["description"] = "How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance?"
+		runtime.append(input_variable)
 	else:
-		not_runtime.append(variable)
+		not_runtime.append(input_variable)
 
 
 with MarkdownGenerator(filename="inputs.md", enable_write=False) as doc:
@@ -67,6 +81,7 @@ with MarkdownGenerator(filename="inputs.md", enable_write=False) as doc:
 	doc.addHeader(3, "Software settings")
 	doc.addTable(dictionary_list=not_runtime)
 	doc.addHeader(3, "Hardware settings")
+	doc.writeTextLine("A note on disk size: On GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.")
 	doc.addTable(dictionary_list=runtime)
 
 
