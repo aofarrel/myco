@@ -84,6 +84,31 @@ for input_variable in task_level:
 	else:
 		not_runtime.append(input_variable)
 
+# extract parameter_meta for workflow-level variables
+parameter_meta = []
+in_parameter_meta = False
+with open("myco.wdl", "r") as myco:
+	for line in myco:
+		if line.startswith("\tparameter_meta"):
+			in_parameter_meta = True
+			continue
+		elif line.startswith("\t}") and in_parameter_meta:
+			break
+		elif in_parameter_meta and not line.startswith("}"):
+			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
+							"description": re.search('(?=\:).+', line).group(0).replace('\"', "").replace(": ", "")}
+			parameter_meta.append(this_parameter)
+		else:
+			continue
+
+for input_variable in workflow_level:
+	value = input_variable["name"]
+	if value in ["biosample_accessions", "paired_fastq_sets"]:
+		input_variable["description"] = "fastq input -- please see running_myco.md for more information"
+	else:
+		parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
+		input_variable["description"] = parameter["description"]
+
 with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.addHeader(2, "Workflow-level inputs")
 	doc.addTable(dictionary_list=workflow_level)

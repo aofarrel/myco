@@ -26,14 +26,13 @@ workflow myco {
 	}
 
 	parameter_meta {
-		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
+		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
 		input_tree: "Base tree to use if decorate_tree = true"
-		less_scattering: "(deprecated) Create less VMs by combining all decontamination jobs"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
-		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples' worth of paired fastqs"
-		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
+		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
+		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout)"

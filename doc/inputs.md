@@ -7,22 +7,22 @@
   
 ## Workflow-level inputs  
   
-| name | type | default |  
-|:---:|:---:|:---:|  
-| bad_data_threshold | Float  | 0.05 |  
-| biosample_accessions | File |  |  
-| decorate_tree | Boolean  | false |  
-| fastqc_on_timeout | Boolean  | false |  
-| input_tree | File? |  |  
-| min_coverage | Int  | 10 |  
-| paired_fastq_sets | Array |  |  
-| ref_genome_for_tree_building | File? |  |  
-| subsample_cutoff | Int  | 450 |  
-| subsample_seed | Int  | 1965 |  
-| timeout_decontam_part1 | Int  | 20 |  
-| timeout_decontam_part2 | Int  | 15 |  
-| timeout_variant_caller | Int  | 120 |  
-| typical_tb_masked_regions | File |  |  
+| name | type | default | description |  
+|:---:|:---:|:---:|:---:|  
+| bad_data_threshold | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, don not include it in the tree |  
+| biosample_accessions | File |  | fastq input -- please see running_myco.md for more information |  
+| decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome |  
+| fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination times out (see timeout_decontam) |  
+| input_tree | File? |  | Base tree to use if decorate_tree = true |  
+| min_coverage | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
+| paired_fastq_sets | Array |  | fastq input -- please see running_myco.md for more information |  
+| ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY `&gt;NC_000962.3` on its first line |  
+| subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
+| subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
+| timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout) |  
+| timeout_decontam_part2 | Int  | 15 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to -1 to never timeout) |  
+| timeout_variant_caller | Int  | 120 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to -1 to never timeout) |  
+| typical_tb_masked_regions | File |  | Bed file of regions to mask when making diff files |  
   
   
 ## Task-level inputs  
