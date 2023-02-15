@@ -1,15 +1,40 @@
 # Running myco
+myco is a WDL workflow. The currently recommended way to run myco is on Terra, a cloud-computing resource which uses Google as its backend. However, it also runs as-is on local machines.
 
 If you are not familiar with running WDLs, [please see this guide](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md).
 
-## Inputs
-| Name                        | Type                | Default | Info                                                                                                                                                                                                                                                                        |
-|---------------------------  |-----------------    |-------- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  |
-| **biosample_accessions**    | File                | n/a     | *(myco_sra.wdl only)* Text file listing BioSample accessions to pull reads from. Each line should have only one accession. SRS, SAM, ERS, and integer inputs are all supported. [Here's a bunch of sample files you can use!](https://github.com/aofarrel/SRANWRP/tree/main/inputs/quick_tests)   |
-| **paired_fastqs**           | Array[Array[File]]  | n/a     | *(myco.wdl only)* Nested array of FASTQ files, where each internal array represents one sample's FASTQ files. Must be paired-end Illumina reads. [Here's a bunch of sample files you can use!](https://github.com/aofarrel/SRANWRP/tree/main/inputs/quick_tests) |
-| min_coverage                | Int                 | 10      | Minimum coverage for a variant to be considered. Only affects the diff file, not the VCF.     |
-| subsample_cutoff            | Int                 | -1      | If not set to -1, any FASTQ larger than this in value in MB will be downsampled with `seqtk`.     |
-| subsample_seed              | Int                 | 1965    | Seed to use when downsampling with `seqtk`. Unused if `subsample_cutoff` is -1.   |
-| typical_tb_masked_regions   | File                | n/a     | BED file of ornery regions to mask. We recommend using [this mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/43ec21319209b23f648f32e4868bdf07cf09f2a0/R00000039_repregions.bed). Only affects the diff file, not the VCF.                      |
+## How do I get my fastqs into myco?
+First of all, please make sure your data:
+* is Illumina paired-end data <sup>†</sup>   
+* is grouped per-sample <sup>†</sup>     
+* len(quality scores) = len(nucleotides) for every line <sup>†</sup>   
+* is actually MTBC
+* isn't huge — individual files over `subsample_cutoff` (default: 450 MB) will be downsampled, but keep an eye on the cumulative size of samples which have lots of small reads
+  * it is okay to have more than two reads per sample -- where things get iffy is if you have 8 or more fastqs per sample (ex: SAMEA968096)
 
-Note that *subsample_cutoff* and *subsample_seed* are workflow-level inputs in *myco.wdl* but are task-level inputs (of the pull task) in *myco_sra.wdl*. This is relevent only if you're using a JSON file to enter your inputs.
+<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. myco.wdl is not able to detect these issues. Neither will check if your sample is actually MTBC or if a single sample has lots of small reads.
+
+### Pulling reads from SRA
+If your reads are on SRA, you should use myco_sra.wdl. Simply input the path to a text file that contains the BioSample accessions of the samples you are interested in (one BioSample accession per line). For example, if you have a file named my_accessions.txt at gs://my-cool-bucket, and my_accessions.txt looks like this:
+```
+SAMN02599053
+SAMN13813990
+```
+
+Then you would input `gs://my-cool-bucket/my_accessions.txt` for **biosample_accessions** in myco_sra.wdl
+
+### Direct input
+If you already have a bunch of fastqs, you will want to input their URIs as a nested array, where each inner array represents one sample. For example, let's say you the following samples in a google bucket located at gs://my-cool-bucket/fqs/
+* SAMN02599053, consisting of SAMN02599053_SRR1173122_1.fq.gz, SAMN02599053_SRR1173122_2.fq.gz, SAMN02599053_SRR1173191_1.fq.gz, and SAMN02599053_SRR1173191_2.fq.gz
+* SAMN13813990, consisting of SAMN13813990_SRR10869128_1.fq.gz and SAMN13813990_SRR10869128_2.fq.gz
+
+You would input the following for **paired_fastq_sets** in myco.wdl:
+
+```
+[["gs://my-cool-bucket/fqs/SAMN02599053_SRR1173122_1.fq.gz", "gs://my-cool-bucket/fqs/SAMN02599053_SRR1173122_2.fq.gz", "gs://my-cool-bucket/fqs/SAMN02599053_SRR1173191_1.fq.gz", "gs://my-cool-bucket/fqs/SAMN02599053_SRR1173191_2.fq.gz"], ["gs://my-cool-bucket/fqs/SAMN13813990_SRR10869128_1.fq.gz", gs://my-cool-bucket/fqs/SAMN13813990_SRR10869128_2.fq.gz"]]
+```
+
+The first array represents sample SAMN02599053. The second array represents sample SAMN13813990. You will note that SAMN02599053 has two pairs of fastqs, while SAMN13813990 only has one pair of fastqs -- this is fine!
+
+
+

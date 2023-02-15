@@ -4,9 +4,9 @@
 # and pip3 install git+https://github.com/Nicceboy/python-markdown-generator
 
 echo "grabbing inputs from myco_sra..."
-java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
+#java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco..."
-java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
+#java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -17,26 +17,37 @@ python3 << CODE
 import re
 from markdowngenerator import MarkdownGenerator
 
+def get_task(line):
+	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
+
+def get_name(line):
+	return str(re.search('([a-z, A-Z, _, 1-9])+"\:', line).group(0)[:-2])
+
+def get_type(line):
+	return str(re.search('\: \"([a-z, A-Z, _, 1-9])+\??', line).group(0)[3:])
+
+def get_default(line):
+	if bool(re.search('default = .+?(?=\))', line)):
+		return str(re.search('= .+?(?=\))', line).group(0).replace("(", "")).replace("= ", "")
+	else:
+		 return ""
+
 def extract_wf_info(input_list):
 	variables = []
 	for line in input_list:
-		this_variable = {"name": str(re.search('([a-z, A-Z, _, 1-9])+"\:', line).group(0)[:-2]),
-						"type": str(re.search('\: \"([a-z, A-Z, _, 1-9])+\??', line).group(0)[3:]),
-						"default": str(re.search("default = ([a-z, A-Z, 0-9])+", line).group(0)) 
-							if bool(re.search("default = ([a-z, A-Z, 0-9])+", line)) 
-							else ""}
+		this_variable = {"name": get_name(line),
+						"type": get_type(line),
+						"default": get_default(line)}
 		variables.append(this_variable)
 	return variables
 
 def extract_task_info(input_list):
 	variables = []
 	for line in input_list:
-		this_variable = {"task": str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1]),
-						"name": str(re.search('([a-z, A-Z, _, 1-9])+"\:', line).group(0)[:-2]),
-						"type": str(re.search('\: \"([a-z, A-Z, _, 1-9])+\??', line).group(0)[3:]),
-						"default": str(re.search("default = ([a-z, A-Z, 0-9])+", line).group(0)) 
-							if bool(re.search("default = ([a-z, A-Z, 0-9])+", line)) 
-							else ""}
+		this_variable = {"task": get_task(line),
+						"name": get_name(line),
+						"type": get_type(line),
+						"default": get_default(line)}
 		variables.append(this_variable)
 	return variables
 
@@ -73,8 +84,7 @@ for input_variable in task_level:
 	else:
 		not_runtime.append(input_variable)
 
-
-with MarkdownGenerator(filename="inputs.md", enable_write=False) as doc:
+with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.addHeader(2, "Workflow-level inputs")
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
@@ -87,5 +97,5 @@ with MarkdownGenerator(filename="inputs.md", enable_write=False) as doc:
 
 CODE
 
-rm sorted.txt unique.txt cleaned.txt
+#rm sorted.txt unique.txt cleaned.txt
 echo "done"
