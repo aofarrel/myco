@@ -86,12 +86,12 @@ workflow myco {
 		}
 	}
 
-	Array[File] minos_vcfs_=select_all(varcall_with_array.vcf_final_call_set)
-	Array[File] bams_to_ref_=select_all(varcall_with_array.mapped_to_ref)
+	Array[File] minos_vcfs=select_all(varcall_with_array.vcf_final_call_set)
+	Array[File] bams_to_ref=select_all(varcall_with_array.mapped_to_ref)
 
 
-	scatter(vcfs_and_bams in zip(bams_to_ref_, minos_vcfs_)) {
-		call diff.make_mask_and_diff as make_mask_and_diff_ {
+	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
+		call diff.make_mask_and_diff as make_mask_and_diff {
 			input:
 				bam = vcfs_and_bams.left,
 				vcf = vcfs_and_bams.right,
@@ -103,18 +103,18 @@ workflow myco {
 	if(decorate_tree) {
 		call build_treesWF.usher_sampled_diff_to_taxonium as trees {
 			input:
-				diffs = make_mask_and_diff_.diff,
+				diffs = make_mask_and_diff.diff,
 				i = input_tree,
 				ref = ref_genome_for_tree_building,
-				coverage_reports = make_mask_and_diff_.report,
+				coverage_reports = make_mask_and_diff.report,
 				bad_data_threshold = bad_data_threshold
 		}
 	}
 
 	output {
-		Array[File] minos = minos_vcfs_
-		Array[File] masks = make_mask_and_diff_.mask_file
-		Array[File] diffs = make_mask_and_diff_.diff
+		Array[File] minos = minos_vcfs
+		Array[File] masks = make_mask_and_diff.mask_file
+		Array[File] diffs = make_mask_and_diff.diff
 		File? tax_tree = trees.taxonium_tree
 	}
 }
