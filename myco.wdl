@@ -26,7 +26,7 @@ workflow myco {
 	}
 
 	parameter_meta {
-		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don not include it in the tree"
+		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
 		input_tree: "Base tree to use if decorate_tree = true"

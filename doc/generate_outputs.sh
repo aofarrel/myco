@@ -17,6 +17,9 @@ python3 << CODE
 import re
 from markdowngenerator import MarkdownGenerator
 
+def strip_junk(string):
+	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "")
+
 def get_task(line):
 	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
 
@@ -96,7 +99,7 @@ with open("myco.wdl", "r") as myco:
 			break
 		elif in_parameter_meta and not line.startswith("}"):
 			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
-							"description": re.search('(?=\:).+', line).group(0).replace('\"', "").replace(": ", "")}
+							"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
 			parameter_meta.append(this_parameter)
 		else:
 			continue
@@ -110,6 +113,7 @@ for input_variable in workflow_level:
 		input_variable["description"] = parameter["description"]
 
 with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
+	doc.writeTextLine("See /inputs/example_inputs.json for examples.")
 	doc.addHeader(2, "Workflow-level inputs")
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
@@ -119,6 +123,15 @@ with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.addHeader(3, "Hardware settings")
 	doc.writeTextLine("A note on disk size: On GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.")
 	doc.addTable(dictionary_list=runtime)
+
+with open("doc/inputs.md", "r") as markdown:
+	stripped = []
+	for line in markdown:
+		stripped.append(strip_junk(line))
+with open("doc/inputs.md", "w") as markdown:
+	for line in stripped:
+		markdown.write(line)
+
 
 
 CODE

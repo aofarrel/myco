@@ -4,19 +4,20 @@
       * [Software settings](#software-settings)
       * [Hardware settings](#hardware-settings)
   
+See /inputs/example_inputs.json for examples.  
   
 ## Workflow-level inputs  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
-| bad_data_threshold | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, don not include it in the tree |  
+| bad_data_threshold | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
 | biosample_accessions | File |  | fastq input -- please see running_myco.md for more information |  
 | decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome |  
 | fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination times out (see timeout_decontam) |  
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
 | min_coverage | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
 | paired_fastq_sets | Array |  | fastq input -- please see running_myco.md for more information |  
-| ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY `&gt;NC_000962.3` on its first line |  
+| ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
 | timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout) |  
@@ -35,7 +36,7 @@ If you are on a backend that does not support call cacheing, you can use the &#x
 | ClockworkRefPrepTB | bluepeter__tar_indexd_H37Rv_ref | File? |  |  
 | ClockworkRefPrepTB | bluepeter__tar_indexd_dcontm_ref | File? |  |  
 | ClockworkRefPrepTB | bluepeter__tar_tb_ref_raw | File? |  |  
-| cat_reports | out | String  | \&quot;pull_reports.txt\&quot; |  
+| cat_reports | out | String  | \'pull_reports.txt\' |  
 | get_sample_IDs | filter_na | Boolean  | true |  
 | make_mask_and_diff | histograms | Boolean  | false |  
 | make_mask_and_diff | retries | Int  | 1 |  
@@ -44,7 +45,7 @@ If you are on a backend that does not support call cacheing, you can use the &#x
 | per_sample_decontam | counts_out | String? |  |  
 | per_sample_decontam | done_file | String? |  |  
 | per_sample_decontam | fail_on_timeout | Boolean  | false |  
-| per_sample_decontam | filename_metadata_tsv | String  | \&quot;remove_contam_metadata.tsv\&quot; |  
+| per_sample_decontam | filename_metadata_tsv | String  | \'remove_contam_metadata.tsv\' |  
 | per_sample_decontam | no_match_out_1 | String? |  |  
 | per_sample_decontam | no_match_out_2 | String? |  |  
 | per_sample_decontam | subsample_cutoff | Int  | -1 |  
@@ -53,7 +54,7 @@ If you are on a backend that does not support call cacheing, you can use the &#x
 | per_sample_decontam | verbose | Boolean  | true |  
 | pull | fail_on_invalid | Boolean  | false |  
 | pull | tar_outputs | Boolean  | false |  
-| trees | outfile | String  | \&quot;tree\&quot; |  
+| trees | outfile | String  | \'tree\' |  
 | varcall_with_array | debug | Boolean  | false |  
 | varcall_with_array | fail_on_timeout | Boolean  | false |  
 | varcall_with_array | force | Boolean  | false |  
@@ -62,7 +63,7 @@ If you are on a backend that does not support call cacheing, you can use the &#x
   
   
 ### Hardware settings  
-A note on disk size: On GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.  
+A note on disk sizeOn GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.  
   
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  
