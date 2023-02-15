@@ -1,6 +1,0 @@
-{
-  "myco.tarball_decontaminated_ref": "/Users/ash/Documents/aaa_test_files/tb/terra_outs/remove_contam/Ref.remove_contam.tar",
-  "myco.tarball_H37Rv_ref": "/Users/ash/Documents/aaa_test_files/tb/terra_outs/H37Rv/Ref.H37Rv.tar",
-  "myco.contamination_metadata_tsv": "/Users/ash/Documents/aaa_test_files/tb/terra_outs/remove_contam/Ref.remove_contam/remove_contam_metadata.tsv",
-  "myco.SRA_accessions": ["SAMEA2534421", "SAMEA2534128"]
-}

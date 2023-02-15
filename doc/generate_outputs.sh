@@ -4,9 +4,9 @@
 # and pip3 install git+https://github.com/Nicceboy/python-markdown-generator
 
 echo "grabbing inputs from myco_sra..."
-#java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
+java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco..."
-#java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
+java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -114,6 +114,7 @@ with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
 	doc.addHeader(3, "Software settings")
+	doc.writeTextLine("If you are on a backend that does not support call cacheing, you can use the 'bluepeter' inputs to skip the download of the reference genome.")
 	doc.addTable(dictionary_list=not_runtime)
 	doc.addHeader(3, "Hardware settings")
 	doc.writeTextLine("A note on disk size: On GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.")
@@ -122,5 +123,5 @@ with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 
 CODE
 
-#rm sorted.txt unique.txt cleaned.txt
+rm raw.txt sorted.txt unique.txt cleaned.txt
 echo "done"

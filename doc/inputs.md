@@ -28,6 +28,7 @@
 ## Task-level inputs  
   
 ### Software settings  
+If you are on a backend that does not support call cacheing, you can use the &#x27;bluepeter&#x27; inputs to skip the download of the reference genome.  
   
 | task | name | type | default |  
 |:---:|:---:|:---:|:---:|  
