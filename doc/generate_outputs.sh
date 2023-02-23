@@ -94,6 +94,9 @@ for input_variable in task_level:
 	elif input_variable["name"] == "retries":
 		input_variable["description"] = "How many times should we retry this task if it fails after it exhausts all uses of preemptibles?"
 		runtime.append(input_variable)
+	elif input_variable["name"] == "ssd":
+		input_variable["description"] = "If true, use SSDs for this task instead of HDDs"
+		runtime.append(input_variable)
 	else:
 		# not a runtime variable
 		if input_variable["name"] in filename_vars:
@@ -110,6 +113,17 @@ for input_variable in task_level:
 			not_runtime.append(input_variable)
 		elif input_variable["name"] == "subsample_seed":
 			input_variable["description"] = "Seed used for subsampling with seqtk"
+			not_runtime.append(input_variable)
+		# decontamination 
+		elif input_variable["name"] == "threads":
+			input_variable["description"] = "Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware."
+			not_runtime.append(input_variable)
+		# variant caller
+		elif input_variable["name"] == "debug":
+			input_variable["description"] = "Do not clean up any files and be verbose"
+			not_runtime.append(input_variable)
+		elif input_variable["name"] == "mem_height":
+			input_variable["description"] = "cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task)"
 			not_runtime.append(input_variable)
 		else:
 			not_runtime.append(input_variable)
@@ -148,8 +162,8 @@ with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.addHeader(3, "Software settings")
 	doc.writeTextLine("If you are on a backend that does not support call cacheing, you can use the 'bluepeter' inputs to skip the download of the reference genome.")
 	doc.addTable(dictionary_list=not_runtime)
-	doc.addHeader(3, "Hardware settings")
-	doc.writeTextLine("A note on disk size: On GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.")
+	doc.addHeader(3, "Runtime attributes")
+	doc.writeTextLine("These variables adjust runtime attributes, which includes hardware settings. See https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/ for more information.")
 	doc.addTable(dictionary_list=runtime)
 
 with open("doc/inputs.md", "r") as markdown:

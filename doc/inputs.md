@@ -2,7 +2,7 @@
     * [Workflow-level inputs](#workflow-level-inputs)
     * [Task-level inputs](#task-level-inputs)
       * [Software settings](#software-settings)
-      * [Hardware settings](#hardware-settings)
+      * [Runtime attributes](#runtime-attributes)
   
 See /inputs/example_inputs.json for examples.  
   
@@ -41,8 +41,8 @@ If you are on a backend that does not support call cacheing, you can use the `bl
 | per_sample_decontam | contam_out_1 | String? |  | Override default output file name with this string |  
 | per_sample_decontam | contam_out_2 | String? |  | Override default output file name with this string |  
 | per_sample_decontam | counts_out | String? |  | Override default output file name with this string |  
+| per_sample_decontam | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
 | per_sample_decontam | done_file | String? |  | Override default output file name with this string |  
-| per_sample_decontam | fail_on_timeout | Boolean  | false |  
 | per_sample_decontam | no_match_out_1 | String? |  | Override default output file name with this string |  
 | per_sample_decontam | no_match_out_2 | String? |  | Override default output file name with this string |  
 | per_sample_decontam | subsample_cutoff | Int  | -1 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
@@ -50,14 +50,13 @@ If you are on a backend that does not support call cacheing, you can use the `bl
 | per_sample_decontam | threads | Int? |  |  
 | per_sample_decontam | verbose | Boolean  | true |  
 | trees | outfile | String  | \'tree\' | Override default output file name with this string |  
-| varcall_with_array | debug | Boolean  | false |  
-| varcall_with_array | fail_on_timeout | Boolean  | false |  
-| varcall_with_array | force | Boolean  | false |  
-| varcall_with_array | mem_height | Int? |  |  
+| varcall_with_array | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
+| varcall_with_array | debug | Boolean  | false | Debug modedo not clean up any files and be verbose |  
+| varcall_with_array | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you`re also adjusting the reference preparation task) |  
   
   
-### Hardware settings  
-A note on disk sizeOn GCP backends, disk size is treated as a maximum. If your task goes above that limit, it will fail.  
+### Runtime attributes  
+These variables adjust runtime attributes, which includes hardware settings. See https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/ for more information.  
   
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  
@@ -72,11 +71,13 @@ A note on disk sizeOn GCP backends, disk size is treated as a maximum. If your t
 | per_sample_decontam | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
 | per_sample_decontam | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
 | per_sample_decontam | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| per_sample_decontam | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
 | pull | disk_size | Int  | 100 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
 | pull | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| varcall_with_array | addldisk | Int  | 250 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| varcall_with_array | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
 | varcall_with_array | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
 | varcall_with_array | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
 | varcall_with_array | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
 | varcall_with_array | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
+| varcall_with_array | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
   
