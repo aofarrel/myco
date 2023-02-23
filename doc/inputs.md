@@ -29,37 +29,31 @@ See /inputs/example_inputs.json for examples.
 ## Task-level inputs  
   
 ### Software settings  
-If you are on a backend that does not support call cacheing, you can use the &#x27;bluepeter&#x27; inputs to skip the download of the reference genome.  
+If you are on a backend that does not support call cacheing, you can use the `bluepeter` inputs to skip the download of the reference genome.  
   
 | task | name | type | default |  
 |:---:|:---:|:---:|:---:|  
 | ClockworkRefPrepTB | bluepeter__tar_indexd_H37Rv_ref | File? |  |  
 | ClockworkRefPrepTB | bluepeter__tar_indexd_dcontm_ref | File? |  |  
 | ClockworkRefPrepTB | bluepeter__tar_tb_ref_raw | File? |  |  
-| cat_reports | out | String  | \'pull_reports.txt\' |  
-| get_sample_IDs | filter_na | Boolean  | true |  
-| make_mask_and_diff | histograms | Boolean  | false |  
-| make_mask_and_diff | retries | Int  | 1 |  
-| per_sample_decontam | contam_out_1 | String? |  |  
-| per_sample_decontam | contam_out_2 | String? |  |  
-| per_sample_decontam | counts_out | String? |  |  
-| per_sample_decontam | done_file | String? |  |  
+| cat_reports | out | String  | \'pull_reports.txt\' | Override default output file name with this string |  
+| make_mask_and_diff | histograms | Boolean  | false | Should coverage histograms be output? |  
+| per_sample_decontam | contam_out_1 | String? |  | Override default output file name with this string |  
+| per_sample_decontam | contam_out_2 | String? |  | Override default output file name with this string |  
+| per_sample_decontam | counts_out | String? |  | Override default output file name with this string |  
+| per_sample_decontam | done_file | String? |  | Override default output file name with this string |  
 | per_sample_decontam | fail_on_timeout | Boolean  | false |  
-| per_sample_decontam | filename_metadata_tsv | String  | \'remove_contam_metadata.tsv\' |  
-| per_sample_decontam | no_match_out_1 | String? |  |  
-| per_sample_decontam | no_match_out_2 | String? |  |  
-| per_sample_decontam | subsample_cutoff | Int  | -1 |  
-| per_sample_decontam | subsample_seed | Int  | 1965 |  
+| per_sample_decontam | no_match_out_1 | String? |  | Override default output file name with this string |  
+| per_sample_decontam | no_match_out_2 | String? |  | Override default output file name with this string |  
+| per_sample_decontam | subsample_cutoff | Int  | -1 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
+| per_sample_decontam | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
 | per_sample_decontam | threads | Int? |  |  
 | per_sample_decontam | verbose | Boolean  | true |  
-| pull | fail_on_invalid | Boolean  | false |  
-| pull | tar_outputs | Boolean  | false |  
-| trees | outfile | String  | \'tree\' |  
+| trees | outfile | String  | \'tree\' | Override default output file name with this string |  
 | varcall_with_array | debug | Boolean  | false |  
 | varcall_with_array | fail_on_timeout | Boolean  | false |  
 | varcall_with_array | force | Boolean  | false |  
 | varcall_with_array | mem_height | Int? |  |  
-| varcall_with_array | retries | Int  | 1 |  
   
   
 ### Hardware settings  
@@ -73,6 +67,7 @@ A note on disk sizeOn GCP backends, disk size is treated as a maximum. If your t
 | make_mask_and_diff | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
 | make_mask_and_diff | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
 | make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| make_mask_and_diff | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
 | per_sample_decontam | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
 | per_sample_decontam | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
 | per_sample_decontam | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
@@ -83,4 +78,5 @@ A note on disk sizeOn GCP backends, disk size is treated as a maximum. If your t
 | varcall_with_array | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
 | varcall_with_array | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
 | varcall_with_array | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| varcall_with_array | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
   

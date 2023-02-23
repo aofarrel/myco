@@ -17,8 +17,15 @@ python3 << CODE
 import re
 from markdowngenerator import MarkdownGenerator
 
+filename_vars = [
+			"out", 
+			"contam_out_1", "contam_out_2", "counts_out",
+			"done_file", "no_match_out_1", "no_match_out_2", 
+			"outfile"
+			]
+
 def strip_junk(string):
-	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "")
+	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`")
 
 def get_task(line):
 	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
@@ -84,8 +91,29 @@ for input_variable in task_level:
 	elif input_variable["name"] == "preempt":
 		input_variable["description"] = "How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance?"
 		runtime.append(input_variable)
+	elif input_variable["name"] == "retries":
+		input_variable["description"] = "How many times should we retry this task if it fails after it exhausts all uses of preemptibles?"
+		runtime.append(input_variable)
 	else:
-		not_runtime.append(input_variable)
+		# not a runtime variable
+		if input_variable["name"] in filename_vars:
+			input_variable["description"] = "Override default output file name with this string"
+			not_runtime.append(input_variable)
+		elif input_variable["name"] == "histograms":
+			input_variable["description"] = "Should coverage histograms be output?"
+			not_runtime.append(input_variable)
+		elif input_variable["name"] == "crash_on_timeout":
+			input_variable["description"] = "If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)?"
+			not_runtime.append(input_variable)
+		elif input_variable["name"] == "subsample_cutoff":
+			input_variable["description"] = "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
+			not_runtime.append(input_variable)
+		elif input_variable["name"] == "subsample_seed":
+			input_variable["description"] = "Seed used for subsampling with seqtk"
+			not_runtime.append(input_variable)
+		else:
+			not_runtime.append(input_variable)
+
 
 # extract parameter_meta for workflow-level variables
 parameter_meta = []

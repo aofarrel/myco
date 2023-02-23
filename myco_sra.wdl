@@ -47,15 +47,18 @@ workflow myco {
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
-			accessions_file = biosample_accessions
+			accessions_file = biosample_accessions,
+			filter_na = true
 	}
 
 	scatter(biosample_accession in get_sample_IDs.accessions) {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
+				fail_on_invalid = false,
 				subsample_cutoff = subsample_cutoff,
-				subsample_seed = subsample_seed
+				subsample_seed = subsample_seed,
+				tar_outputs = false
 		} # output: pull.fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
@@ -75,6 +78,7 @@ workflow myco {
 				reads_files = pulled_fastq,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa",
+				filename_metadata_tsv = "remove_contam_metadata.tsv",
 				timeout_map_reads = timeout_decontam_part1,
 				timeout_decontam = timeout_decontam_part2
 		}

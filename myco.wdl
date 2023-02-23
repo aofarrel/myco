@@ -50,6 +50,7 @@ workflow myco {
 				reads_files = paired_fastqs,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa",
+				filename_metadata_tsv = "remove_contam_metadata.tsv",
 				subsample_cutoff = subsample_cutoff,
 				subsample_seed = subsample_seed,
 				timeout_map_reads = timeout_decontam_part1,
