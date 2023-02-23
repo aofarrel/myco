@@ -120,11 +120,18 @@ workflow myco {
 	}
 
 	if(fastqc_on_timeout) {
+		if(length(per_sample_decontam.check_this_fastq)>1 && length(varcall_with_array.check_this_fastq)>1) {
+			Array[File] bad_fastqs_both = select_all(per_sample_decontam.check_this_fastq)
+		}
 		if(length(per_sample_decontam.check_this_fastq)>1) {
-			call fastqc.FastqcWF {
-				input:
-					fastqs = select_all(per_sample_decontam.check_this_fastq)
-			}
+			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
+		}
+		if(length(varcall_with_array.check_this_fastq)>1) {
+			Array[File] bad_fastqs_varcallr = select_all(varcall_with_array.check_this_fastq)
+		}
+		call fastqc.FastqcWF {
+			input:
+				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
 		}
 	}
 
