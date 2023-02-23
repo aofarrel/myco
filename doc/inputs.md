@@ -31,11 +31,11 @@ See /inputs/example_inputs.json for examples.
 ### Software settings  
 If you are on a backend that does not support call cacheing, you can use the `bluepeter` inputs to skip the download of the reference genome.  
   
-| task | name | type | default |  
-|:---:|:---:|:---:|:---:|  
-| ClockworkRefPrepTB | bluepeter__tar_indexd_H37Rv_ref | File? |  |  
-| ClockworkRefPrepTB | bluepeter__tar_indexd_dcontm_ref | File? |  |  
-| ClockworkRefPrepTB | bluepeter__tar_tb_ref_raw | File? |  |  
+| task | name | type | default | description |  
+|:---:|:---:|:---:|:---:|:---:|  
+| ClockworkRefPrepTB | bluepeter__tar_indexd_H37Rv_ref | File? |  |  |  
+| ClockworkRefPrepTB | bluepeter__tar_indexd_dcontm_ref | File? |  |  |  
+| ClockworkRefPrepTB | bluepeter__tar_tb_ref_raw | File? |  |  |  
 | cat_reports | out | String  | \'pull_reports.txt\' | Override default output file name with this string |  
 | make_mask_and_diff | histograms | Boolean  | false | Should coverage histograms be output? |  
 | per_sample_decontam | contam_out_1 | String? |  | Override default output file name with this string |  
@@ -47,12 +47,12 @@ If you are on a backend that does not support call cacheing, you can use the `bl
 | per_sample_decontam | no_match_out_2 | String? |  | Override default output file name with this string |  
 | per_sample_decontam | subsample_cutoff | Int  | -1 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | per_sample_decontam | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
-| per_sample_decontam | threads | Int? |  |  
-| per_sample_decontam | verbose | Boolean  | true |  
+| per_sample_decontam | threads | Int? |  | Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware. |  
+| per_sample_decontam | verbose | Boolean  | true |  |  
 | trees | outfile | String  | \'tree\' | Override default output file name with this string |  
 | varcall_with_array | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
-| varcall_with_array | debug | Boolean  | false | Debug modedo not clean up any files and be verbose |  
-| varcall_with_array | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you`re also adjusting the reference preparation task) |  
+| varcall_with_array | debug | Boolean  | false | Do not clean up any files and be verbose |  
+| varcall_with_array | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
   
   
 ### Runtime attributes  

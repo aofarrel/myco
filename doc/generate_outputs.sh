@@ -126,6 +126,7 @@ for input_variable in task_level:
 			input_variable["description"] = "cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task)"
 			not_runtime.append(input_variable)
 		else:
+			input_variable["description"] = "" # need this or else the table is missing a column
 			not_runtime.append(input_variable)
 
 
