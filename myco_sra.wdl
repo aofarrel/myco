@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/vari
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/lesser-runtime-attributes/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -121,7 +121,10 @@ workflow myco {
 
 	if(fastqc_on_timeout) {
 		if(length(per_sample_decontam.check_this_fastq)>1 && length(varcall_with_array.check_this_fastq)>1) {
-			Array[File] bad_fastqs_both = select_all(per_sample_decontam.check_this_fastq)
+			Array[File] bad_fastqs_decontam_ = select_all(per_sample_decontam.check_this_fastq)
+			Array[File] bad_fastqs_varcallr_ = select_all(varcall_with_array.check_this_fastq)
+			Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
+			Array[File] bad_fastqs_both      = flatten(bad_fastqs_)  
 		}
 		if(length(per_sample_decontam.check_this_fastq)>1) {
 			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
