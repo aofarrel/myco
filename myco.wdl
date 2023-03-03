@@ -1,10 +1,10 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -78,11 +78,18 @@ workflow myco {
 	}
 
 	if(fastqc_on_timeout) {
+		if(length(per_sample_decontam.check_this_fastq)>1 && length(varcall_with_array.check_this_fastq)>1) {
+			Array[File] bad_fastqs_both = select_all(per_sample_decontam.check_this_fastq)
+		}
 		if(length(per_sample_decontam.check_this_fastq)>1) {
-			call fastqc.FastqcWF {
-				input:
-					fastqs = select_all(per_sample_decontam.check_this_fastq)
-			}
+			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
+		}
+		if(length(varcall_with_array.check_this_fastq)>1) {
+			Array[File] bad_fastqs_varcallr = select_all(varcall_with_array.check_this_fastq)
+		}
+		call fastqc.FastqcWF {
+			input:
+				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
 		}
 	}
 
@@ -116,5 +123,6 @@ workflow myco {
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File] diffs = make_mask_and_diff.diff
 		File? tax_tree = trees.taxonium_tree
+		Array[File]? fastqc_reports = FastqcWF.reports
 	}
 }
