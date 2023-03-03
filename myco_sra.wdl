@@ -123,14 +123,14 @@ workflow myco {
 		Array[File] bad_fastqs_decontam_ = select_all(per_sample_decontam.check_this_fastq)
 		Array[File] bad_fastqs_varcallr_ = select_all(varcall_with_array.check_this_fastq)
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
-		if(length(per_sample_decontam.check_this_fastq)>1 && length(varcall_with_array.check_this_fastq)>1) {
+		if(length(per_sample_decontam.check_this_fastq)>1 && length(bad_fastqs_varcallr_)>1) {
 			Array[File] bad_fastqs_both      = flatten(bad_fastqs_)  
 		}
 		if(length(per_sample_decontam.check_this_fastq)>1) {
 			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
 		}
-		if(length(varcall_with_array.check_this_fastq)>1) {
-			Array[File] bad_fastqs_varcallr = select_all(varcall_with_array.check_this_fastq)
+		if(length(bad_fastqs_varcallr_)>1) {
+			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
 		}
 		call fastqc.FastqcWF {
 			input:
