@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -47,15 +47,18 @@ workflow myco {
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
-			accessions_file = biosample_accessions
+			accessions_file = biosample_accessions,
+			filter_na = true
 	}
 
 	scatter(biosample_accession in get_sample_IDs.accessions) {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
+				fail_on_invalid = false,
 				subsample_cutoff = subsample_cutoff,
-				subsample_seed = subsample_seed
+				subsample_seed = subsample_seed,
+				tar_outputs = false
 		} # output: pull.fastqs
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
@@ -75,6 +78,7 @@ workflow myco {
 				reads_files = pulled_fastq,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa",
+				filename_metadata_tsv = "remove_contam_metadata.tsv",
 				timeout_map_reads = timeout_decontam_part1,
 				timeout_decontam = timeout_decontam_part2
 		}
@@ -116,11 +120,21 @@ workflow myco {
 	}
 
 	if(fastqc_on_timeout) {
+		Array[File] bad_fastqs_decontam_ = select_all(per_sample_decontam.check_this_fastq)
+		Array[File] bad_fastqs_varcallr_ = select_all(varcall_with_array.check_this_fastq)
+		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
+		if(length(per_sample_decontam.check_this_fastq)>1 && length(bad_fastqs_varcallr_)>1) {
+			Array[File] bad_fastqs_both      = flatten(bad_fastqs_)  
+		}
 		if(length(per_sample_decontam.check_this_fastq)>1) {
-			call fastqc.FastqcWF {
-				input:
-					fastqs = select_all(per_sample_decontam.check_this_fastq)
-			}
+			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
+		}
+		if(length(bad_fastqs_varcallr_)>1) {
+			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
+		}
+		call fastqc.FastqcWF {
+			input:
+				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
 		}
 	}
 

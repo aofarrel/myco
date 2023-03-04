@@ -1,10 +1,10 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.0.1/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.6.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.0/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -26,14 +26,13 @@ workflow myco {
 	}
 
 	parameter_meta {
-		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
+		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
 		input_tree: "Base tree to use if decorate_tree = true"
-		less_scattering: "(deprecated) Create less VMs by combining all decontamination jobs"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
-		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples' worth of paired fastqs"
-		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
+		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
+		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout)"
@@ -51,6 +50,7 @@ workflow myco {
 				reads_files = paired_fastqs,
 				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
 				ref_fasta_filename = "ref.fa",
+				filename_metadata_tsv = "remove_contam_metadata.tsv",
 				subsample_cutoff = subsample_cutoff,
 				subsample_seed = subsample_seed,
 				timeout_map_reads = timeout_decontam_part1,
@@ -78,11 +78,18 @@ workflow myco {
 	}
 
 	if(fastqc_on_timeout) {
+		if(length(per_sample_decontam.check_this_fastq)>1 && length(varcall_with_array.check_this_fastq)>1) {
+			Array[File] bad_fastqs_both = select_all(per_sample_decontam.check_this_fastq)
+		}
 		if(length(per_sample_decontam.check_this_fastq)>1) {
-			call fastqc.FastqcWF {
-				input:
-					fastqs = select_all(per_sample_decontam.check_this_fastq)
-			}
+			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
+		}
+		if(length(varcall_with_array.check_this_fastq)>1) {
+			Array[File] bad_fastqs_varcallr = select_all(varcall_with_array.check_this_fastq)
+		}
+		call fastqc.FastqcWF {
+			input:
+				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
 		}
 	}
 
@@ -116,5 +123,6 @@ workflow myco {
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File] diffs = make_mask_and_diff.diff
 		File? tax_tree = trees.taxonium_tree
+		Array[File]? fastqc_reports = FastqcWF.reports
 	}
 }

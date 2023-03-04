@@ -1,7 +1,3 @@
-# myco: An overview
-
-For information on running myco, [see here](./running_myco.md).
-
 ## Flowchart of myco
 ![Flowchart of myco](./myco_basic_flowchart.png)
 
