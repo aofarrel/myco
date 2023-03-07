@@ -15,24 +15,24 @@ workflow myco {
 		File typical_tb_masked_regions
 
 		Float   bad_data_threshold = 0.05
-		Boolean decorate_tree = false
-		Boolean fastqc_on_timeout = false
-		Boolean force_diff = false
+		Boolean decorate_tree      = false
+		Boolean fastqc_on_timeout  = false
+		Boolean force_diff         = false
 		File?   input_tree
 		Int     min_coverage = 10
 		File?   ref_genome_for_tree_building
-		Int     subsample_cutoff = 450
-		Int     subsample_seed = 1965
-		Int     timeout_decontam_part1 =  20
-		Int     timeout_decontam_part2 =  15
-		Int     timeout_variant_caller = 120
+		Int     subsample_cutoff       =  450
+		Int     subsample_seed         = 1965
+		Int     timeout_decontam_part1 =   20
+		Int     timeout_decontam_part2 =   15
+		Int     timeout_variant_caller =  120
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
-		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
+		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
@@ -47,19 +47,14 @@ workflow myco {
 
 	# WDL doesn't understand mutual exclusivity, so we have to get a little creative on 
 	# our determination of whether or not we want to create diff files.
-	if(decorate_tree) {
-		Boolean create_diff_files_ = true
-	}
+	if(decorate_tree)  {  Boolean create_diff_files_   = true  }
 	if(!decorate_tree) {
-		if(!force_diff) {
-			Boolean create_diff_files__ = false
-		}
-		if(force_diff) {
-			Boolean create_diff_files___ = true
-		}
+		if(!force_diff){  Boolean create_diff_files__  = false }
+		if(force_diff) {  Boolean create_diff_files___ = true  }
 	}
-	Boolean create_diff_files = select_first([create_diff_files_, create_diff_files__, create_diff_files___])
-	
+	Boolean create_diff_files = select_first([create_diff_files_,
+											  create_diff_files__, 
+											  create_diff_files___])
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
 
