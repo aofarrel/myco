@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/var
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.7/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.1/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -15,23 +15,25 @@ workflow myco {
 		File typical_tb_masked_regions
 
 		Float   bad_data_threshold = 0.05
-		Boolean decorate_tree = false
-		Boolean fastqc_on_timeout = false
+		Boolean decorate_tree      = false
+		Boolean fastqc_on_timeout  = false
+		Boolean force_diff         = false
 		File?   input_tree
 		Int     min_coverage = 10
 		File?   ref_genome_for_tree_building
-		Int     subsample_cutoff = 450
-		Int     subsample_seed = 1965
-		Int     timeout_decontam_part1 =  20
-		Int     timeout_decontam_part2 =  15
-		Int     timeout_variant_caller = 120
+		Int     subsample_cutoff       =  450
+		Int     subsample_seed         = 1965
+		Int     timeout_decontam_part1 =   20
+		Int     timeout_decontam_part2 =   15
+		Int     timeout_variant_caller =  120
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, don't include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
-		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination times out (see timeout_decontam)"
+		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
+		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
 		ref_genome_for_tree_building: "Ref genome, ONLY used for building trees, NOT variant calling"
@@ -42,6 +44,17 @@ workflow myco {
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to -1 to never timeout)"
 		typical_tb_masked_regions: "Bed file of regions to mask when making diff files"
 	}
+
+	# WDL doesn't understand mutual exclusivity, so we have to get a little creative on 
+	# our determination of whether or not we want to create diff files.
+	if(decorate_tree)  {  Boolean create_diff_files_   = true  }
+	if(!decorate_tree) {
+		if(!force_diff){  Boolean create_diff_files__  = false }
+		if(force_diff) {  Boolean create_diff_files___ = true  }
+	}
+	Boolean create_diff_files = select_first([create_diff_files_,
+											  create_diff_files__, 
+											  create_diff_files___])
 
 	call clockwork_ref_prepWF.ClockworkRefPrepTB
 
@@ -115,7 +128,8 @@ workflow myco {
 				bam = vcfs_and_bams.left,
 				vcf = vcfs_and_bams.right,
 				min_coverage = min_coverage,
-				tbmf = typical_tb_masked_regions
+				tbmf = typical_tb_masked_regions,
+				diffs = create_diff_files
 		}
 	}
 
@@ -139,12 +153,16 @@ workflow myco {
 	}
 
 	if(decorate_tree) {
+		# diff files must exist if decorate_tree is true, so we can force the Array[File?]?
+		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
+		Array[File] coerced_diffs = select_first([select_all(make_mask_and_diff.diff), minos_vcfs])
+		Array[File] coerced_reports = select_first([select_all(make_mask_and_diff.report), minos_vcfs])
 		call build_treesWF.usher_sampled_diff_to_taxonium as trees {
 			input:
-				diffs = make_mask_and_diff.diff,
+				diffs = coerced_diffs,
 				i = input_tree,
 				ref = ref_genome_for_tree_building,
-				coverage_reports = make_mask_and_diff.report,
+				coverage_reports = coerced_reports,
 				bad_data_threshold = bad_data_threshold
 		}
 	}
@@ -153,7 +171,7 @@ workflow myco {
 		File download_report = cat_reports.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
-		Array[File] diffs = make_mask_and_diff.diff
+		Array[File?] diffs = make_mask_and_diff.diff
 		File? tax_tree = trees.taxonium_tree
 		Array[File]? fastqc_reports = FastqcWF.reports
 	}
