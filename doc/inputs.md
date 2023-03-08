@@ -13,7 +13,8 @@ See /inputs/example_inputs.json for examples.
 | bad_data_threshold | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
 | biosample_accessions | File |  | fastq input -- please see running_myco.md for more information |  
 | decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome |  
-| fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination times out (see timeout_decontam) |  
+| fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination or variant calling times out |  
+| force_diff | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
 | min_coverage | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
 | paired_fastq_sets | Array |  | fastq input -- please see running_myco.md for more information |  
@@ -50,6 +51,7 @@ If you are on a backend that does not support call cacheing, you can use the `bl
 | per_sample_decontam | threads | Int? |  | Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware. |  
 | per_sample_decontam | verbose | Boolean  | true |  |  
 | trees | outfile | String  | \'tree\' | Override default output file name with this string |  
+| varcall_with_array | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
 | varcall_with_array | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
 | varcall_with_array | debug | Boolean  | false | Do not clean up any files and be verbose |  
 | varcall_with_array | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
@@ -62,9 +64,9 @@ These variables adjust runtime attributes, which includes hardware settings. See
 |:---:|:---:|:---:|:---:|:---:|  
 | cat_reports | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
 | get_sample_IDs | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| make_mask_and_diff | addldisk | Int  | 250 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| make_mask_and_diff | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
-| make_mask_and_diff | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
+| make_mask_and_diff | addldisk | Int  | 10 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| make_mask_and_diff | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
+| make_mask_and_diff | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
 | make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
 | make_mask_and_diff | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
 | per_sample_decontam | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  

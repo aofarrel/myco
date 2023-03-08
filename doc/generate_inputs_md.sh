@@ -4,9 +4,9 @@
 # and pip3 install git+https://github.com/Nicceboy/python-markdown-generator
 
 echo "grabbing inputs from myco_sra..."
-java -jar /Applications/womtool-76.jar inputs myco_sra.wdl > raw.txt
+java -jar /Applications/womtool-85.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco..."
-java -jar /Applications/womtool-76.jar inputs myco.wdl >> raw.txt
+java -jar /Applications/womtool-85.jar inputs myco.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -102,11 +102,11 @@ for input_variable in task_level:
 		if input_variable["name"] in filename_vars:
 			input_variable["description"] = "Override default output file name with this string"
 			not_runtime.append(input_variable)
-		elif input_variable["name"] == "histograms":
-			input_variable["description"] = "Should coverage histograms be output?"
-			not_runtime.append(input_variable)
 		elif input_variable["name"] == "crash_on_timeout":
 			input_variable["description"] = "If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)?"
+			not_runtime.append(input_variable)
+		elif input_variable["name"] == "crash_on_error":
+			input_variable["description"] = "If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting."
 			not_runtime.append(input_variable)
 		elif input_variable["name"] == "subsample_cutoff":
 			input_variable["description"] = "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
@@ -124,6 +124,10 @@ for input_variable in task_level:
 			not_runtime.append(input_variable)
 		elif input_variable["name"] == "mem_height":
 			input_variable["description"] = "cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task)"
+			not_runtime.append(input_variable)
+		# diffs and masking
+		elif input_variable["name"] == "histograms":
+			input_variable["description"] = "Should coverage histograms be output?"
 			not_runtime.append(input_variable)
 		else:
 			input_variable["description"] = "" # need this or else the table is missing a column

@@ -118,7 +118,8 @@ workflow myco {
 				bam = vcfs_and_bams.left,
 				vcf = vcfs_and_bams.right,
 				min_coverage = min_coverage,
-				tbmf = typical_tb_masked_regions
+				tbmf = typical_tb_masked_regions,
+				diffs = create_diff_files
 		}
 	}
 
