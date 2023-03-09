@@ -17,7 +17,7 @@ SAME, SAMN, SRS, ERS, and numeric BioSample accessions are all supported, as wel
 All other inputs are documented here: [doc/inputs.md](./doc/inputs.md)
 
 ## How does the fastq downloading part differ from similar workflows?
-There are several existing workflows which can pull from SRA, such as [SRA Fetch](https://dockstore.org/workflows/github.com/theiagen/terra_utilities/SRA_Fetch:v1.4.1?tab=info) and [DownloadFromSRA](https://dockstore.org/workflows/github.com/broadinstitute/long-read-pipelines/DownloadFromSRA:kvg_update_downloaders?tab=info). If you need your reads downloaded with no processing or saved to a specific GCS directory, these workflows might be better suited to your needs than SRANWRP, because SRANWRP assumes you only want paired-end Illumina data while also making no assumptions about you actually giving it that.
+There are several existing workflows which can pull from SRA, such as [SRA Fetch](https://dockstore.org/workflows/github.com/theiagen/terra_utilities/SRA_Fetch:v1.4.1?tab=info) and [DownloadFromSRA](https://dockstore.org/workflows/github.com/broadinstitute/long-read-pipelines/DownloadFromSRA:kvg_update_downloaders?tab=info). If you need your reads downloaded with no processing or saved to a specific GCS directory, these workflows might be better suited to your needs than SRANWRP. SRANWRP assumes you only want paired-end Illumina data while also making no assumptions about you actually giving it that.
 
 SRANWRP also supports downloading fastqs per BioSamples accession rather than per run accession. In myco_sra this helps maintain a sense of which reads belong to which sample (clockwork operates per-sample), but it can also be helpful when dealing with samples with very large number of run accessions.
 
