@@ -14,7 +14,7 @@ SAMEA111556114
 
 SAME, SAMN, SRS, ERS, and numeric BioSample accessions are all supported, as well as any combination of these formats. **Run accessions (SRR, ERR, DRR) are not supported, [but you can use this workflow to convert your run accessions to BioSample accessions](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info).**
 
-All other inputs are documented here: [doc/inputs.md](./doc/inputs.md)
+All other inputs are documented here: [inputs.md](./inputs.md)
 
 ## How does the fastq downloading part differ from similar workflows?
 There are several existing workflows which can pull from SRA, such as [SRA Fetch](https://dockstore.org/workflows/github.com/theiagen/terra_utilities/SRA_Fetch:v1.4.1?tab=info) and [DownloadFromSRA](https://dockstore.org/workflows/github.com/broadinstitute/long-read-pipelines/DownloadFromSRA:kvg_update_downloaders?tab=info). If you need your reads downloaded with no processing, need PacBio reads downloaded, or need your fastqs saved to a specific GCS directory, these workflows might be better suited to your needs than SRANWRP. **SRANWRP assumes you only want paired-end Illumina data while also making no assumptions that the BioSamples you are giving it actually have any paired-end Illumina data.**
