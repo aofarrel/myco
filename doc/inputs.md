@@ -20,7 +20,8 @@ Regardless of which version of myco you use, please make sure your fastqs:
 * len(quality scores) = len(nucleotides) for every line <sup>†</sup>  
 * is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  
 * is not huge — individual files over subsample_cutoff (default450 MB) will be downsampled, but keep an eye on the cumulative size of samples which have lots of small reads  
-* it is okay to have more than two reads per sample -- where things get iffy is if you have 8 or more fastqs per sample (exSAMEA968096)  
+* it is okay to have more than two reads per sample -- where things get iffy is if you have 8 or more fastqs per sample (such as SAMEA968096)  
+
 <sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.  
   
 | name | type | default | description |  

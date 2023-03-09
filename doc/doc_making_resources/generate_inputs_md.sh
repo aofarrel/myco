@@ -29,7 +29,7 @@ dont_input_garbage = ("Regardless of which version of myco you use, please make 
 					"will be downsampled, but keep an eye on the cumulative size of samples "
 					"which have lots of small reads  \n"
   					"* it is okay to have more than two reads per sample -- where things get iffy "
-					"is if you have 8 or more fastqs per sample (ex: SAMEA968096)  \n"
+					"is if you have 8 or more fastqs per sample (such as SAMEA968096)  \n\n"
 					"<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out "
 					"those samples without erroring. Other forms of myco are not able to detect "
 					"these issues.")

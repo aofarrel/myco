@@ -43,7 +43,8 @@ The only other accessions known to fail SRANWRP are ones which break prefetch or
 We can't always tell that data isn't up to our standards until later down the pipeline. myco (including myco_sra) will filter out samples which:
 * are too heavily contaminated to complete decontamination in a timely manner<sup>†</sup>
 * take too long in the variant caller<sup>†</sup>
-* have low overall coverage
+* have low overall coverage  
+
 <sup>†</sup>This sort of filtering can be disabled by setting the timeout optional variables to 0 -- but be aware that GCP will kill any VM that is still alive after about a week, so if you're on Terra, your samples need to process faster than that!
 
 There is a small number of BioSamples known to return fastqs which, after decontamination, will cause a runtime error in the variant caller. As of version 3.0.1 of myco, this runtime error is handled by throwing out the sample rather than stopping the entire pipeline (unless you set crash_on_error to true). Throwing out samples like this was decided as the default behavior as a quick analysis indicates the runtime error only happens when clockwork's variant calling removes >95% of the fastq during a Trimmomatic run (ie, the sample probably shouldn't be used anyway). The list of these samples can be found [in SRANWPR's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists).
