@@ -7,23 +7,36 @@
 See /inputs/example_inputs.json for examples.  
   
 ## Workflow-level inputs  
+Each version of myco has a slightly different way of inputting fastqs. A basic explanation for each workflow is in the table below. You can find more detailed explanations in each workflow`s workflow-level readme.  
+  
+| name | type | workflow | description |  
+|:---:|:---:|:---:|:---:|  
+| biosample_accessions | File | myco_sra | File of BioSample accessions to pull, one accession per line |  
+| paired_fastq_sets | Array | myco_raw | Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs |  
+  
+Regardless of which version of myco you use, please make sure your fastqs:
+* is Illumina paired-end data <sup>†</sup>  
+* is grouped per-sample <sup>†</sup>   
+* len(quality scores) = len(nucleotides) for every line <sup>†</sup>  
+* is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  
+* is not huge — individual files over subsample_cutoff (default450 MB) will be downsampled, but keep an eye on the cumulative size of samples which have lots of small reads  
+* it is okay to have more than two reads per sample -- where things get iffy is if you have 8 or more fastqs per sample (exSAMEA968096)  
+<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
 | bad_data_threshold | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
-| biosample_accessions | File |  | fastq input -- please see running_myco.md for more information |  
 | decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome |  
 | fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination or variant calling times out |  
 | force_diff | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
 | min_coverage | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
-| paired_fastq_sets | Array |  | fastq input -- please see running_myco.md for more information |  
 | ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
-| timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to -1 to never timeout) |  
-| timeout_decontam_part2 | Int  | 15 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to -1 to never timeout) |  
-| timeout_variant_caller | Int  | 120 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to -1 to never timeout) |  
+| timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout |  
+| timeout_decontam_part2 | Int  | 15 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) |  
+| timeout_variant_caller | Int  | 120 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) |  
 | typical_tb_masked_regions | File |  | Bed file of regions to mask when making diff files |  
   
   

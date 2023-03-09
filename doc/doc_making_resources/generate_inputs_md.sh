@@ -25,7 +25,7 @@ dont_input_garbage = ("Regardless of which version of myco you use, please make 
 					"* is grouped per-sample <sup>†</sup>   \n"
 					"* len(quality scores) = len(nucleotides) for every line <sup>†</sup>  \n"
 					"* is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  \n"
-					"* isn't huge — individual files over `subsample_cutoff` (default: 450 MB) "
+					"* is not huge — individual files over subsample_cutoff (default: 450 MB) "
 					"will be downsampled, but keep an eye on the cumulative size of samples "
 					"which have lots of small reads  \n"
   					"* it is okay to have more than two reads per sample -- where things get iffy "
@@ -33,7 +33,6 @@ dont_input_garbage = ("Regardless of which version of myco you use, please make 
 					"<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out "
 					"those samples without erroring. Other forms of myco are not able to detect "
 					"these issues.")
-"""
 filename_vars = [
 			"out", 
 			"contam_out_1", "contam_out_2", "counts_out",
@@ -42,7 +41,7 @@ filename_vars = [
 			]
 
 def strip_junk(string):
-	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`")
+	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`").replace("&lt;", "<")
 
 def get_task(line):
 	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
@@ -167,28 +166,52 @@ with open("myco.wdl", "r") as myco:
 			parameter_meta.append(this_parameter)
 		else:
 			continue
+in_parameter_meta = False
+with open("myco_sra.wdl", "r") as myco:
+	for line in myco:
+		if line.startswith("\tparameter_meta"):
+			in_parameter_meta = True
+			continue
+		elif line.startswith("\t}") and in_parameter_meta:
+			break
+		elif in_parameter_meta and not line.startswith("}"):
+			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
+							"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
+			if this_parameter not in parameter_meta:
+				# this will add duplicates if the same variable have diff descriptions in diff workflows
+				# TODO: add a check to detect such duplicates, which indicate inconsistent documentation
+				parameter_meta.append(this_parameter)
+		else:
+			continue
 
+# give workflow level variables their parameter meta descriptions and/or add to fastq_inputs
+fastq_inputs = []
 for input_variable in workflow_level:
 	value = input_variable["name"]
-	parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
-	input_variable["description"] = parameter["description"]
 	if value == "biosample_accessions":
 		input_variable["workflow"] = "myco_sra"
+		del input_variable["default"]
 		fastq_inputs.append(input_variable)
 	elif value == "paired_fastq_sets":
 		input_variable["workflow"] = "myco_raw"
+		del input_variable["default"]
 		fastq_inputs.append(input_variable)
 	#elif value == "clean_forward_reads":
 	#	input_variable["workflow"] = "myco_cleaned"
+	#	del input_variable["default"]
 	#	fastq_inputs.append(input_variable)
 	#elif value == "clean_reverse_reads":
 	#	input_variable["workflow"] = "myco_cleaned"
+	#	del input_variable["default"]
 	#	fastq_inputs.append(input_variable)
 	else:
 		pass
+	# do this last to put it after the workflow name in the fastq ones
+	parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
+	input_variable["description"] = parameter["description"]
 
 for input_variable in fastq_inputs:
-	del workflow_level[input_variable]
+	workflow_level.remove(input_variable)
 		
 with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.writeTextLine("See /inputs/example_inputs.json for examples.")
