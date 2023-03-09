@@ -1,5 +1,5 @@
 # myco 🍄
-myco is a pipeline built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
+myco is group of pipelines built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
 
 ## Which workflow should I use?
 Each version of myco is relatively similar. Where they differ is the sort of the inputs they expect. **In all cases, your FASTQs must be paired-end Illumina reads.**
@@ -11,7 +11,7 @@ Each version of myco is relatively similar. Where they differ is the sort of the
 * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: [convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then myco_sra
 
 ## More information
-* Basic info on running myco: [running_myco.md](./doc/running_myco.md)
+* How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
 * Full list of inputs: [inputs.md](./doc/inputs.md)
 * Overview of the pipeline: [pipline_overview.md](./doc/pipline_overview.md)
 

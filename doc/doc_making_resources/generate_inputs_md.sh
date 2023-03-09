@@ -17,6 +17,23 @@ python3 << CODE
 import re
 from markdowngenerator import MarkdownGenerator
 
+fastq_intro =  ("Each version of myco has a slightly different way of inputting fastqs. "
+				"A basic explanation for each workflow is in the table below. You can "
+				"find more detailed explanations in each workflow's workflow-level readme.")
+dont_input_garbage = ("Regardless of which version of myco you use, please make sure your fastqs:\n"
+					"* is Illumina paired-end data <sup>†</sup>  \n"
+					"* is grouped per-sample <sup>†</sup>   \n"
+					"* len(quality scores) = len(nucleotides) for every line <sup>†</sup>  \n"
+					"* is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  \n"
+					"* isn't huge — individual files over `subsample_cutoff` (default: 450 MB) "
+					"will be downsampled, but keep an eye on the cumulative size of samples "
+					"which have lots of small reads  \n"
+  					"* it is okay to have more than two reads per sample -- where things get iffy "
+					"is if you have 8 or more fastqs per sample (ex: SAMEA968096)  \n"
+					"<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out "
+					"those samples without erroring. Other forms of myco are not able to detect "
+					"these issues.")
+"""
 filename_vars = [
 			"out", 
 			"contam_out_1", "contam_out_2", "counts_out",
@@ -153,15 +170,32 @@ with open("myco.wdl", "r") as myco:
 
 for input_variable in workflow_level:
 	value = input_variable["name"]
-	if value in ["biosample_accessions", "paired_fastq_sets"]:
-		input_variable["description"] = "fastq input -- please see running_myco.md for more information"
+	parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
+	input_variable["description"] = parameter["description"]
+	if value == "biosample_accessions":
+		input_variable["workflow"] = "myco_sra"
+		fastq_inputs.append(input_variable)
+	elif value == "paired_fastq_sets":
+		input_variable["workflow"] = "myco_raw"
+		fastq_inputs.append(input_variable)
+	#elif value == "clean_forward_reads":
+	#	input_variable["workflow"] = "myco_cleaned"
+	#	fastq_inputs.append(input_variable)
+	#elif value == "clean_reverse_reads":
+	#	input_variable["workflow"] = "myco_cleaned"
+	#	fastq_inputs.append(input_variable)
 	else:
-		parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
-		input_variable["description"] = parameter["description"]
+		pass
 
+for input_variable in fastq_inputs:
+	del workflow_level[input_variable]
+		
 with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.writeTextLine("See /inputs/example_inputs.json for examples.")
 	doc.addHeader(2, "Workflow-level inputs")
+	doc.writeTextLine(fastq_intro)
+	doc.addTable(dictionary_list=fastq_inputs)
+	doc.writeTextLine(dont_input_garbage)
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
 	doc.addHeader(3, "Software settings")
