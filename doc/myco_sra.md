@@ -33,7 +33,7 @@ The "ideal" scenario is that each BioSample has some number of run accessions, a
 For example, let's say this task got SAMN08436121. This has only one run associated with it: SRR6650260. Pulling that yields three files: SRR6650260_1.fastq, SRR6650260_2.fastq, and SRR6650260.fastq. Only SRR6650260_1.fastq and SRR6650260_2.fastq will be passed to the decontamination and variant calling steps.
 
 ## Are there any SRA accessions known to break SRANWRP?
-Accessions belonging to "sample groups" are not supported, as it isn't very clear which run accessions correlate to which sample accessions. Known "sample group" accessions can be found [in SRANWPR's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists). Non-TB accessions are also not supported.
+Accessions belonging to "sample groups" are not supported, as it isn't very clear which run accessions correlate to which sample accessions. Known "sample group" accessions can be found [in SRANWRP's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists). Non-TB accessions are also not supported.
 
 Although none that aren't also in sample groups have been found yet, in theory, samples with a very large number of run accessions could be problematic on a GCP backend. GCP backends require you request a certain amount of disk size before runtime, which can get dicey when what you want to do at runtime is download an unknown number of files of unknown size. As such, SRANWRP requests more disk size than you *probably* need, but there could come a time that guess doesn't prove to be enough.
 
@@ -47,7 +47,7 @@ We can't always tell that data isn't up to our standards until later down the pi
 
 <sup>†</sup>This sort of filtering can be disabled by setting the timeout optional variables to 0 -- but be aware that GCP will kill any VM that is still alive after about a week, so if you're on Terra, your samples need to process faster than that!
 
-There is a small number of BioSamples known to return fastqs which, after decontamination, will cause a runtime error in the variant caller. As of version 3.0.1 of myco, this runtime error is handled by throwing out the sample rather than stopping the entire pipeline (unless you set crash_on_error to true). Throwing out samples like this was decided as the default behavior as a quick analysis indicates the runtime error only happens when clockwork's variant calling removes >95% of the fastq during a Trimmomatic run (ie, the sample probably shouldn't be used anyway). The list of these samples can be found [in SRANWPR's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists).
+There is a small number of BioSamples known to return fastqs which, after decontamination, will cause a runtime error in the variant caller. As of version 3.0.1 of myco, this runtime error is handled by throwing out the sample rather than stopping the entire pipeline (unless you set crash_on_error to true). Throwing out samples like this was decided as the default behavior as a quick analysis indicates the runtime error only happens when clockwork's variant calling removes >95% of the fastq during a Trimmomatic run (ie, the sample probably shouldn't be used anyway). The list of these samples can be found [in SRANWRP's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists).
 
 ## Flowchart and explanations of every step
 ![Flowchart of myco_sra, part 1](./doc_making_resources/myco_sra_flowchart_1.png)
