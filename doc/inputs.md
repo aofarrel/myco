@@ -1,5 +1,6 @@
 ## Table of Contents  
     * [Workflow-level inputs](#workflow-level-inputs)
+      * [Non-fastq workflow-level inputs](#non-fastq-workflow-level-inputs)
     * [Task-level inputs](#task-level-inputs)
       * [Software settings](#software-settings)
       * [Runtime attributes](#runtime-attributes)
@@ -7,7 +8,7 @@
 See /inputs/example_inputs.json for examples.  
   
 ## Workflow-level inputs  
-Each version of myco has a slightly different way of inputting fastqs. A basic explanation for each workflow is in the table below. You can find more detailed explanations in each workflow`s workflow-level readme.  
+Each version of myco has a slightly different way of inputting fastqs. A basic explanation for each workflow is in the table below. You can find more detailed explanations in each workflow's workflow-level readme.  
   
 | name | type | workflow | description |  
 |:---:|:---:|:---:|:---:|  
@@ -16,13 +17,13 @@ Each version of myco has a slightly different way of inputting fastqs. A basic e
   
 Regardless of which version of myco you use, please make sure your fastqs:
 * is Illumina paired-end data <sup>†</sup>  
-* is grouped per-sample <sup>†</sup>   
+* is grouped per-sample   
 * len(quality scores) = len(nucleotides) for every line <sup>†</sup>  
 * is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  
-* is not huge — individual files over subsample_cutoff (default450 MB) will be downsampled, but keep an eye on the cumulative size of samples which have lots of small reads  
-* it is okay to have more than two reads per sample -- where things get iffy is if you have 8 or more fastqs per sample (such as SAMEA968096)  
-
-<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.  
+<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.
+It is recommend that you also keep an eye on the total size of your fastqs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' fastqs are over 1 GB in size, but the sum total of these fastqs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)  
+  
+### Non-fastq workflow-level inputs  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
@@ -32,7 +33,7 @@ Regardless of which version of myco you use, please make sure your fastqs:
 | force_diff | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
 | min_coverage | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
-| ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line |  
+| ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY '>NC_000962.3' on its first line |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
 | timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout |  
@@ -44,7 +45,7 @@ Regardless of which version of myco you use, please make sure your fastqs:
 ## Task-level inputs  
   
 ### Software settings  
-If you are on a backend that does not support call cacheing, you can use the `bluepeter` inputs to skip the download of the reference genome.  
+If you are on a backend that does not support call cacheing, you can use the 'bluepeter' inputs to skip the download of the reference genome.  
   
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  

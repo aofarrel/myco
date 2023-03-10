@@ -5,8 +5,8 @@
 
 echo "grabbing inputs from myco_sra..."
 java -jar /Applications/womtool-85.jar inputs myco_sra.wdl > raw.txt
-echo "grabbing inputs from myco..."
-java -jar /Applications/womtool-85.jar inputs myco.wdl >> raw.txt
+echo "grabbing inputs from myco_raw..."
+java -jar /Applications/womtool-85.jar inputs myco_raw.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -22,17 +22,18 @@ fastq_intro =  ("Each version of myco has a slightly different way of inputting 
 				"find more detailed explanations in each workflow's workflow-level readme.")
 dont_input_garbage = ("Regardless of which version of myco you use, please make sure your fastqs:\n"
 					"* is Illumina paired-end data <sup>†</sup>  \n"
-					"* is grouped per-sample <sup>†</sup>   \n"
+					"* is grouped per-sample   \n"
 					"* len(quality scores) = len(nucleotides) for every line <sup>†</sup>  \n"
 					"* is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  \n"
-					"* is not huge — individual files over subsample_cutoff (default: 450 MB) "
-					"will be downsampled, but keep an eye on the cumulative size of samples "
-					"which have lots of small reads  \n"
-  					"* it is okay to have more than two reads per sample -- where things get iffy "
-					"is if you have 8 or more fastqs per sample (such as SAMEA968096)  \n\n"
-					"<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out "
-					"those samples without erroring. Other forms of myco are not able to detect "
-					"these issues.")
+					"<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples "
+					"without erroring. Other forms of myco are not able to detect these issues.\n"
+					"It is recommend that you also keep an eye on the total size of your fastqs. "
+					"Individual files over subsample_cutoff (default: 450 MB, -1 disables this check) "
+					"will be downsampled, but keep an eye on the cumulative size of samples. For example, "
+					"a sample like SAMEA968096 has 12 run accessions associated with it. Individually, "
+					"none of these run accessions' fastqs are over 1 GB in size, but the sum total of "
+					"these fastqs could quickly fill up your disk space. (You probably should not be using "
+					"SAMEA968096 anyway because it is in sample group, which can cause other issues.)")
 filename_vars = [
 			"out", 
 			"contam_out_1", "contam_out_2", "counts_out",
@@ -41,7 +42,11 @@ filename_vars = [
 			]
 
 def strip_junk(string):
-	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`").replace("&lt;", "<")
+	"""
+	The python to markdown converter we're using seems to do some character replacements to ensure
+	greater markdown compatiability, but they render awfully GitHub. This function undos that.
+	"""
+	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`").replace("&lt;", "<").replace("\`", "\'")
 
 def get_task(line):
 	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
@@ -153,7 +158,7 @@ for input_variable in task_level:
 # extract parameter_meta for workflow-level variables
 parameter_meta = []
 in_parameter_meta = False
-with open("myco.wdl", "r") as myco:
+with open("myco_raw.wdl", "r") as myco:
 	for line in myco:
 		if line.startswith("\tparameter_meta"):
 			in_parameter_meta = True
@@ -219,6 +224,7 @@ with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.writeTextLine(fastq_intro)
 	doc.addTable(dictionary_list=fastq_inputs)
 	doc.writeTextLine(dont_input_garbage)
+	doc.addHeader(3, "Non-fastq workflow-level inputs")
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
 	doc.addHeader(3, "Software settings")
