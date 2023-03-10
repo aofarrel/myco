@@ -1,5 +1,5 @@
 # myco_raw
-myco_raw is the "I have my fastqs in nested arrays already" version of myco.
+myco_raw is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis, and you want to decontaminate them before calling variants.
 
 ## Notable inputs
 You need your FASTQs as a nested array, where each inner array represents one sample. For example, let's say you the following samples in a google bucket located at gs://my-cool-bucket/fqs/
