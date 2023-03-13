@@ -10,7 +10,7 @@ Each version of myco is relatively similar. Where they differ is the sort of the
 * a list of SRA BioSamples whose FASTQs you'd like to use: myco_sra
 * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: [convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then myco_sra
 
-Note that myco_cleaned is designed for [Terra data tables](https://support.terra.bio/hc/en-us/articles/360025758392) specifically. **This means that myco_cleaned, as a single workflow, runs a single sample.** This is in contrast to myco_sra and myco_raw, which run as a single workflow with individual tasks scattered upon multiple samples. To run myco_cleaned on more than one sample at a time, you must run multiple instances of myco_cleaned -- which is very easy to do with Terra data tables.
+Note that myco_cleaned is designed for [Terra data tables](https://support.terra.bio/hc/en-us/articles/360025758392) specifically. **This means that myco_cleaned, as a single workflow, runs a single sample.** This is in contrast to myco_sra and myco_raw, which run as a single workflow with individual tasks scattered upon multiple samples. To run myco_cleaned on more than one sample at a time, you must run multiple instances of myco_cleaned -- which is very easy to do with Terra data tables. 
 
 ## More information
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
