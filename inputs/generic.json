@@ -1,0 +1,9 @@
+{
+	"myco.decorate_tree":"true",
+	"myco.input_tree":"gs://topmed_workflow_testing/tb/alldiffs_mask2ref.L.fixed.pb",
+	"myco.ref_genome_for_tree_building":"gs://topmed_workflow_testing/tb/tb_seq.fasta",
+	"myco.timeout_decontam_part1":"0",
+	"myco.timeout_decontam_part2":"0",
+	"myco.timeout_variant_caller":"0",
+	"myco.typical_tb_masked_regions":"gs://topmed_workflow_testing/tb/R00000039_repregions.bed"
+}
