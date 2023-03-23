@@ -7,6 +7,8 @@ echo "grabbing inputs from myco_sra..."
 java -jar /Applications/womtool-85.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco_raw..."
 java -jar /Applications/womtool-85.jar inputs myco_raw.wdl >> raw.txt
+echo "grabbing inputs from myco_cleaned..."
+java -jar /Applications/womtool-85.jar inputs myco_cleaned.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -33,7 +35,10 @@ dont_input_garbage = ("Regardless of which version of myco you use, please make 
 					"a sample like SAMEA968096 has 12 run accessions associated with it. Individually, "
 					"none of these run accessions' fastqs are over 1 GB in size, but the sum total of "
 					"these fastqs could quickly fill up your disk space. (You probably should not be using "
-					"SAMEA968096 anyway because it is in sample group, which can cause other issues.)")
+					"SAMEA968096 anyway because it is in sample group, which can cause other issues.)\n\n"
+					"myco_cleaned expects that the fastqs you are putting into have already been cleaned and "
+					"merged. It's recommend you do this by running "
+					"[Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).")
 filename_vars = [
 			"out", 
 			"contam_out_1", "contam_out_2", "counts_out",
@@ -188,6 +193,23 @@ with open("myco_sra.wdl", "r") as myco:
 				parameter_meta.append(this_parameter)
 		else:
 			continue
+in_parameter_meta = False
+with open("myco_cleaned.wdl", "r") as myco:
+	for line in myco:
+		if line.startswith("\tparameter_meta"):
+			in_parameter_meta = True
+			continue
+		elif line.startswith("\t}") and in_parameter_meta:
+			break
+		elif in_parameter_meta and not line.startswith("}"):
+			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
+							"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
+			if this_parameter not in parameter_meta:
+				# this will add duplicates if the same variable have diff descriptions in diff workflows
+				# TODO: add a check to detect such duplicates, which indicate inconsistent documentation
+				parameter_meta.append(this_parameter)
+		else:
+			continue
 
 # give workflow level variables their parameter meta descriptions and/or add to fastq_inputs
 fastq_inputs = []
@@ -199,6 +221,10 @@ for input_variable in workflow_level:
 		fastq_inputs.append(input_variable)
 	elif value == "paired_fastq_sets":
 		input_variable["workflow"] = "myco_raw"
+		del input_variable["default"]
+		fastq_inputs.append(input_variable)
+	elif value == "paired_decontaminated_fastq_sets":
+		input_variable["workflow"] = "myco_cleaned"
 		del input_variable["default"]
 		fastq_inputs.append(input_variable)
 	#elif value == "clean_forward_reads":

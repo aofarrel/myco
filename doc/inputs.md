@@ -13,6 +13,7 @@ Each version of myco has a slightly different way of inputting fastqs. A basic e
 | name | type | workflow | description |  
 |:---:|:---:|:---:|:---:|  
 | biosample_accessions | File | myco_sra | File of BioSample accessions to pull, one accession per line |  
+| paired_decontaminated_fastq_sets | Array | myco_cleaned | Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one forward read and one reverse read. |  
 | paired_fastq_sets | Array | myco_raw | Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs |  
   
 Regardless of which version of myco you use, please make sure your fastqs:
@@ -21,7 +22,9 @@ Regardless of which version of myco you use, please make sure your fastqs:
 * len(quality scores) = len(nucleotides) for every line <sup>†</sup>  
 * is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  
 <sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.
-It is recommend that you also keep an eye on the total size of your fastqs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' fastqs are over 1 GB in size, but the sum total of these fastqs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)  
+It is recommend that you also keep an eye on the total size of your fastqs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' fastqs are over 1 GB in size, but the sum total of these fastqs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)
+
+myco_cleaned expects that the fastqs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
   
 ### Non-fastq workflow-level inputs  
   

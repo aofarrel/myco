@@ -7,7 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" a
 
 workflow myco {
 	input {
-		Array[Array[File]] paired_fastq_sets
+		Array[Array[File]] paired_decontaminated_fastq_sets
 		File typical_tb_masked_regions
 
 		Float   bad_data_threshold = 0.05
@@ -29,7 +29,7 @@ workflow myco {
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
-		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
+		paired_decontaminated_fastq_sets: "Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one forward read and one reverse read."
 		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
@@ -50,7 +50,7 @@ workflow myco {
     
     call clockwork_ref_prepWF.ClockworkRefPrepTB
 
-	scatter(paired_fastqs in paired_fastq_sets) {
+	scatter(paired_fastqs in paired_decontaminated_fastq_sets) {
 			call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
