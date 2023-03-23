@@ -12,3 +12,15 @@ workflows:
     readMePath: /doc/myco_sra.md
     authors:
       - orcid: 0000-0003-4896-1858
+  - name: myco_cleaned
+    subclass: WDL
+    primaryDescriptorPath: /myco_cleaned.wdl
+    readMePath: /doc/myco_cleaned.md
+    authors:
+      - orcid: 0000-0003-4896-1858
+  - name: myco_cleaned_one_sample
+    subclass: WDL
+    primaryDescriptorPath: /myco_cleaned_1samp.wdl
+    readMePath: /doc/myco_cleaned_1samp.md
+    authors:
+      - orcid: 0000-0003-4896-1858

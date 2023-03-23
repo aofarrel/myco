@@ -1,13 +1,17 @@
 version 1.0
 
-import "./myco_cleaned.wdl" as WF
+import "https://raw.githubusercontent.com/aofarrel/myco/split-further/myco_cleaned.wdl" as WF
 
 # This is just a one-sample wrapper for myco_cleaned. It is intended for Terra data tables with a format like this:
-
-
-
-
-
+#
+#  | entity:sample_id | FASTQ_forward             | FASTQ_reverse             | decontaminated_fastq_1 | decontaminated_fastq_2 |
+#  |------------------|---------------------------|---------------------------|------------------------|------------------------|
+#  | sampleA          | raw_A_r1.fq               | raw_A_r2.fq               | decontam_A_r1.fq       | decontam_A_r2.fq       |
+#  | sampleB          | raw_B1_r1.fq, rawB2_r1.fq | raw_B1_r2.fq, rawB2_r2.fq | decontam_B_r1.fq       | decontam_B_r2.fq       |
+#  | sampleC          | raw_C_r1.fq               | raw_C_r2.fq               | decontam_C_r1.fq       | decontam_C_r2.fq       |
+#
+# You can get the last two columns of this table from the first three columns by running Decontam_And_Combine_One_Samples_Fastqs
+# which is on Dockstore: https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs
 
 
 workflow myco_cleaned_one_sample {
@@ -22,10 +26,10 @@ workflow myco_cleaned_one_sample {
     }
 
 output {
-		Array[File] minos = WF.myco.minos_vcfs
-		Array[File] masks = WF.myco.make_mask_and_diff.mask_file
-		Array[File?] diffs = WF.myco.make_mask_and_diff.diff
-		File? tax_tree = WF.myco.trees.taxonium_tree
-		Array[File]? fastqc_reports = WF.myco.FastqcWF.reports
+		Array[File] minos = myco.minos
+		Array[File] masks = myco.masks
+		Array[File?] diffs = myco.diffs
+		File? tax_tree = myco.tax_tree
+		Array[File]? fastqc_reports = myco.fastqc_reports
 	}
 }
