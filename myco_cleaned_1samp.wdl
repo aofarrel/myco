@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/myco/split-further/myco_cleaned.wdl" as WF
+import "https://raw.githubusercontent.com/aofarrel/myco/develop/myco_cleaned.wdl" as WF
 
 # This is just a one-sample wrapper for myco_cleaned. It is intended for Terra data tables with a format like this:
 #
@@ -29,7 +29,9 @@ output {
 		Array[File] minos = myco.minos
 		Array[File] masks = myco.masks
 		Array[File?] diffs = myco.diffs
-		File? tax_tree = myco.tax_tree
+        File? tree_usher = trees.usher_tree
+		File? tree_taxonium = trees.taxonium_tree
+		Array[File]? trees_nextstrain = trees.nextstrain_trees
 		Array[File]? fastqc_reports = myco.fastqc_reports
 	}
 }
