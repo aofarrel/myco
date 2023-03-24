@@ -1,7 +1,7 @@
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/usher-sampled-wdl/0.0.2/usher_sampled.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/tree-nine/0.0.2/usher_sampled.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
@@ -105,7 +105,9 @@ workflow myco {
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File?] diffs = make_mask_and_diff.diff
-		File? tax_tree = trees.taxonium_tree
+		File? tree_usher = trees.usher_tree
+		File? tree_taxonium = trees.taxonium_tree
+		Array[File]? trees_nextstrain = trees.nextstrain_trees
 		Array[File]? fastqc_reports = FastqcWF.reports
 	}
 }
