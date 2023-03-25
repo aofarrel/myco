@@ -131,7 +131,7 @@ workflow myco {
 		call build_treesWF.usher_sampled_diff_to_taxonium as trees {
 			input:
 				diffs = coerced_diffs,
-				i = input_tree,
+				input_mutation_annotated_tree = input_tree,
 				ref = ref_genome_for_tree_building,
 				coverage_reports = coerced_reports,
 				bad_data_threshold = bad_data_threshold
