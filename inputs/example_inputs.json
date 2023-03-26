@@ -1,8 +1,0 @@
-{
-  "myco.biosample_accessions": "/per_sample/20_samples.txt",
-  "myco.min_coverage": 10,
-  "myco.typical_tb_masked_regions": "/masks/R00000039_repregions.bed",
-  "myco.ref_genome": "/ref/tb_seq.fasta",
-  "myco.input_tree": "/trees/alldiffs_mask2ref.L.fixed.pb",
-  "myco.decorate_tree": true
-}

@@ -1,0 +1,8 @@
+{
+	"myco.biosample_accessions": "gs://topmed_workflow_testing/tb/sra/20_samples.txt",
+	"myco.decorate_tree": true,
+	"myco.input_tree": "gs://topmed_workflow_testing/tb/alldiffs_mask2ref.L.fixed.pb",
+	"myco.min_coverage": 10,
+	"myco.ref_genome": "gs://topmed_workflow_testing/tb/tb_seq.fasta",
+	"myco.typical_tb_masked_regions": "gs://topmed_workflow_testing/tb/R00000039_repregions.bed"
+}
