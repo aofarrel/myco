@@ -1,6 +1,8 @@
 ## Table of Contents  
     * [Workflow-level inputs](#workflow-level-inputs)
-      * [Non-fastq workflow-level inputs](#non-fastq-workflow-level-inputs)
+      * [FASTQ-related inputs](#fastq-related-inputs)
+      * [More info on each version of myco's use case](#more-info-on-each-version-of-mycos-use-case)
+      * [Non-FASTQ workflow-level inputs](#non-fastq-workflow-level-inputs)
     * [Task-level inputs](#task-level-inputs)
       * [Software settings](#software-settings)
       * [Runtime attributes](#runtime-attributes)
@@ -8,25 +10,34 @@
 See /inputs/example_inputs.json for examples.  
   
 ## Workflow-level inputs  
-Each version of myco has a slightly different way of inputting fastqs. A basic explanation for each workflow is in the table below. You can find more detailed explanations in each workflow's workflow-level readme.  
+  
+### FASTQ-related inputs  
+Each version of myco has a slightly different way of inputting FASTQs. A basic explanation for each workflow is in the table below. You can find more detailed explanations in each workflow's workflow-level readme.  
   
 | name | type | workflow | description |  
 |:---:|:---:|:---:|:---:|  
 | biosample_accessions | File | myco_sra | File of BioSample accessions to pull, one accession per line |  
-| paired_decontaminated_fastq_sets | Array | myco_cleaned | Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one forward read and one reverse read. |  
-| paired_fastq_sets | Array | myco_raw | Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs |  
   
-Regardless of which version of myco you use, please make sure your fastqs:
+Regardless of which version of myco you use, please make sure your FASTQs:
 * is Illumina paired-end data <sup>†</sup>  
 * is grouped per-sample   
 * len(quality scores) = len(nucleotides) for every line <sup>†</sup>  
 * is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  
 <sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.
-It is recommend that you also keep an eye on the total size of your fastqs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' fastqs are over 1 GB in size, but the sum total of these fastqs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)
+It is recommend that you also keep an eye on the total size of your FASTQs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' FASTQs are over 1 GB in size, but the sum total of these FASTQs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)
 
-myco_cleaned expects that the fastqs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
+myco_cleaned expects that the FASTQs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
   
-### Non-fastq workflow-level inputs  
+### More info on each version of myco's use case  
+* pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it**myco_cleaned** 
+  * if these are in Terra data table format, you may want to use **myco_cleaned_1samp** 
+ * pairs of FASTQs which have yet to be decontaminated or merged
+ * if each sample has its FASTQs in a single array**myco_raw** 
+ * if each sample has its forward FASTQs in one array and reverse FASTQs in another array[Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_cleaned** or **myco_cleaned_1samp** 
+ * a list of SRA BioSamples whose FASTQs you'd like to use**myco_sra** 
+ * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use[convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then **myco_sra**)   
+  
+### Non-FASTQ workflow-level inputs  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
@@ -64,11 +75,12 @@ If you are on a backend that does not support call cacheing, you can use the 'bl
 | per_sample_decontam | done_file | String? |  | Override default output file name with this string |  
 | per_sample_decontam | no_match_out_1 | String? |  | Override default output file name with this string |  
 | per_sample_decontam | no_match_out_2 | String? |  | Override default output file name with this string |  
-| per_sample_decontam | subsample_cutoff | Int  | -1 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
+| per_sample_decontam | subsample_cutoff | Int  | -1 | If a FASTQ file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | per_sample_decontam | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
 | per_sample_decontam | threads | Int? |  | Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware. |  
 | per_sample_decontam | verbose | Boolean  | true |  |  
-| trees | outfile | String  | \'tree\' | Override default output file name with this string |  
+| trees | make_nextstrain_subtrees | Boolean  | true |  |  
+| trees | outfile | String? |  | Override default output file name with this string |  
 | varcall_with_array | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
 | varcall_with_array | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
 | varcall_with_array | debug | Boolean  | false | Do not clean up any files and be verbose |  

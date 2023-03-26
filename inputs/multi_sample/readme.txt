@@ -1,1 +1,0 @@
-You can get actual .txt files with lists of samples at https://github.com/aofarrel/SRANWRP
