@@ -108,7 +108,7 @@ workflow myco {
 		File? tree_usher = trees.usher_tree
 		File? tree_taxonium = trees.taxonium_tree
 		File? tree_nextstrain = trees.nextstrain_tree
-		Array[File]? trees_nextstrain = trees.nextstrain_trees
+		Array[File]? trees_nextstrain = trees.nextstrain_subtrees
 		Array[File]? fastqc_reports = FastqcWF.reports
 	}
 }

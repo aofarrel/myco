@@ -144,8 +144,8 @@ workflow myco {
 		Array[File?] diffs = make_mask_and_diff.diff
 		File? tree_usher = trees.usher_tree
 		File? tree_taxonium = trees.taxonium_tree
-		File? tree_nextstrain = tress.nextstrain_tree
-		Array[File]? trees_nextstrain = trees.nextstrain_trees
+		File? tree_nextstrain = trees.nextstrain_tree
+		Array[File]? trees_nextstrain = trees.nextstrain_subtrees
 		Array[File]? fastqc_reports = FastqcWF.reports
 	}
 }
