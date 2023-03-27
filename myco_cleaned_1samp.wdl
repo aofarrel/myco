@@ -22,7 +22,7 @@ workflow myco_cleaned_one_sample {
 
     call WF.myco {
         input:
-            paired_fastq_sets = [[decontaminated_fastq_1, decontaminated_fastq_2]]
+            paired_decontaminated_fastq_sets = [[decontaminated_fastq_1, decontaminated_fastq_2]]
     }
 
 output {
