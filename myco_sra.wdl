@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.8/tasks/processi
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.5/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-#import "../tb_profiler/tb_profiler.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tb_profiler.wdl" as profiler
 
 workflow myco {
 	input {
@@ -133,10 +133,10 @@ workflow myco {
 				diffs = create_diff_files
 		}
 
-		#call profiler.tb_profiler_bam as profile {
-		#	input:
-		#		bam = vcfs_and_bams.left
-		#}
+		call profiler.tb_profiler_bam as profile {
+			input:
+				bam = vcfs_and_bams.left
+		}
 	}
 
 	if(fastqc_on_timeout) {
@@ -177,7 +177,7 @@ workflow myco {
 		File download_report = cat_reports.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
-		#Array[File] tbprofiler = profile.tbprofiler_results
+		Array[File] tbprofiler = profile.tbprofiler_results
 		Array[File?] diffs = make_mask_and_diff.diff
 		File? tree_usher = trees.usher_tree
 		File? tree_taxonium = trees.taxonium_tree
