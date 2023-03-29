@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/myco/develop/myco_cleaned.wdl" as WF
+import "https://raw.githubusercontent.com/aofarrel/myco/4.0.0/myco_cleaned.wdl" as WF
 
 # This is just a one-sample wrapper for myco_cleaned. It is intended for Terra data tables with a format like this:
 #
