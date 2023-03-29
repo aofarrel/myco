@@ -239,12 +239,12 @@ for input_variable in workflow_level:
 		input_variable["workflow"] = "myco_cleaned"
 		del input_variable["default"]
 		fastq_inputs.append(input_variable)
-	#elif value == "clean_forward_reads":
-	#	input_variable["workflow"] = "myco_cleaned"
+	#elif value == "decontaminated_fastq_1":
+	#	input_variable["workflow"] = "myco_cleaned_1samp"
 	#	del input_variable["default"]
 	#	fastq_inputs.append(input_variable)
-	#elif value == "clean_reverse_reads":
-	#	input_variable["workflow"] = "myco_cleaned"
+	#elif value == "decontaminated_fastq_2":
+	#	input_variable["workflow"] = "myco_cleaned_1samp"
 	#	del input_variable["default"]
 	#	fastq_inputs.append(input_variable)
 	else:

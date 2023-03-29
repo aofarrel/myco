@@ -17,6 +17,8 @@ Each version of myco has a slightly different way of inputting FASTQs. A basic e
 | name | type | workflow | description |  
 |:---:|:---:|:---:|:---:|  
 | biosample_accessions | File | myco_sra | File of BioSample accessions to pull, one accession per line |  
+| paired_decontaminated_fastq_sets | Array | myco_cleaned | Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one forward read and one reverse read. |  
+| paired_fastq_sets | Array | myco_raw | Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs |  
   
 Regardless of which version of myco you use, please make sure your FASTQs:
 * is Illumina paired-end data <sup>†</sup>  
