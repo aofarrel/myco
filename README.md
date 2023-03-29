@@ -1,18 +1,26 @@
 # myco 🍄
-myco is a pipeline built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
+myco is group of pipelines built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
 
 ## Which workflow should I use?
-If you already have a bunch of fastqs: myco.wdl  
-If you want to pull fastqs from SRA: myco_sra.wdl 
+Each version of myco largely only differs in how you are passing in FASTQ files. **In all cases, your FASTQs must be paired-end Illumina reads.**
+* [myco_cleaned](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_cleaned) (and its Terra-data-table-friendly wrapper myco_cleaned_1samp) expects decontaminated and merged FASTQs
+* [myco_raw](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated and may or may not be merged
+* [myco_sra](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
+
+For more information please see [./docs/inputs.md].
 
 ## More information
-* Basic info on running myco: [running_myco.md](./doc/running_myco.md)
+* How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
 * Full list of inputs: [inputs.md](./doc/inputs.md)
-* Overview of the pipeline: [pipline_overview.md](./doc/pipline_overview.md)
+* Per-workflow readmes:
+  * [myco_cleaned_1sample](.doc/myco_cleaned_1sample.md)
+  * [myco_cleaned](./doc/myco_cleaned.md)
+  * [myco_raw](./doc/myco_raw.md)
+  * [myco_sra](./doc/myco_sra.md)
 
 myco imports almost all of its code from other repos. Please see those specific repos for support with different parts of the myco pipeline:
 * Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)
 * Decontamination and calling variants: [clockwork-wdl](https://github.com/aofarrel/clockwork-wdl)
 * Turning VCFs into diff files: [parsevcf](https://github.com/lilymaryam/parsevcf)
-* Building UShER and Taxonium trees: [usher-sampled-wdl](https://github.com/aofarrel/usher-sampled-wdl)
-
+* Building UShER, Taxonium, and Nextstrain/Auspice trees: [tree-nine](https://github.com/aofarrel/tree-nine)
+* Determining why your sample spent 20 hours in the decontamination task: [FastQC-wdl](https://qa.dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)

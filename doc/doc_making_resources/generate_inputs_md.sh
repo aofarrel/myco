@@ -5,8 +5,10 @@
 
 echo "grabbing inputs from myco_sra..."
 java -jar /Applications/womtool-85.jar inputs myco_sra.wdl > raw.txt
-echo "grabbing inputs from myco..."
-java -jar /Applications/womtool-85.jar inputs myco.wdl >> raw.txt
+echo "grabbing inputs from myco_raw..."
+java -jar /Applications/womtool-85.jar inputs myco_raw.wdl >> raw.txt
+echo "grabbing inputs from myco_cleaned..."
+java -jar /Applications/womtool-85.jar inputs myco_cleaned.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -17,6 +19,38 @@ python3 << CODE
 import re
 from markdowngenerator import MarkdownGenerator
 
+fastq_intro =  ("Each version of myco has a slightly different way of inputting FASTQs. "
+				"A basic explanation for each workflow is in the table below. You can "
+				"find more detailed explanations in each workflow's workflow-level readme.")
+fastq_summary = ("* pairs of FASTQs which have been decontaminated and merged such that each "
+				"sample has precisely two FASTQs associated with it: **myco_cleaned** \n"
+				"  * if these are in Terra data table format, you may want to use **myco_cleaned_1samp** \n"
+				" * pairs of FASTQs which have yet to be decontaminated or merged: \n"
+				" * if each sample has its FASTQs in a single array: **myco_raw** \n"
+				" * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: "
+				"[Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), "
+				"then **myco_cleaned** or **myco_cleaned_1samp** \n"
+				" * a list of SRA BioSamples whose FASTQs you'd like to use: **myco_sra** \n"
+				" * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: "
+				"[convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), "
+				"then **myco_sra**) ")
+dont_input_garbage = ("Regardless of which version of myco you use, please make sure your FASTQs:\n"
+					"* is Illumina paired-end data <sup>†</sup>  \n"
+					"* is grouped per-sample   \n"
+					"* len(quality scores) = len(nucleotides) for every line <sup>†</sup>  \n"
+					"* is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  \n"
+					"<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples "
+					"without erroring. Other forms of myco are not able to detect these issues.\n"
+					"It is recommend that you also keep an eye on the total size of your FASTQs. "
+					"Individual files over subsample_cutoff (default: 450 MB, -1 disables this check) "
+					"will be downsampled, but keep an eye on the cumulative size of samples. For example, "
+					"a sample like SAMEA968096 has 12 run accessions associated with it. Individually, "
+					"none of these run accessions' FASTQs are over 1 GB in size, but the sum total of "
+					"these FASTQs could quickly fill up your disk space. (You probably should not be using "
+					"SAMEA968096 anyway because it is in sample group, which can cause other issues.)\n\n"
+					"myco_cleaned expects that the FASTQs you are putting into have already been cleaned and "
+					"merged. It's recommend you do this by running "
+					"[Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).")
 filename_vars = [
 			"out", 
 			"contam_out_1", "contam_out_2", "counts_out",
@@ -25,7 +59,11 @@ filename_vars = [
 			]
 
 def strip_junk(string):
-	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`")
+	"""
+	The python to markdown converter we're using seems to do some character replacements to ensure
+	greater markdown compatiability, but they render awfully GitHub. This function undos that.
+	"""
+	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`").replace("&lt;", "<").replace("\`", "\'")
 
 def get_task(line):
 	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
@@ -109,7 +147,7 @@ for input_variable in task_level:
 			input_variable["description"] = "If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting."
 			not_runtime.append(input_variable)
 		elif input_variable["name"] == "subsample_cutoff":
-			input_variable["description"] = "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
+			input_variable["description"] = "If a FASTQ file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 			not_runtime.append(input_variable)
 		elif input_variable["name"] == "subsample_seed":
 			input_variable["description"] = "Seed used for subsampling with seqtk"
@@ -137,7 +175,7 @@ for input_variable in task_level:
 # extract parameter_meta for workflow-level variables
 parameter_meta = []
 in_parameter_meta = False
-with open("myco.wdl", "r") as myco:
+with open("myco_raw.wdl", "r") as myco:
 	for line in myco:
 		if line.startswith("\tparameter_meta"):
 			in_parameter_meta = True
@@ -150,18 +188,84 @@ with open("myco.wdl", "r") as myco:
 			parameter_meta.append(this_parameter)
 		else:
 			continue
+in_parameter_meta = False
+with open("myco_sra.wdl", "r") as myco:
+	for line in myco:
+		if line.startswith("\tparameter_meta"):
+			in_parameter_meta = True
+			continue
+		elif line.startswith("\t}") and in_parameter_meta:
+			break
+		elif in_parameter_meta and not line.startswith("}"):
+			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
+							"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
+			if this_parameter not in parameter_meta:
+				# this will add duplicates if the same variable have diff descriptions in diff workflows
+				# TODO: add a check to detect such duplicates, which indicate inconsistent documentation
+				parameter_meta.append(this_parameter)
+		else:
+			continue
+in_parameter_meta = False
+with open("myco_cleaned.wdl", "r") as myco:
+	for line in myco:
+		if line.startswith("\tparameter_meta"):
+			in_parameter_meta = True
+			continue
+		elif line.startswith("\t}") and in_parameter_meta:
+			break
+		elif in_parameter_meta and not line.startswith("}"):
+			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
+							"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
+			if this_parameter not in parameter_meta:
+				# this will add duplicates if the same variable have diff descriptions in diff workflows
+				# TODO: add a check to detect such duplicates, which indicate inconsistent documentation
+				parameter_meta.append(this_parameter)
+		else:
+			continue
 
+# give workflow level variables their parameter meta descriptions and/or add to fastq_inputs
+fastq_inputs = []
 for input_variable in workflow_level:
 	value = input_variable["name"]
-	if value in ["biosample_accessions", "paired_fastq_sets"]:
-		input_variable["description"] = "fastq input -- please see running_myco.md for more information"
+	if value == "biosample_accessions":
+		input_variable["workflow"] = "myco_sra"
+		del input_variable["default"]
+		fastq_inputs.append(input_variable)
+	elif value == "paired_fastq_sets":
+		input_variable["workflow"] = "myco_raw"
+		del input_variable["default"]
+		fastq_inputs.append(input_variable)
+	elif value == "paired_decontaminated_fastq_sets":
+		input_variable["workflow"] = "myco_cleaned"
+		del input_variable["default"]
+		fastq_inputs.append(input_variable)
+	#elif value == "decontaminated_fastq_1":
+	#	input_variable["workflow"] = "myco_cleaned_1samp"
+	#	del input_variable["default"]
+	#	fastq_inputs.append(input_variable)
+	#elif value == "decontaminated_fastq_2":
+	#	input_variable["workflow"] = "myco_cleaned_1samp"
+	#	del input_variable["default"]
+	#	fastq_inputs.append(input_variable)
 	else:
-		parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
-		input_variable["description"] = parameter["description"]
+		pass
+	# do this last to put it after the workflow name in the fastq ones
+	parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
+	input_variable["description"] = parameter["description"]
 
+for input_variable in fastq_inputs:
+	workflow_level.remove(input_variable)
+		
 with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.writeTextLine("See /inputs/example_inputs.json for examples.")
 	doc.addHeader(2, "Workflow-level inputs")
+	doc.addHeader(3, "FASTQ-related inputs")
+	doc.writeTextLine(fastq_intro)
+	doc.addTable(dictionary_list=fastq_inputs)
+	doc.writeTextLine(dont_input_garbage)
+	doc.addHeader(3, "More info on each version of myco's use case")
+	doc.writeTextLine(fastq_summary)
+	doc.addHeader(3, "Non-FASTQ workflow-level inputs")
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
 	doc.addHeader(3, "Software settings")
