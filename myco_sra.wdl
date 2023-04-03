@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/refprep-improvements/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.8/tasks/pull_fastqs.wdl" as sranwrp_pull
@@ -37,7 +37,7 @@ workflow myco {
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
-		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
+		ref_genome_for_tree_building: "Ref genome for building trees iff different from ref genome used to call variants -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
@@ -167,7 +167,7 @@ workflow myco {
 			input:
 				diffs = coerced_diffs,
 				input_mutation_annotated_tree = input_tree,
-				ref = ref_genome_for_tree_building,
+				ref = select_first([ref_genome_for_tree_building, ClockworkRefPrepTB.reference_genome_fasta]),
 				coverage_reports = coerced_reports,
 				bad_data_threshold = bad_data_threshold
 		}
