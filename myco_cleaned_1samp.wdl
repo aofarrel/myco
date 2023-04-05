@@ -29,10 +29,10 @@ output {
 		Array[File] minos = myco.minos
 		Array[File] masks = myco.masks
 		Array[File?] diffs = myco.diffs
-		File? tree_usher = trees.usher_tree
-		File? tree_taxonium = trees.taxonium_tree
-		File? tree_nextstrain = trees.nextstrain_tree
-		Array[File]? trees_nextstrain = trees.nextstrain_subtrees
+		File? tree_usher = myco.tree_usher
+		File? tree_taxonium = myco.tree_taxonium
+		File? tree_nextstrain = myco.tree_nextstrain
+		Array[File]? trees_nextstrain = myco.trees_nextstrain
 		Array[File]? fastqc_reports = myco.fastqc_reports
 	}
 }
