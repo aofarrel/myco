@@ -1,13 +1,14 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.7.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.8/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.8/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.5/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.1.1/tb_profiler.wdl" as profiler
 
 workflow myco {
 	input {
@@ -36,7 +37,7 @@ workflow myco {
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage: "Positions with coverage below this value will be masked in diff files"
-		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
+		ref_genome_for_tree_building: "Ref genome for building trees iff different from ref genome used to call variants -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
@@ -131,6 +132,11 @@ workflow myco {
 				tbmf = typical_tb_masked_regions,
 				diffs = create_diff_files
 		}
+
+		call profiler.tb_profiler_bam as profile {
+			input:
+				bam = vcfs_and_bams.left
+		}
 	}
 
 	if(fastqc_on_timeout) {
@@ -161,7 +167,7 @@ workflow myco {
 			input:
 				diffs = coerced_diffs,
 				input_mutation_annotated_tree = input_tree,
-				ref = ref_genome_for_tree_building,
+				ref = select_first([ref_genome_for_tree_building, ClockworkRefPrepTB.reference_genome_fasta]),
 				coverage_reports = coerced_reports,
 				bad_data_threshold = bad_data_threshold
 		}
@@ -171,6 +177,7 @@ workflow myco {
 		File download_report = cat_reports.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
+		Array[File] tbprofiler = profile.tbprofiler_results
 		Array[File?] diffs = make_mask_and_diff.diff
 		File? tree_usher = trees.usher_tree
 		File? tree_taxonium = trees.taxonium_tree
