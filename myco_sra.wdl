@@ -3,12 +3,12 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.8/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/debug-no-output/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.8/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.5/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.1.1/tb_profiler.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.1.2/tb_profiler.wdl" as profiler
 
 workflow myco {
 	input {
@@ -138,6 +138,16 @@ workflow myco {
 				bam = vcfs_and_bams.left
 		}
 	}
+	
+	call sranwrp_processing.cat_strings as cat_strains {
+		input:
+			strings = profile.tbprofiler_strain
+	}
+	
+	call sranwrp_processing.cat_strings as cat_resistance {
+		input:
+			strings = profile.tbprofiler_resistance
+	}
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(per_sample_decontam.check_this_fastq)
@@ -175,6 +185,8 @@ workflow myco {
 
 	output {
 		File download_report = cat_reports.outfile
+		File strain_report = cat_strains.outfile
+		File resistance_report = cat_resistance.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File] tbprofiler = profile.tbprofiler_results
