@@ -189,7 +189,7 @@ workflow myco {
 		File resistance_report = cat_resistance.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
-		Array[File] tbprofiler = profile.tbprofiler_results
+		Array[File] tbprofiler_debug_texts = profile.tbprofiler_txt
 		Array[File?] diffs = make_mask_and_diff.diff
 		File? tree_usher = trees.usher_tree
 		File? tree_taxonium = trees.taxonium_tree
