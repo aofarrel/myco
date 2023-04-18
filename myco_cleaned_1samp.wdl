@@ -18,11 +18,13 @@ workflow myco_cleaned_one_sample {
     input {
         File decontaminated_fastq_1
         File decontaminated_fastq_2
+        File typical_tb_masked_regions
     }
 
     call WF.myco {
         input:
-            paired_decontaminated_fastq_sets = [[decontaminated_fastq_1, decontaminated_fastq_2]]
+            paired_decontaminated_fastq_sets = [[decontaminated_fastq_1, decontaminated_fastq_2]],
+            typical_tb_masked_regions = typical_tb_masked_regions
     }
 
 output {
