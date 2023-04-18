@@ -17,8 +17,6 @@ workflow myco {
 		File?   input_tree
 		Int     min_coverage = 10
 		File?   ref_genome_for_tree_building
-		Int     subsample_cutoff       =  450
-		Int     subsample_seed         = 1965
 		Int     timeout_variant_caller =  120
 	}
 
