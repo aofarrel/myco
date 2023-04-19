@@ -81,7 +81,9 @@ workflow myco {
 
 	call sranwrp_processing.cat_strings as cat_reports {
 		input:
-			strings = pull.results
+			strings = pull.results,
+			out = "pull_reports.txt"
+
 	}
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
@@ -141,12 +143,14 @@ workflow myco {
 	
 	call sranwrp_processing.cat_strings as cat_strains {
 		input:
-			strings = profile.tbprofiler_strain
+			strings = profile.tbprofiler_strain,
+			out = "strain_reports.txt"
 	}
 	
 	call sranwrp_processing.cat_strings as cat_resistance {
 		input:
-			strings = profile.tbprofiler_resistance
+			strings = profile.tbprofiler_resistance,
+			out = "resistance_reports.txt"
 	}
 
 	if(fastqc_on_timeout) {
