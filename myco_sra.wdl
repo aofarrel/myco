@@ -2,7 +2,7 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/new-dockers/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.10/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.10/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.5/tree_nine.wdl" as build_treesWF
@@ -111,9 +111,8 @@ workflow myco {
     			[per_sample_decontam.decontaminated_fastq_2, 
     				biosample_accessions])
 
-			call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
+			call clckwrk_var_call.variant_call_one_sample_ref_included as varcall_with_array {
 				input:
-					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 					timeout = timeout_variant_caller
 			}
