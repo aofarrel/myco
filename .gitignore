@@ -5,3 +5,4 @@ cromwell-input/*
 _LAST
 raw.txt
 .vscode/settings.json
+doc/FAQs.md
