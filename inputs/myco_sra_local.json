@@ -2,7 +2,7 @@
   "myco.biosample_accessions": "inputs/multi_sample/3_samples.txt",
   "myco.decorate_tree": true,
   "myco.input_tree": "inputs/trees/alldiffs_mask2ref.L.fixed.pb",
-  "myco.min_coverage": 10,
+  "myco.min_coverage_per_site": 10,
   "myco.ref_genome_for_tree_building": "inputs/ref/tb_seq.fasta",
   "myco.typical_tb_masked_regions": "inputs/masks/R00000039_repregions.bed"
 }

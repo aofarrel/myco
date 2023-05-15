@@ -14,13 +14,13 @@ workflow myco {
 		File biosample_accessions
 		File typical_tb_masked_regions
 
-		Float   bad_data_threshold = 0.05
 		Boolean decorate_tree      = false
 		Boolean fastqc_on_timeout  = false
 		Boolean force_diff         = false
 		File?   input_tree
-		Int     min_coverage = 10
-		File   ref_genome_for_tree_building
+		Float   max_low_coverage_sites = 0.05
+		Int     min_coverage_per_site = 10
+		File    ref_genome_for_tree_building
 		Int     subsample_cutoff       =  450
 		Int     subsample_seed         = 1965
 		Int     timeout_decontam_part1 =   20
@@ -30,12 +30,12 @@ workflow myco {
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		bad_data_threshold: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
+		max_low_coverage_sites: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
-		min_coverage: "Positions with coverage below this value will be masked in diff files"
+		min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
 		ref_genome_for_tree_building: "Ref genome for building trees iff different from ref genome used to call variants -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
@@ -123,7 +123,7 @@ workflow myco {
 			input:
 				bam = vcfs_and_bams.left,
 				vcf = vcfs_and_bams.right,
-				min_coverage = min_coverage,
+				min_coverage_per_site = min_coverage_per_site,
 				tbmf = typical_tb_masked_regions,
 				diffs = create_diff_files
 		}
@@ -176,7 +176,7 @@ workflow myco {
 				input_mutation_annotated_tree = input_tree,
 				ref = ref_genome_for_tree_building,
 				coverage_reports = coerced_reports,
-				bad_data_threshold = bad_data_threshold
+				max_low_coverage_sites = max_low_coverage_sites
 		}
 	}
 

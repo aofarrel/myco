@@ -43,12 +43,12 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
-| bad_data_threshold | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
 | decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome |  
 | fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination or variant calling times out |  
 | force_diff | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
-| min_coverage | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
+| max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this fraction of low coverage data, do not include it in the tree -- ex: 0.02 will remove any samples where 20% or more of their calls are low coverage as defined by min_coverage_per_site |  
+| min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files and count against max_low_coverage_sites |  
 | ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY '>NC_000962.3' on its first line |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
