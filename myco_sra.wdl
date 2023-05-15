@@ -1,10 +1,9 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/new-dockers/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/new-dockers/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.10/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.10/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.5/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
@@ -21,7 +20,7 @@ workflow myco {
 		Boolean force_diff         = false
 		File?   input_tree
 		Int     min_coverage = 10
-		File?   ref_genome_for_tree_building
+		File   ref_genome_for_tree_building
 		Int     subsample_cutoff       =  450
 		Int     subsample_seed         = 1965
 		Int     timeout_decontam_part1 =   20
@@ -57,8 +56,6 @@ workflow myco {
 											  create_diff_files__, 
 											  create_diff_files___])
 
-	call clockwork_ref_prepWF.ClockworkRefPrepTB
-
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
 			accessions_file = biosample_accessions,
@@ -88,13 +85,10 @@ workflow myco {
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 	scatter(pulled_fastq in pulled_fastqs) {
-		call clckwrk_combonation.combined_decontamination_single as per_sample_decontam {
+		call clckwrk_combonation.combined_decontamination_single_ref_included as per_sample_decontam {
 			input:
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
-				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa",
-				filename_metadata_tsv = "remove_contam_metadata.tsv",
 				timeout_map_reads = timeout_decontam_part1,
 				timeout_decontam = timeout_decontam_part2
 		}
@@ -180,7 +174,7 @@ workflow myco {
 			input:
 				diffs = coerced_diffs,
 				input_mutation_annotated_tree = input_tree,
-				ref = select_first([ref_genome_for_tree_building, ClockworkRefPrepTB.reference_genome_fasta]),
+				ref = ref_genome_for_tree_building,
 				coverage_reports = coerced_reports,
 				bad_data_threshold = bad_data_threshold
 		}
