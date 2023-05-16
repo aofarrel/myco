@@ -136,18 +136,25 @@ workflow myco {
 		}
 
 	}
+
+	if(length(profile.tbprofiler_strain)>1) {
+		Array[String] coerced_strains=select_all(profile.tbprofiler_strain)
+		Array[String] coerced_resistance=select_all(profile.tbprofiler_resistance)
+
+		call sranwrp_processing.cat_strings as cat_strains {
+			input:
+				strings = coerced_strains,
+				out = "strain_reports.txt"
+		}
+		
+		call sranwrp_processing.cat_strings as cat_resistance {
+			input:
+				strings = coerced_resistance,
+				out = "resistance_reports.txt"
+		}
+  	}
 	
-	call sranwrp_processing.cat_strings as cat_strains {
-		input:
-			strings = profile.tbprofiler_strain,
-			out = "strain_reports.txt"
-	}
 	
-	call sranwrp_processing.cat_strings as cat_resistance {
-		input:
-			strings = profile.tbprofiler_resistance,
-			out = "resistance_reports.txt"
-	}
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
@@ -185,11 +192,11 @@ workflow myco {
 
 	output {
 		File download_report = merge_reports.outfile
-		File strain_report = cat_strains.outfile
-		File resistance_report = cat_resistance.outfile
+		File? strain_report = cat_strains.outfile
+		File? resistance_report = cat_resistance.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
-		Array[File] tbprofiler_debug_texts = profile.tbprofiler_txt
+		Array[File?]? tbprofiler_texts = profile.tbprofiler_txt
 		Array[File?] diffs = make_mask_and_diff.diff
 		File? tree_usher = trees.usher_tree
 		File? tree_taxonium = trees.taxonium_tree
