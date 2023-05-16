@@ -7,7 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.1.3/tb_profiler.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/main/tb_profiler.wdl" as profiler
 
 workflow myco {
 	input {
@@ -105,6 +105,13 @@ workflow myco {
     			[decontam_each_sample.decontaminated_fastq_2, 
     				biosample_accessions])
 
+			
+			call profiler.tb_profiler_fastq as profile {
+				input:
+					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+			}
+
+
 			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
 				input:
 					reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
@@ -128,10 +135,6 @@ workflow myco {
 				diffs = create_diff_files
 		}
 
-		call profiler.tb_profiler_bam as profile {
-			input:
-				bam = vcfs_and_bams.left
-		}
 	}
 	
 	call sranwrp_processing.cat_strings as cat_strains {
