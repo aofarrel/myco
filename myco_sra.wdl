@@ -76,7 +76,7 @@ workflow myco {
   		}
 	}
 
-	call sranwrp_processing.cat_strings as cat_reports {
+	call sranwrp_processing.cat_strings as merge_reports {
 		input:
 			strings = pull.results,
 			out = "pull_reports.txt"
@@ -85,7 +85,7 @@ workflow myco {
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 	scatter(pulled_fastq in pulled_fastqs) {
-		call clckwrk_combonation.combined_decontamination_single_ref_included as per_sample_decontam {
+		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
 			input:
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
@@ -93,19 +93,19 @@ workflow myco {
 				timeout_decontam = timeout_decontam_part2
 		}
 
-		if(defined(per_sample_decontam.decontaminated_fastq_1)) {
+		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
 		# This region only executes if decontaminated fastqs exist.
 		# We can use this to coerce File? into File by using a
 		# select_first() where the first element is the File? we know
 		# absolutely must exist, and the second element is bogus
     		File real_decontaminated_fastq_1=select_first([
-    			per_sample_decontam.decontaminated_fastq_1, 
+    			decontam_each_sample.decontaminated_fastq_1, 
     				biosample_accessions])
     		File real_decontaminated_fastq_2=select_first(
-    			[per_sample_decontam.decontaminated_fastq_2, 
+    			[decontam_each_sample.decontaminated_fastq_2, 
     				biosample_accessions])
 
-			call clckwrk_var_call.variant_call_one_sample_ref_included as varcall_with_array {
+			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
 				input:
 					reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 					timeout = timeout_variant_caller
@@ -114,8 +114,8 @@ workflow myco {
 
 	}
 
-	Array[File] minos_vcfs=select_all(varcall_with_array.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(varcall_with_array.mapped_to_ref)
+	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
+	Array[File] bams_to_ref=select_all(variant_call_each_sample.mapped_to_ref)
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
@@ -147,14 +147,14 @@ workflow myco {
 	}
 
 	if(fastqc_on_timeout) {
-		Array[File] bad_fastqs_decontam_ = select_all(per_sample_decontam.check_this_fastq)
-		Array[File] bad_fastqs_varcallr_ = select_all(varcall_with_array.check_this_fastq)
+		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
+		Array[File] bad_fastqs_varcallr_ = select_all(variant_call_each_sample.check_this_fastq)
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
-		if(length(per_sample_decontam.check_this_fastq)>1 && length(bad_fastqs_varcallr_)>1) {
+		if(length(decontam_each_sample.check_this_fastq)>1 && length(bad_fastqs_varcallr_)>1) {
 			Array[File] bad_fastqs_both      = flatten(bad_fastqs_)  
 		}
-		if(length(per_sample_decontam.check_this_fastq)>1) {
-			Array[File] bad_fastqs_decontam = select_all(per_sample_decontam.check_this_fastq)
+		if(length(decontam_each_sample.check_this_fastq)>1) {
+			Array[File] bad_fastqs_decontam = select_all(decontam_each_sample.check_this_fastq)
 		}
 		if(length(bad_fastqs_varcallr_)>1) {
 			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
@@ -181,7 +181,7 @@ workflow myco {
 	}
 
 	output {
-		File download_report = cat_reports.outfile
+		File download_report = merge_reports.outfile
 		File strain_report = cat_strains.outfile
 		File resistance_report = cat_resistance.outfile
 		Array[File] minos = minos_vcfs

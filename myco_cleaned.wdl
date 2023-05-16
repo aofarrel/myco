@@ -1,8 +1,8 @@
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.5/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.4/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.6/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
@@ -49,7 +49,7 @@ workflow myco {
     call clockwork_ref_prepWF.ClockworkRefPrepTB
 
 	scatter(paired_fastqs in paired_decontaminated_fastq_sets) {
-			call clckwrk_var_call.variant_call_one_sample_simple as varcall_with_array {
+			call clckwrk_var_call.variant_call_one_sample_simple as variant_call_each_sample {
 				input:
 					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = paired_fastqs,
@@ -60,8 +60,8 @@ workflow myco {
 	if(fastqc_on_timeout) {
 		# Note: This might be problematic in some situations -- may need to make this look like myco_sra
 		# But until then, I'm going to stick with this simpler implementation
-		if(length(varcall_with_array.check_this_fastq)>1) {
-			Array[File] bad_fastqs_varcallr = select_all(varcall_with_array.check_this_fastq)
+		if(length(variant_call_each_sample.check_this_fastq)>1) {
+			Array[File] bad_fastqs_varcallr = select_all(variant_call_each_sample.check_this_fastq)
 		}
 		call fastqc.FastqcWF {
 			input:
@@ -69,8 +69,8 @@ workflow myco {
 		}
 	}
 
-	Array[File] minos_vcfs=select_all(varcall_with_array.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(varcall_with_array.mapped_to_ref)
+	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
+	Array[File] bams_to_ref=select_all(variant_call_each_sample.mapped_to_ref)
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
