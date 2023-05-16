@@ -4,7 +4,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.6/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
 
 workflow myco {
