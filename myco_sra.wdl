@@ -169,10 +169,14 @@ workflow myco {
 		if(length(bad_fastqs_varcallr_)>1) {
 			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
 		}
-		call fastqc.FastqcWF {
-			input:
-				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
+		Array[File] fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
+		if(length(fastqs)>1) {
+			call fastqc.FastqcWF {
+				input:
+					fastqs = fastqs
+			}
 		}
+		
 	}
 
 	if(decorate_tree) {
