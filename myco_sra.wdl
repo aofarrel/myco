@@ -137,7 +137,7 @@ workflow myco {
 
 	}
 
-	if(length(profile.tbprofiler_strain)>1) {
+	if(defined(profile.tbprofiler_strain)) {
 		Array[String] coerced_strains=select_all(profile.tbprofiler_strain)
 		Array[String] coerced_resistance=select_all(profile.tbprofiler_resistance)
 
