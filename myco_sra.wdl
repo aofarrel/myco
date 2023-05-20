@@ -186,7 +186,7 @@ workflow myco {
 			input:
 				fastqs = fastqs
 		}
-		if(length(fastqs)>=1) {
+		if(length(fastqs)>0) {
 			call fastqc.FastqcWF {
 				input:
 					fastqs = fastqs
