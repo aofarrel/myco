@@ -231,6 +231,13 @@ task debug_bad_fastqs_both {
 		Array[String] bad_fastqs_both
 	}
 	command <<< >>>
+	runtime {
+		cpu: 4
+		docker: "ashedpotatoes/sranwrp:1.1.6"
+		disks: "local-disk 5 HDD"
+		memory: "2 GB"
+		preemptible: "3"
+	}
 }
 
 task debug_bad_fastqs_decontam {
@@ -238,6 +245,13 @@ task debug_bad_fastqs_decontam {
 		Array[String] bad_fastqs_decontam
 	}
 	command <<< >>>
+	runtime {
+		cpu: 4
+		docker: "ashedpotatoes/sranwrp:1.1.6"
+		disks: "local-disk 5 HDD"
+		memory: "2 GB"
+		preemptible: "3"
+	}
 }
 
 task debug_bad_fastqs_varcallr {
@@ -245,6 +259,13 @@ task debug_bad_fastqs_varcallr {
 		Array[String] bad_fastqs_varcallr
 	}
 	command <<< >>>
+	runtime {
+		cpu: 4
+		docker: "ashedpotatoes/sranwrp:1.1.6"
+		disks: "local-disk 5 HDD"
+		memory: "2 GB"
+		preemptible: "3"
+	}
 }
 
 task debug_fastqs {
@@ -252,4 +273,11 @@ task debug_fastqs {
 		Array[String] fastqs
 	}
 	command <<< >>>
+	runtime {
+		cpu: 4
+		docker: "ashedpotatoes/sranwrp:1.1.6"
+		disks: "local-disk 5 HDD"
+		memory: "2 GB"
+		preemptible: "3"
+	}
 }
