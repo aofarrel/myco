@@ -160,21 +160,21 @@ workflow myco {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
 		Array[File] bad_fastqs_varcallr_ = select_all(variant_call_each_sample.check_this_fastq)
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
-		if(length(decontam_each_sample.check_this_fastq)>1 && length(bad_fastqs_varcallr_)>1) {
+		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  
 			call debug_bad_fastqs_both { 
 				input: 
 					bad_fastqs_both = bad_fastqs_both
 			}
 		}
-		if(length(decontam_each_sample.check_this_fastq)>1) {
+		if(length(decontam_each_sample.check_this_fastq)>=1) {
 			Array[File] bad_fastqs_decontam = select_all(bad_fastqs_decontam_)
 			call debug_bad_fastqs_decontam { 
 				input: 
 					bad_fastqs_decontam = bad_fastqs_decontam
 			}
 		}
-		if(length(bad_fastqs_varcallr_)>1) {
+		if(length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
 			call debug_bad_fastqs_varcallr { 
 				input: 
@@ -186,7 +186,7 @@ workflow myco {
 			input:
 				fastqs = fastqs
 		}
-		if(length(fastqs)>1) {
+		if(length(fastqs)>=1) {
 			call fastqc.FastqcWF {
 				input:
 					fastqs = fastqs
