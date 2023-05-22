@@ -1,11 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/new-dockers/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/new-dockers/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.0/tbprofiler_tasks.wdl" as profiler
 
 workflow myco {
 	input {
@@ -54,16 +55,11 @@ workflow myco {
 											  create_diff_files__, 
 											  create_diff_files___])
 
-	call clockwork_ref_prepWF.ClockworkRefPrepTB
-
 	scatter(paired_fastqs in paired_fastq_sets) {
-		call clckwrk_combonation.combined_decontamination_single as decontam_each_sample {
+		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
 			input:
 				unsorted_sam = true,
 				reads_files = paired_fastqs,
-				tarball_ref_fasta_and_index = ClockworkRefPrepTB.tar_indexd_dcontm_ref,
-				ref_fasta_filename = "ref.fa",
-				filename_metadata_tsv = "remove_contam_metadata.tsv",
 				subsample_cutoff = subsample_cutoff,
 				subsample_seed = subsample_seed,
 				timeout_map_reads = timeout_decontam_part1,
@@ -79,10 +75,16 @@ workflow myco {
 					typical_tb_masked_regions])
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, 
 					typical_tb_masked_regions])
-
-			call clckwrk_var_call.variant_call_one_sample_simple as variant_call_each_sample {
+			
+			call profiler.tb_profiler_fastq as profile {
 				input:
-					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
+					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+			}
+
+			# if median depth is > some cutoff...
+
+			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
+				input:
 					reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 					timeout = timeout_variant_caller
 			}
@@ -110,6 +112,30 @@ workflow myco {
 
 	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
 	Array[File] bams_to_ref=select_all(variant_call_each_sample.mapped_to_ref)
+
+	if(defined(profile.strain)) {
+		Array[String] coerced_strains=select_all(profile.strain)
+		Array[String] coerced_resistance=select_all(profile.resistance)
+		Array[String] coerced_depth=select_all(profile.median_depth)
+
+		call sranwrp_processing.cat_strings as collate_strains {
+			input:
+				strings = coerced_strains,
+				out = "strain_reports.txt"
+		}
+		
+		call sranwrp_processing.cat_strings as collate_resistance {
+			input:
+				strings = coerced_resistance,
+				out = "resistance_reports.txt"
+		}
+
+		call sranwrp_processing.cat_strings as collate_depth {
+			input:
+				strings = coerced_depth,
+				out = "depth_reports.txt"
+		}
+  	}
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
@@ -139,6 +165,9 @@ workflow myco {
 	}
 
 	output {
+		File? strain_report = collate_strains.outfile
+		File? resistance_report = collate_resistance.outfile
+		File? depth_report = collate_depth.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File?] diffs = make_mask_and_diff.diff

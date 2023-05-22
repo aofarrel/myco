@@ -7,7 +7,8 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/main/tb_profiler.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.0/tbprofiler_tasks.wdl" as profiler
+
 
 workflow myco {
 	input {
@@ -80,7 +81,6 @@ workflow myco {
 		input:
 			strings = pull.results,
 			out = "pull_reports.txt"
-
 	}
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
@@ -106,11 +106,12 @@ workflow myco {
     				biosample_accessions])
 
 			
-			call profiler.tb_profiler_fastq as profile {
-				input:
-					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
-			}
-
+			# To save money, myco_sra runs TBProfiler on bams instead -- but if you wanted to use
+			# fastqs, here is where you'd put the task.
+			#call profiler.tb_profiler_fastq as profile {
+			#	input:
+			#		fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+			#}
 
 			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
 				input:
@@ -118,7 +119,6 @@ workflow myco {
 					timeout = timeout_variant_caller
 			}
 		}
-
 	}
 
 	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
@@ -134,23 +134,34 @@ workflow myco {
 				tbmf = typical_tb_masked_regions,
 				diffs = create_diff_files
 		}
-
+		
+		call profiler.tb_profiler_bam as profile {
+				input:
+					bam = vcfs_and_bams.left
+		}
 	}
 
-	if(defined(profile.tbprofiler_strain)) {
-		Array[String] coerced_strains=select_all(profile.tbprofiler_strain)
-		Array[String] coerced_resistance=select_all(profile.tbprofiler_resistance)
+	if(defined(profile.strain)) {
+		Array[String] coerced_strains=select_all(profile.strain)
+		Array[String] coerced_resistance=select_all(profile.resistance)
+		Array[String] coerced_depth=select_all(profile.median_depth)
 
-		call sranwrp_processing.cat_strings as cat_strains {
+		call sranwrp_processing.cat_strings as collate_strains {
 			input:
 				strings = coerced_strains,
 				out = "strain_reports.txt"
 		}
 		
-		call sranwrp_processing.cat_strings as cat_resistance {
+		call sranwrp_processing.cat_strings as collate_resistance {
 			input:
 				strings = coerced_resistance,
 				out = "resistance_reports.txt"
+		}
+
+		call sranwrp_processing.cat_strings as collate_depth {
+			input:
+				strings = coerced_depth,
+				out = "depth_reports.txt"
 		}
   	}
 	
@@ -162,30 +173,14 @@ workflow myco {
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
 		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  
-			call debug_bad_fastqs_both { 
-				input: 
-					bad_fastqs_both = bad_fastqs_both
-			}
 		}
 		if(length(decontam_each_sample.check_this_fastq)>=1) {
 			Array[File] bad_fastqs_decontam = select_all(bad_fastqs_decontam_)
-			call debug_bad_fastqs_decontam { 
-				input: 
-					bad_fastqs_decontam = bad_fastqs_decontam
-			}
 		}
 		if(length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
-			call debug_bad_fastqs_varcallr { 
-				input: 
-					bad_fastqs_varcallr = bad_fastqs_varcallr
-			}
 		}
 		Array[File] fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
-		call debug_fastqs {
-			input:
-				fastqs = fastqs
-		}
 		if(length(fastqs)>0) {
 			call fastqc.FastqcWF {
 				input:
@@ -212,8 +207,9 @@ workflow myco {
 
 	output {
 		File download_report = merge_reports.outfile
-		File? strain_report = cat_strains.outfile
-		File? resistance_report = cat_resistance.outfile
+		File? strain_report = collate_strains.outfile
+		File? resistance_report = collate_resistance.outfile
+		File? depth_report = collate_depth.outfile
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File?]? tbprofiler_texts = profile.tbprofiler_txt
@@ -223,61 +219,5 @@ workflow myco {
 		File? tree_nextstrain = trees.nextstrain_tree
 		Array[File]? trees_nextstrain = trees.nextstrain_subtrees
 		Array[File]? fastqc_reports = FastqcWF.reports
-	}
-}
-
-task debug_bad_fastqs_both {
-	input {
-		Array[String] bad_fastqs_both
-	}
-	command <<< >>>
-	runtime {
-		cpu: 4
-		docker: "ashedpotatoes/sranwrp:1.1.6"
-		disks: "local-disk 5 HDD"
-		memory: "2 GB"
-		preemptible: "3"
-	}
-}
-
-task debug_bad_fastqs_decontam {
-	input {
-		Array[String] bad_fastqs_decontam
-	}
-	command <<< >>>
-	runtime {
-		cpu: 4
-		docker: "ashedpotatoes/sranwrp:1.1.6"
-		disks: "local-disk 5 HDD"
-		memory: "2 GB"
-		preemptible: "3"
-	}
-}
-
-task debug_bad_fastqs_varcallr {
-	input {
-		Array[String] bad_fastqs_varcallr
-	}
-	command <<< >>>
-	runtime {
-		cpu: 4
-		docker: "ashedpotatoes/sranwrp:1.1.6"
-		disks: "local-disk 5 HDD"
-		memory: "2 GB"
-		preemptible: "3"
-	}
-}
-
-task debug_fastqs {
-	input {
-		Array[String] fastqs
-	}
-	command <<< >>>
-	runtime {
-		cpu: 4
-		docker: "ashedpotatoes/sranwrp:1.1.6"
-		disks: "local-disk 5 HDD"
-		memory: "2 GB"
-		preemptible: "3"
 	}
 }

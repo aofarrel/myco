@@ -4,6 +4,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/var
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
+#import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.0/tbprofiler_tasks.wdl" as profiler
 
 workflow myco {
 	input {
