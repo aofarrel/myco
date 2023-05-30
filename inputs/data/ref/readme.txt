@@ -1,0 +1,3 @@
+As of release 4.2.0, the refprep subworkflow does not run in any version of myco. Instead, most Docker images come with the references pre-installed, with the exception of the tree builder task taking in ref_genome_for_tree_building.
+
+Most of the references created by refprep are too large to commit anyway, so md5 checksums are provided instead. You can find mirrors of the reference tarballs at gs://topmed_workflow_testing/tb/ref/

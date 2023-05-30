@@ -25,5 +25,7 @@ workflows:
     subclass: WDL
     primaryDescriptorPath: /myco_cleaned_1samp.wdl
     readMePath: /doc/myco_cleaned_1samp.md
+    testParameterFiles:
+      - /inputs/myco_sra_terra.json    
     authors:
       - orcid: 0000-0003-4896-1858

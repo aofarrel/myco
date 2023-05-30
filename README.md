@@ -7,7 +7,7 @@ Each version of myco largely only differs in how you are passing in FASTQ files.
 * [myco_raw](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated and may or may not be merged
 * [myco_sra](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
 
-For more information please see [./docs/inputs.md].
+For more information please see [./docs/inputs.md](./doc/inputs.md).
 
 ## More information
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)

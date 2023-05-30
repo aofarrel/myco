@@ -1,0 +1,1 @@
+Typical fastqs are too large to commit, so these are VERY heavily downsampled. Don't use these for actual analysis, they're just for very basic testing.
