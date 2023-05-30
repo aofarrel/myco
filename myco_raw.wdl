@@ -28,11 +28,11 @@ workflow myco {
 	}
 
 	parameter_meta {
-		max_low_coverage_sites: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
+		max_low_coverage_sites: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
@@ -76,6 +76,11 @@ workflow myco {
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, 
 					typical_tb_masked_regions])
 			
+			call fastqc.FastqcWF {
+				input:
+					fastqs = [real_decontaminated_fastq_1]
+			}
+			
 			call profiler.tb_profiler_fastq as profile {
 				input:
 					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
@@ -90,24 +95,6 @@ workflow myco {
 			}
 		}
 
-	}
-
-	if(fastqc_on_timeout) {
-		# Note: This might be problematic in some situations -- may need to make this look like myco_sra
-		# But until then, I'm going to stick with this simpler implementation
-		if(length(decontam_each_sample.check_this_fastq)>1 && length(variant_call_each_sample.check_this_fastq)>1) {
-			Array[File] bad_fastqs_both = select_all(decontam_each_sample.check_this_fastq)
-		}
-		if(length(decontam_each_sample.check_this_fastq)>1) {
-			Array[File] bad_fastqs_decontam = select_all(decontam_each_sample.check_this_fastq)
-		}
-		if(length(variant_call_each_sample.check_this_fastq)>1) {
-			Array[File] bad_fastqs_varcallr = select_all(variant_call_each_sample.check_this_fastq)
-		}
-		call fastqc.FastqcWF {
-			input:
-				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
-		}
 	}
 
 	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
