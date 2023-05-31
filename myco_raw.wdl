@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.1/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 
 workflow myco {
 	input {
@@ -78,7 +78,7 @@ workflow myco {
 			
 			call fastqc.FastqcWF {
 				input:
-					fastqs = [real_decontaminated_fastq_1]
+					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
 			}
 			
 			call profiler.tb_profiler_fastq as profile {
