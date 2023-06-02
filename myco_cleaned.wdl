@@ -49,12 +49,10 @@ workflow myco {
 											  create_diff_files__, 
 											  create_diff_files___])
     
-    call clockwork_ref_prepWF.ClockworkRefPrepTB
 
 	scatter(paired_fastqs in paired_decontaminated_fastq_sets) {
-			call clckwrk_var_call.variant_call_one_sample_simple as variant_call_each_sample {
+			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
 				input:
-					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = paired_fastqs,
 					timeout = timeout_variant_caller
 			}

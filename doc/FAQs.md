@@ -36,7 +36,7 @@ This isn't officially supported due to TBProfiler, UShER, and clockwork each nee
 * TBProfiler's reference genome must be *exactly* the same as the one you called variants upon, if you're running TBProfiler on bams
 * UShER has limitations on how long a chromosome's name can be
 * clockwork's decontamination is designed with their specific decontamination reference in mind
-That being said, old versions of myco used clockwork reference prepare to prepare the TB genome, and you could hack that passing-reference-genomes-around functionality to use your own custom reference genomes if you're confident. The latest version of myco that used clockwork reference prepare was [4.1.3](https://github.com/aofarrel/myco/releases/tag/4.1.3), so that's a good place to start.
+That being said, old versions of myco used clockwork reference prepare to prepare the TB genome, and you could hack that passing-reference-genomes-around functionality to use your own custom reference genomes if you're confident. The latest version of myco_raw and myco_sra that used clockwork reference prepare was [4.1.3](https://github.com/aofarrel/myco/releases/tag/4.1.3), so that's a good place to start. The latest version of myco that required reference genomes for TBProfiler and/or UShER was [4.2.0](https://github.com/aofarrel/myco/releases/tag/4.2.0).
 
 
 ## Common warnings/errors

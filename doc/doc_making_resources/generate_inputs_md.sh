@@ -51,6 +51,15 @@ dont_input_garbage = ("Regardless of which version of myco you use, please make 
 					"myco_cleaned expects that the FASTQs you are putting into have already been cleaned and "
 					"merged. It's recommend you do this by running "
 					"[Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).")
+timeout_intro =    ("When working with data of unknown quality such as SRA data, it can be helpful to quickly remove "
+					"samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given "
+					"sample took an unusually long time in the decontamination or variant calling step, they were likely "
+					"to end up filtered out by the final quality control steps of the pipeline. This is especially true "
+					"of the decontamination step -- the more contamination a sample has, the more that step has to do. "
+					"This heuristic was defined on the default runtime attributes and using Terra as a backend, so "
+					"straying from those defaults is likely to make the default timeout values less useful. This "
+					"*includes* changing from SDDs to HDDs! \n\n myco_raw and myco_cleaned default to not using this "
+					"heuristic at all.")
 filename_vars = [
 			"out", 
 			"contam_out_1", "contam_out_2", "counts_out",
@@ -255,21 +264,57 @@ for input_variable in workflow_level:
 
 for input_variable in fastq_inputs:
 	workflow_level.remove(input_variable)
-		
+
+# handle timeouts, which are different for different workflows
+timeout_inputs = []
+for input_variable in workflow_level:
+	# myco_sra, which has nonzero defaults
+	if input_variable["name"] == "timeout_decontam_part1" and input_variable["default"] != "0":
+		input_variable["workflow"] = "myco_sra"
+		timeout_inputs.append(input_variable)
+	elif input_variable["name"] == "timeout_decontam_part2" and input_variable["default"] != "0":
+		input_variable["workflow"] = "myco_sra"
+		timeout_inputs.append(input_variable)
+	elif input_variable["name"] == "timeout_variant_caller" and input_variable["default"] != "0":
+		input_variable["workflow"] = "myco_sra"
+		timeout_inputs.append(input_variable)
+	
+	# the other ones, which have zero for the defaults
+	elif input_variable["name"] == "timeout_decontam_part1" and input_variable["default"] == "0":
+		input_variable["workflow"] = "myco_raw, myco_cleaned"
+		timeout_inputs.append(input_variable)
+	elif input_variable["name"] == "timeout_decontam_part2" and input_variable["default"] == "0":
+		input_variable["workflow"] = "myco_raw, myco_cleaned"
+		timeout_inputs.append(input_variable)
+	elif input_variable["name"] == "timeout_variant_caller" and input_variable["default"] == "0":
+		input_variable["workflow"] = "myco_raw, myco_cleaned"
+		timeout_inputs.append(input_variable)
+	
+	else:
+		pass
+	value = input_variable["name"]
+	parameter = next((parameter for parameter in parameter_meta if parameter["name"] == value), None)
+	input_variable["description"] = parameter["description"]
+
+for input_variable in timeout_inputs:
+	workflow_level.remove(input_variable)
+
 with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.writeTextLine("See /inputs/example_inputs.json for examples.")
 	doc.addHeader(2, "Workflow-level inputs")
-	doc.addHeader(3, "FASTQ-related inputs")
+	doc.addHeader(3, "FASTQs")
 	doc.writeTextLine(fastq_intro)
 	doc.addTable(dictionary_list=fastq_inputs)
 	doc.writeTextLine(dont_input_garbage)
 	doc.addHeader(3, "More info on each version of myco's use case")
 	doc.writeTextLine(fastq_summary)
-	doc.addHeader(3, "Non-FASTQ workflow-level inputs")
+	doc.addHeader(3, "Timeouts")
+	doc.writeTextLine(timeout_intro)
+	doc.addTable(dictionary_list=timeout_inputs)
+	doc.addHeader(3, "Miscellanous workflow-level inputs")
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
 	doc.addHeader(3, "Software settings")
-	doc.writeTextLine("If you are on a backend that does not support call cacheing, you can use the 'bluepeter' inputs to skip the download of the reference genome, or simply rely on the reference genomes provided in the Docker image.")
 	doc.addTable(dictionary_list=not_runtime)
 	doc.addHeader(3, "Runtime attributes")
 	doc.writeTextLine("These variables adjust runtime attributes, which includes hardware settings. See https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/ for more information.")
