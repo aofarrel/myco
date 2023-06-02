@@ -1,19 +1,18 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.10/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.7/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 
 
 workflow myco {
 	input {
 		File biosample_accessions
-		File typical_tb_masked_regions
 
 		Boolean decorate_tree      = false
 		Boolean fastqc_on_timeout  = false
@@ -21,12 +20,13 @@ workflow myco {
 		File?   input_tree
 		Float   max_low_coverage_sites = 0.05
 		Int     min_coverage_per_site = 10
-		File    ref_genome_for_tree_building
+		File?   ref_genome_for_tree_building
 		Int     subsample_cutoff       =  450
 		Int     subsample_seed         = 1965
 		Int     timeout_decontam_part1 =   20
 		Int     timeout_decontam_part2 =   15
 		Int     timeout_variant_caller =  120
+		File?   typical_tb_masked_regions
 	}
 
 	parameter_meta {

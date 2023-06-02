@@ -269,7 +269,7 @@ with MarkdownGenerator(filename="doc/inputs.md", enable_write=False) as doc:
 	doc.addTable(dictionary_list=workflow_level)
 	doc.addHeader(2, "Task-level inputs")
 	doc.addHeader(3, "Software settings")
-	doc.writeTextLine("If you are on a backend that does not support call cacheing, you can use the 'bluepeter' inputs to skip the download of the reference genome.")
+	doc.writeTextLine("If you are on a backend that does not support call cacheing, you can use the 'bluepeter' inputs to skip the download of the reference genome, or simply rely on the reference genomes provided in the Docker image.")
 	doc.addTable(dictionary_list=not_runtime)
 	doc.addHeader(3, "Runtime attributes")
 	doc.writeTextLine("These variables adjust runtime attributes, which includes hardware settings. See https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/ for more information.")

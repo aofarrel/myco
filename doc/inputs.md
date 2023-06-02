@@ -49,14 +49,17 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
 | max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
 | min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
-| ref_genome_for_tree_building | File |  | Ref genome for building trees -- must have ONLY '>NC_000962.3' on its first line |  
 | ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY '>NC_000962.3' on its first line |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
+| timeout_decontam_part1 | Int  | 0 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout |  
 | timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout |  
+| timeout_decontam_part2 | Int  | 0 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) |  
 | timeout_decontam_part2 | Int  | 15 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) |  
+| timeout_variant_caller | Int  | 0 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) |  
 | timeout_variant_caller | Int  | 120 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) |  
 | typical_tb_masked_regions | File |  | Bed file of regions to mask when making diff files |  
+| typical_tb_masked_regions | File? |  | Bed file of regions to mask when making diff files |  
   
   
 ## Task-level inputs  
@@ -68,6 +71,7 @@ If you are on a backend that does not support call cacheing, you can use the 'bl
 |:---:|:---:|:---:|:---:|:---:|  
 | ClockworkRefPrepTB | bluepeter__tar_indexd_dcontm_ref | File? |  |  |  
 | ClockworkRefPrepTB | bluepeter__tar_tb_ref_raw | File? |  |  |  
+| FastqcWF | limits | File? |  |  |  
 | decontam_each_sample | contam_out_1 | String? |  | Override default output file name with this string |  
 | decontam_each_sample | contam_out_2 | String? |  | Override default output file name with this string |  
 | decontam_each_sample | counts_out | String? |  | Override default output file name with this string |  
@@ -80,6 +84,7 @@ If you are on a backend that does not support call cacheing, you can use the 'bl
 | decontam_each_sample | threads | Int? |  | Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware. |  
 | decontam_each_sample | verbose | Boolean  | true |  |  
 | make_mask_and_diff | histograms | Boolean  | false | Should coverage histograms be output? |  
+| profile | bam_suffix | String? |  |  |  
 | trees | make_nextstrain_subtrees | Boolean  | true |  |  
 | trees | outfile | String? |  | Override default output file name with this string |  
 | variant_call_each_sample | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
@@ -93,8 +98,9 @@ These variables adjust runtime attributes, which includes hardware settings. See
   
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  
-| cat_resistance | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| cat_strains | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
+| collate_depth | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
+| collate_resistance | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
+| collate_strains | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
 | decontam_each_sample | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
 | decontam_each_sample | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
 | decontam_each_sample | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
@@ -105,9 +111,9 @@ These variables adjust runtime attributes, which includes hardware settings. See
 | make_mask_and_diff | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
 | make_mask_and_diff | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
 | make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
 | make_mask_and_diff | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
 | merge_reports | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
+| profile | addldisk | Int  | 15 | Additional disk size, in GB, on top of auto-scaling disk size. |  
 | profile | cpu | Int  | 2 | Number of CPUs (cores) to request from GCP. |  
 | profile | memory | Int  | 4 | Amount of memory, in GB, to request from GCP. |  
 | profile | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  

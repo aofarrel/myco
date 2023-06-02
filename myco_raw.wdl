@@ -2,9 +2,9 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/ref-optional/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/tbmf-optional/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.7/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 
@@ -21,9 +21,9 @@ workflow myco {
 		File?   ref_genome_for_tree_building
 		Int     subsample_cutoff       =  450
 		Int     subsample_seed         = 1965
-		Int     timeout_decontam_part1 =   20
-		Int     timeout_decontam_part2 =   15
-		Int     timeout_variant_caller =  120
+		Int     timeout_decontam_part1 =    0
+		Int     timeout_decontam_part2 =    0
+		Int     timeout_variant_caller =    0
 		File?   typical_tb_masked_regions
 	}
 
