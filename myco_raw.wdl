@@ -1,17 +1,16 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.11/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.1/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.7/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-		File typical_tb_masked_regions
 
 		Boolean decorate_tree      = false
 		Boolean fastqc_on_timeout  = false
@@ -22,17 +21,18 @@ workflow myco {
 		File?   ref_genome_for_tree_building
 		Int     subsample_cutoff       =  450
 		Int     subsample_seed         = 1965
-		Int     timeout_decontam_part1 =   20
-		Int     timeout_decontam_part2 =   15
-		Int     timeout_variant_caller =  120
+		Int     timeout_decontam_part1 =    0
+		Int     timeout_decontam_part2 =    0
+		Int     timeout_variant_caller =    0
+		File?   typical_tb_masked_regions
 	}
 
 	parameter_meta {
-		max_low_coverage_sites: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
+		max_low_coverage_sites: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
 		min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
@@ -76,6 +76,11 @@ workflow myco {
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, 
 					typical_tb_masked_regions])
 			
+			call fastqc.FastqcWF {
+				input:
+					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+			}
+			
 			call profiler.tb_profiler_fastq as profile {
 				input:
 					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
@@ -90,24 +95,6 @@ workflow myco {
 			}
 		}
 
-	}
-
-	if(fastqc_on_timeout) {
-		# Note: This might be problematic in some situations -- may need to make this look like myco_sra
-		# But until then, I'm going to stick with this simpler implementation
-		if(length(decontam_each_sample.check_this_fastq)>1 && length(variant_call_each_sample.check_this_fastq)>1) {
-			Array[File] bad_fastqs_both = select_all(decontam_each_sample.check_this_fastq)
-		}
-		if(length(decontam_each_sample.check_this_fastq)>1) {
-			Array[File] bad_fastqs_decontam = select_all(decontam_each_sample.check_this_fastq)
-		}
-		if(length(variant_call_each_sample.check_this_fastq)>1) {
-			Array[File] bad_fastqs_varcallr = select_all(variant_call_each_sample.check_this_fastq)
-		}
-		call fastqc.FastqcWF {
-			input:
-				fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
-		}
 	}
 
 	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
@@ -175,6 +162,6 @@ workflow myco {
 		File? tree_taxonium = trees.taxonium_tree
 		File? tree_nextstrain = trees.nextstrain_tree
 		Array[File]? trees_nextstrain = trees.nextstrain_subtrees
-		Array[File]? fastqc_reports = FastqcWF.reports
+		Array[Array[File]?] fastqc_reports = FastqcWF.reports
 	}
 }

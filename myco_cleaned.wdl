@@ -1,15 +1,16 @@
 version 1.0
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/workflows/refprep-TB.wdl" as clockwork_ref_prepWF
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.8.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.6/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.7/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/main/fastqc.wdl" as fastqc
-#import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.1/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.7/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
+#import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_decontaminated_fastq_sets
-		File typical_tb_masked_regions
 
 		Boolean decorate_tree      = false
 		Boolean fastqc_on_timeout  = false
@@ -19,6 +20,7 @@ workflow myco {
 		Int     min_coverage_per_site = 10
 		File?   ref_genome_for_tree_building
 		Int     timeout_variant_caller =  120
+		File?   typical_tb_masked_regions
 	}
 
 	parameter_meta {
@@ -47,12 +49,10 @@ workflow myco {
 											  create_diff_files__, 
 											  create_diff_files___])
     
-    call clockwork_ref_prepWF.ClockworkRefPrepTB
 
 	scatter(paired_fastqs in paired_decontaminated_fastq_sets) {
-			call clckwrk_var_call.variant_call_one_sample_simple as variant_call_each_sample {
+			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
 				input:
-					ref_dir = ClockworkRefPrepTB.tar_indexd_H37Rv_ref,
 					reads_files = paired_fastqs,
 					timeout = timeout_variant_caller
 			}

@@ -1,0 +1,7 @@
+{
+  "myco.paired_fastq_sets": [["./inputs/data/fastqs/ERR7057565_tiny_1.fq", "./inputs/data/fastqs/ERR7057565_tiny_2.fq"]],
+  "myco.decorate_tree":true,
+  "myco.timeout_decontam_part1":0,
+  "myco.timeout_decontam_part2":0,
+  "myco.timeout_variant_caller":0
+}
