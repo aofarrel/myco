@@ -198,7 +198,7 @@ workflow myco {
 		call build_treesWF.Tree_Nine as trees {
 			input:
 				diffs = coerced_diffs,
-				input_mutation_annotated_tree = input_tree,
+				input_tree = input_tree,
 				ref_genome = ref_genome_for_tree_building,
 				coverage_reports = coerced_reports,
 				max_low_coverage_sites = max_low_coverage_sites
