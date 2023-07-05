@@ -2,8 +2,8 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.7/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.14/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
@@ -141,11 +141,11 @@ workflow myco {
 		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
 		Array[File] coerced_diffs = select_first([select_all(make_mask_and_diff.diff), minos_vcfs])
 		Array[File] coerced_reports = select_first([select_all(make_mask_and_diff.report), minos_vcfs])
-		call build_treesWF.usher_sampled_diff_to_taxonium as trees {
+		call build_treesWF.Tree_Nine as trees {
 			input:
 				diffs = coerced_diffs,
-				input_mutation_annotated_tree = input_tree,
-				ref = ref_genome_for_tree_building,
+				input_tree = input_tree,
+				ref_genome = ref_genome_for_tree_building,
 				coverage_reports = coerced_reports,
 				max_low_coverage_sites = max_low_coverage_sites
 		}
@@ -158,10 +158,13 @@ workflow myco {
 		Array[File] minos = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File?] diffs = make_mask_and_diff.diff
-		File? tree_usher = trees.usher_tree
-		File? tree_taxonium = trees.taxonium_tree
-		File? tree_nextstrain = trees.nextstrain_tree
-		Array[File]? trees_nextstrain = trees.nextstrain_subtrees
 		Array[Array[File]?] fastqc_reports = FastqcWF.reports
+
+		# tree nine
+		File? tree_nwk = trees.tree_nwk
+		File? tree_usher = trees.tree_usher_raw
+		File? tree_taxonium = trees.tree_taxonium
+		File? tree_nextstrain = trees.tree_nextstrain
+		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 	}
 }
