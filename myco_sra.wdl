@@ -20,7 +20,7 @@ workflow myco {
 		Boolean fastqc_on_timeout       = false
 		Boolean early_qc_apply_cutoffs  = false
 		Float   early_qc_cutoff_q30     = 0.90
-		Boolean early_qc_skip_entirely  = true
+		Boolean early_qc_skip_entirely  = false
 		
 		Boolean force_diff         = false
 		File?   input_tree
