@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://github.com/aofarrel/fastp-wdl/blob/main/fastp.wdl" as fastpWF
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as fastp_and_tbprofiler
 
 
 workflow myco {
@@ -17,6 +17,8 @@ workflow myco {
 
 		Boolean decorate_tree      = false
 		Boolean fastqc_on_timeout  = false
+		Boolean fastp_as_filter    = false
+		Float   fastp_q30_cutoff   = 0.90
 		Boolean force_diff         = false
 		File?   input_tree
 		Float   max_low_coverage_sites = 0.05
@@ -24,6 +26,7 @@ workflow myco {
 		File?   ref_genome_for_tree_building
 		Int     subsample_cutoff       =  450
 		Int     subsample_seed         = 1965
+		Boolean tbprofiler_on_bam      = true
 		Int     timeout_decontam_part1 =   20
 		Int     timeout_decontam_part2 =   15
 		Int     timeout_variant_caller =  120
@@ -32,15 +35,18 @@ workflow myco {
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		max_low_coverage_sites: "If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree"
+		max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
+		fastp_as_filter: "If true, run fastp + TBProfiler on decontaminated fastqs, and if the fastqs are below fastp_q30_cutoff, throw out the sample."
+		fastp_q30_cutoff: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff fastp_as_filter is also true."
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
 		ref_genome_for_tree_building: "Ref genome for building trees iff different from ref genome used to call variants -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
+		tbprofiler_on_bam: "If true, run TBProfiler on BAMs."
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
@@ -95,35 +101,51 @@ workflow myco {
 		}
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
-		# This region only executes if decontaminated fastqs exist.
-		# We can use this to coerce File? into File by using a
-		# select_first() where the first element is the File? we know
-		# absolutely must exist, and the second element is bogus
-    		File real_decontaminated_fastq_1=select_first([
-    			decontam_each_sample.decontaminated_fastq_1, 
-    				biosample_accessions])
-    		File real_decontaminated_fastq_2=select_first(
-    			[decontam_each_sample.decontaminated_fastq_2, 
-    				biosample_accessions])
+		# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
+		# select_first() where the first element is the File? we know must exist, and the second element is bogus.
+    		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, biosample_accessions])
+    		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, biosample_accessions])
+
+			if(fastp_as_filter) {
+				call fastp_and_tbprofiler.TBfastProfiler as check_fastqs {
+					input:
+						fastq1 = real_decontaminated_fastq_1,
+						fastq2 = real_decontaminated_fastq_2,
+						q30_cutoff = fastp_q30_cutoff
+				}
+				
+				if(check_fastqs.did_this_sample_pass) {
+					File possibly_fastp_cleaned_fastq1=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+			    	File possibly_fastp_cleaned_fastq2=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+			    	
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_checking_fqs {
+						input:
+							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
+							timeout = timeout_variant_caller
+					}
+				}
+			}
+			
+			if(!fastp_as_filter) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_checking_fqs {
+					input:
+						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
+						timeout = timeout_variant_caller
+				}
+			}
 
 			
-			# To save money, myco_sra runs TBProfiler on bams instead -- but if you wanted to use
-			# fastqs, here is where you'd put the task.
-			#call profiler.tb_profiler_fastq as profile {
-			#	input:
-			#		fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
-			#}
-
-			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
-				input:
-					reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
-					timeout = timeout_variant_caller
-			}
 		}
 	}
 
-	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(variant_call_each_sample.mapped_to_ref)
+	# do some wizardry to deal with optionals
+	Array[File] minos_vcfs_if_fqs_checked     = select_all(variant_call_without_checking_fqs.vcf_final_call_set)
+	Array[File] minos_vcfs_if_fqs_not_checked = select_all(variant_call_after_checking_fqs.vcf_final_call_set)
+	Array[File] bams_if_fqs_checked     = select_all(variant_call_after_checking_fqs.mapped_to_ref)
+	Array[File] bams_if_fqs_not_checked = select_all(variant_call_without_checking_fqs.mapped_to_ref)
+	
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_fqs_checked, minos_vcfs_if_fqs_not_checked])
+	Array[File] bams_to_ref = flatten([bams_if_fqs_checked, bams_if_fqs_not_checked])
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
@@ -136,9 +158,11 @@ workflow myco {
 				diffs = create_diff_files
 		}
 		
-		call profiler.tb_profiler_bam as profile {
-				input:
-					bam = vcfs_and_bams.left
+		if(tbprofiler_on_bam) {
+			call profiler.tb_profiler_bam as profile {
+					input:
+						bam = vcfs_and_bams.left
+			}
 		}
 	}
 
@@ -170,7 +194,7 @@ workflow myco {
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
-		Array[File] bad_fastqs_varcallr_ = select_all(variant_call_each_sample.check_this_fastq)
+		Array[File] bad_fastqs_varcallr_ = select_all(variant_call_without_checking_fqs.check_this_fastq)
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
 		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  
