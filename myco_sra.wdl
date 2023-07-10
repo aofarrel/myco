@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/main/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as fastp_and_tbprofiler
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as earlyQC
 
 
 workflow myco {
@@ -16,9 +16,12 @@ workflow myco {
 		File biosample_accessions
 
 		Boolean decorate_tree      = false
-		Boolean fastqc_on_timeout  = false
-		Boolean fastp_as_filter    = false
-		Float   fastp_q30_cutoff   = 0.90
+		
+		Boolean fastqc_on_timeout       = false
+		Boolean early_qc_apply_cutoffs  = false
+		Float   early_qc_cutoff_q30     = 0.90
+		Boolean early_qc_skip_entirely  = true
+		
 		Boolean force_diff         = false
 		File?   input_tree
 		Float   max_low_coverage_sites = 0.05
@@ -37,9 +40,12 @@ workflow myco {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 		max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
+		
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
-		fastp_as_filter: "If true, run fastp + TBProfiler on decontaminated fastqs, and if the fastqs are below fastp_q30_cutoff, throw out the sample."
-		fastp_q30_cutoff: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff fastp_as_filter is also true."
+		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
+		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
+		
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
 		min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
@@ -101,24 +107,40 @@ workflow myco {
 		}
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
-		# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
-		# select_first() where the first element is the File? we know must exist, and the second element is bogus.
+			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
+			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, biosample_accessions])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, biosample_accessions])
 
-			if(fastp_as_filter) {
-				call fastp_and_tbprofiler.TBfastProfiler as check_fastqs {
+			# if we are NOT skipping earlyQC
+			if(!early_qc_skip_entirely) {
+				call earlyQC.TBfastProfiler as check_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = fastp_q30_cutoff
+						q30_cutoff = early_qc_cutoff_q30
 				}
 				
-				if(check_fastqs.did_this_sample_pass) {
+				# if we are filtering out samples via earlyQC...
+				if(early_qc_apply_cutoffs) {
+					if(check_fastqs.did_this_sample_pass) {
+						File possibly_fastp_cleaned_fastq1_passed=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+				    	File possibly_fastp_cleaned_fastq2_passed=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+				    	
+						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
+							input:
+								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
+								timeout = timeout_variant_caller
+						}
+					}
+				}
+				
+				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
+				if(!early_qc_apply_cutoffs) {
 					File possibly_fastp_cleaned_fastq1=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-			    	
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_checking_fqs {
+				    	
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 							timeout = timeout_variant_caller
@@ -126,26 +148,29 @@ workflow myco {
 				}
 			}
 			
-			if(!fastp_as_filter) {
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_checking_fqs {
+			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
+			if(early_qc_skip_entirely) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						timeout = timeout_variant_caller
 				}
 			}
-
-			
 		}
+			
 	}
 
 	# do some wizardry to deal with optionals
-	Array[File] minos_vcfs_if_fqs_checked     = select_all(variant_call_without_checking_fqs.vcf_final_call_set)
-	Array[File] minos_vcfs_if_fqs_not_checked = select_all(variant_call_after_checking_fqs.vcf_final_call_set)
-	Array[File] bams_if_fqs_checked     = select_all(variant_call_after_checking_fqs.mapped_to_ref)
-	Array[File] bams_if_fqs_not_checked = select_all(variant_call_without_checking_fqs.mapped_to_ref)
+	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.vcf_final_call_set)
+	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.vcf_final_call_set)
+	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.vcf_final_call_set)
 	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_fqs_checked, minos_vcfs_if_fqs_not_checked])
-	Array[File] bams_to_ref = flatten([bams_if_fqs_checked, bams_if_fqs_not_checked])
+	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.mapped_to_ref)
+	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.mapped_to_ref)
+	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.mapped_to_ref)
+	
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
+	Array[File] bams_to_ref = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
@@ -194,7 +219,7 @@ workflow myco {
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
-		Array[File] bad_fastqs_varcallr_ = select_all(variant_call_without_checking_fqs.check_this_fastq)
+		Array[File] bad_fastqs_varcallr_ = select_all(flatten([variant_call_without_earlyQC.check_this_fastq, variant_call_after_earlyQC_but_not_filtering_samples.check_this_fastq]))
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
 		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  

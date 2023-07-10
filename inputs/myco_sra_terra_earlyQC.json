@@ -4,6 +4,7 @@
   "myco.input_tree": "gs://topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb",
   "myco.min_coverage_per_site": 10,
   "myco.typical_tb_masked_regions": "gs://topmed_workflow_testing/tb/R00000039_repregions.bed",
-  "myco.fastp_as_filter": "true",
-  "myco.fastp_q30_cutoff": "0.90"
+  "myco.early_qc_skip_entirely": "false",
+  "myco.early_qc_apply_cutoffs": "true",
+  "myco.early_qc_cutoff_q30": "0.90"
 }
