@@ -2,34 +2,40 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.14/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://github.com/aofarrel/fastp-wdl/blob/main/fastp.wdl" as fastpWF
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.2/TBfastProfiler.wdl" as earlyQC
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 
-		Boolean decorate_tree      = false
-		Boolean fastqc_on_timeout  = false
-		Boolean force_diff         = false
+		Boolean decorate_tree           = false
+		Boolean early_qc_apply_cutoffs  = false
+		Float   early_qc_cutoff_q30     = 0.90
+		Boolean early_qc_skip_entirely  = false
+		Boolean fastqc_on_timeout       = false
+		Boolean force_diff              = false
 		File?   input_tree
-		Float   max_low_coverage_sites = 0.05
-		Int     min_coverage_per_site = 10
+		Float   max_low_coverage_sites  = 0.05
+		Int     min_coverage_per_site   = 10
 		File?   ref_genome_for_tree_building
-		Int     subsample_cutoff       =  450
-		Int     subsample_seed         = 1965
-		Int     timeout_decontam_part1 =    0
-		Int     timeout_decontam_part2 =    0
-		Int     timeout_variant_caller =    0
+		Int     subsample_cutoff        =  450
+		Int     subsample_seed          = 1965
+		Boolean tbprofiler_on_bam       = false
+		Int     timeout_decontam_part1  =    0
+		Int     timeout_decontam_part2  =    0
+		Int     timeout_variant_caller  =    0
 		File?   typical_tb_masked_regions
 	}
 
 	parameter_meta {
 		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
+		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
+		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
@@ -39,6 +45,7 @@ workflow myco {
 		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
+		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
@@ -68,38 +75,86 @@ workflow myco {
 		}
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
-			# This region only executes if decontaminated fastqs exist.
-			# We can use this to coerce File? into File by using a
-			# select_first() where the first element is the File? we know
-			# absolutely must exist, and the second element is bogus.
-			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, 
-					typical_tb_masked_regions])
-			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, 
-					typical_tb_masked_regions])
-			
-			call fastqc.FastqcWF {
-				input:
-					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
+			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
+			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
+    		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
+    		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
+
+			if(!early_qc_skip_entirely) {
+				call earlyQC.TBfastProfiler as check_fastqs {
+					input:
+						fastq1 = real_decontaminated_fastq_1,
+						fastq2 = real_decontaminated_fastq_2,
+						q30_cutoff = early_qc_cutoff_q30
+				}
+				
+				# if we are filtering out samples via earlyQC...
+				if(early_qc_apply_cutoffs) {
+					if(check_fastqs.did_this_sample_pass) {
+						File possibly_fastp_cleaned_fastq1_passed=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+				    	File possibly_fastp_cleaned_fastq2_passed=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
+							input:
+								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
+								timeout = timeout_variant_caller
+						}
+					}
+				}
+				
+				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
+				if(!early_qc_apply_cutoffs) {
+					File possibly_fastp_cleaned_fastq1=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+			    	File possibly_fastp_cleaned_fastq2=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
+						input:
+							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
+							timeout = timeout_variant_caller
+					}
+				}
 			}
 			
-			call profiler.tb_profiler_fastq as profile {
-				input:
-					fastqs = [real_decontaminated_fastq_1, real_decontaminated_fastq_2]
-			}
-
-			# if median depth is > some cutoff...
-
-			call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_each_sample {
-				input:
-					reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
-					timeout = timeout_variant_caller
+			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
+			if(early_qc_skip_entirely) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
+					input:
+						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
+						timeout = timeout_variant_caller
+				}
 			}
 		}
 
 	}
 
-	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(variant_call_each_sample.mapped_to_ref)
+	# do some wizardry to deal with optionals
+	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.vcf_final_call_set)
+	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.vcf_final_call_set)
+	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.vcf_final_call_set)
+	
+	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.mapped_to_ref)
+	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.mapped_to_ref)
+	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.mapped_to_ref)
+	
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
+	Array[File] bams_to_ref = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
+	
+	
+	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
+		call diff.make_mask_and_diff as make_mask_and_diff {
+			input:
+				bam = vcfs_and_bams.left,
+				vcf = vcfs_and_bams.right,
+				min_coverage_per_site = min_coverage_per_site,
+				tbmf = typical_tb_masked_regions,
+				diffs = create_diff_files
+		}
+		
+		if(tbprofiler_on_bam) {
+			call profiler.tb_profiler_bam as profile {
+					input:
+						bam = vcfs_and_bams.left
+			}
+		}
+	}
 
 	if(defined(profile.strain)) {
 		Array[String] coerced_strains=select_all(profile.strain)
@@ -125,18 +180,6 @@ workflow myco {
 		}
   	}
 
-
-	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
-		call diff.make_mask_and_diff as make_mask_and_diff {
-			input:
-				bam = vcfs_and_bams.left,
-				vcf = vcfs_and_bams.right,
-				min_coverage_per_site = min_coverage_per_site,
-				tbmf = typical_tb_masked_regions,
-				diffs = create_diff_files
-		}
-	}
-
 	if(decorate_tree) {
 		# diff files must exist if decorate_tree is true, so we can force the Array[File?]?
 		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
@@ -153,13 +196,15 @@ workflow myco {
 	}
 
 	output {
+		# raw files
+		Array[File?] diffs = make_mask_and_diff.diff
+		Array[File] masks = make_mask_and_diff.mask_file
+		Array[File] vcfs = minos_vcfs
+		
+		# metadata
+		File? depth_report = collate_depth.outfile
 		File? strain_report = collate_strains.outfile
 		File? resistance_report = collate_resistance.outfile
-		File? depth_report = collate_depth.outfile
-		Array[File] minos = minos_vcfs
-		Array[File] masks = make_mask_and_diff.mask_file
-		Array[File?] diffs = make_mask_and_diff.diff
-		Array[Array[File]?] fastqc_reports = FastqcWF.reports
 
 		# tree nine
 		File? tree_nwk = trees.tree_nwk
