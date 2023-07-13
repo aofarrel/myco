@@ -75,13 +75,13 @@ def strip_junk(string):
 	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`").replace("&lt;", "<").replace("\`", "\'")
 
 def get_task(line):
-	return str(re.search('([a-z, A-Z, _, 1-9])+\.', line).group(0)[:-1])
+	return str(re.search('([a-z, A-Z, _, 0-9])+\.', line).group(0)[:-1])
 
 def get_name(line):
-	return str(re.search('([a-z, A-Z, _, 1-9])+"\:', line).group(0)[:-2])
+	return str(re.search('([a-z, A-Z, _, 0-9])+"\:', line).group(0)[:-2])
 
 def get_type(line):
-	return str(re.search('\: \"([a-z, A-Z, _, 1-9])+\??', line).group(0)[3:])
+	return str(re.search('\: \"([a-z, A-Z, _, 0-9])+\??', line).group(0)[3:])
 
 def get_default(line):
 	if bool(re.search('default = .+?(?=\))', line)):
@@ -92,10 +92,11 @@ def get_default(line):
 def extract_wf_info(input_list):
 	variables = []
 	for line in input_list:
-		this_variable = {"name": get_name(line),
-						"type": get_type(line),
-						"default": get_default(line)}
-		variables.append(this_variable)
+		if line is not None:
+			this_variable = {"name": get_name(line),
+							"type": get_type(line),
+							"default": get_default(line)}
+			variables.append(this_variable)
 	return variables
 
 def extract_task_info(input_list):
@@ -184,6 +185,7 @@ for input_variable in task_level:
 # extract parameter_meta for workflow-level variables
 parameter_meta = []
 in_parameter_meta = False
+print("Extracting workflow-level variables from myco_raw...")
 with open("myco_raw.wdl", "r") as myco:
 	for line in myco:
 		if line.startswith("\tparameter_meta"):
@@ -198,6 +200,7 @@ with open("myco_raw.wdl", "r") as myco:
 		else:
 			continue
 in_parameter_meta = False
+print("Extracting workflow-level variables from myco_sra...")
 with open("myco_sra.wdl", "r") as myco:
 	for line in myco:
 		if line.startswith("\tparameter_meta"):
@@ -206,15 +209,20 @@ with open("myco_sra.wdl", "r") as myco:
 		elif line.startswith("\t}") and in_parameter_meta:
 			break
 		elif in_parameter_meta and not line.startswith("}"):
-			this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
-							"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
-			if this_parameter not in parameter_meta:
-				# this will add duplicates if the same variable have diff descriptions in diff workflows
-				# TODO: add a check to detect such duplicates, which indicate inconsistent documentation
-				parameter_meta.append(this_parameter)
+			try:
+				this_parameter = {"name": re.search("\S.+?(?=\:)", line).group(0),
+								"description": strip_junk(re.search('(?=\:).+', line).group(0).replace('\"', ""))}
+				if this_parameter not in parameter_meta:
+					# this will add duplicates if the same variable have diff descriptions in diff workflows
+					# TODO: add a check to detect such duplicates, which indicate inconsistent documentation
+					parameter_meta.append(this_parameter)
+			except AttributeError:
+				# no matches, eg this is a blank line
+				continue
 		else:
 			continue
 in_parameter_meta = False
+print("Extracting workflow-level variables from myco_cleaned...")
 with open("myco_cleaned.wdl", "r") as myco:
 	for line in myco:
 		if line.startswith("\tparameter_meta"):

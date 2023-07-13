@@ -15,36 +15,36 @@ workflow myco {
 	input {
 		File biosample_accessions
 
-		Boolean decorate_tree      = false
+		Boolean decorate_tree           = false
 		
 		Boolean fastqc_on_timeout       = false
 		Boolean early_qc_apply_cutoffs  = false
 		Float   early_qc_cutoff_q30     = 0.90
 		Boolean early_qc_skip_entirely  = false
 		
-		Boolean force_diff         = false
+		Boolean force_diff              = false
 		File?   input_tree
-		Float   max_low_coverage_sites = 0.05
-		Int     min_coverage_per_site = 10
+		Float   max_low_coverage_sites  = 0.05
+		Int     min_coverage_per_site   = 10
 		File?   ref_genome_for_tree_building
-		Int     subsample_cutoff       =  450
-		Int     subsample_seed         = 1965
-		Boolean tbprofiler_on_bam      = true
-		Int     timeout_decontam_part1 =   20
-		Int     timeout_decontam_part2 =   15
-		Int     timeout_variant_caller =  120
+		Int     subsample_cutoff        =  450
+		Int     subsample_seed          = 1965
+		Boolean tbprofiler_on_bam       = true
+		Int     timeout_decontam_part1  =   20
+		Int     timeout_decontam_part2  =   15
+		Int     timeout_variant_caller  =  120
 		File?   typical_tb_masked_regions
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 		max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
-		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome"
+		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated?"
 		
-		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
 		early_qc_cutoff_q30: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
+		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		
 		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		input_tree: "Base tree to use if decorate_tree = true"
@@ -256,16 +256,19 @@ workflow myco {
 	}
 
 	output {
+		# raw files
+		Array[File?] diffs = make_mask_and_diff.diff
+		Array[File] masks = make_mask_and_diff.mask_file
+		Array[File] vcfs = minos_vcfs
+		
+		# metadata
+		Array[File]? fastqc_reports = FastqcWF.reports
+		File? depth_report = collate_depth.outfile
 		File download_report = merge_reports.outfile
 		File? strain_report = collate_strains.outfile
 		File? resistance_report = collate_resistance.outfile
-		File? depth_report = collate_depth.outfile
-		Array[File] minos = minos_vcfs
-		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File?]? tbprofiler_texts = profile.tbprofiler_txt
-		Array[File?] diffs = make_mask_and_diff.diff
-		Array[File]? fastqc_reports = FastqcWF.reports
-
+		
 		# tree nine
 		File? tree_nwk = trees.tree_nwk
 		File? tree_usher = trees.tree_usher_raw
