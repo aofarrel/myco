@@ -59,7 +59,10 @@ When working with data of unknown quality such as SRA data, it can be helpful to
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
-| decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? Requires input_tree and ref_genome |  
+| decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? |  
+| early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
+| early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
+| early_qc_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
 | fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination or variant calling times out |  
 | force_diff | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
 | input_tree | File? |  | Base tree to use if decorate_tree = true |  
@@ -68,6 +71,8 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 | ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY '>NC_000962.3' on its first line |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
+| tbprofiler_on_bam | Boolean  | false | If true, run TBProfiler on BAMs |  
+| tbprofiler_on_bam | Boolean  | true | If true, run TBProfiler on BAMs |  
 | typical_tb_masked_regions | File? |  | Bed file of regions to mask when making diff files |  
   
   
@@ -78,6 +83,7 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  
 | FastqcWF | limits | File? |  |  |  
+| check_fastqs | output_fastps_cleaned_fastqs | Boolean  | false |  |  
 | decontam_each_sample | contam_out_1 | String? |  | Override default output file name with this string |  
 | decontam_each_sample | contam_out_2 | String? |  | Override default output file name with this string |  
 | decontam_each_sample | counts_out | String? |  | Override default output file name with this string |  
@@ -91,12 +97,37 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 | decontam_each_sample | verbose | Boolean  | true |  |  
 | make_mask_and_diff | histograms | Boolean  | false | Should coverage histograms be output? |  
 | profile | bam_suffix | String? |  |  |  
+| trees | detailed_clades | Boolean  | false |  |  
+| trees | in_prefix_summary | String? |  |  |  
 | trees | make_nextstrain_subtrees | Boolean  | true |  |  
-| trees | outfile | String? |  | Override default output file name with this string |  
+| trees | metadata_tsv | File? |  |  |  
+| trees | out_diffs | String  | \'_combined\' |  |  
+| trees | out_prefix | String  | \'tree\' |  |  
+| trees | out_prefix_summary | String? |  |  |  
+| trees | out_tree_annotated_pb | String  | \'_annotated\' |  |  
+| trees | out_tree_nextstrain | String  | \'_auspice\' |  |  
+| trees | out_tree_nwk | String  | \'_nwk\' |  |  
+| trees | out_tree_raw_pb | String  | \'_raw\' |  |  
+| trees | out_tree_taxonium | String  | \'_taxonium\' |  |  
+| trees | reroot_to_this_node | String? |  |  |  
+| trees | subtree_only_new_samples | Boolean  | true |  |  
+| trees | summarize_input_mat | Boolean  | true |  |  
+| variant_call_after_earlyQC_but_not_filtering_samples | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
+| variant_call_after_earlyQC_but_not_filtering_samples | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
+| variant_call_after_earlyQC_but_not_filtering_samples | debug | Boolean  | false | Do not clean up any files and be verbose |  
+| variant_call_after_earlyQC_but_not_filtering_samples | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
+| variant_call_after_earlyQC_filtering | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
+| variant_call_after_earlyQC_filtering | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
+| variant_call_after_earlyQC_filtering | debug | Boolean  | false | Do not clean up any files and be verbose |  
+| variant_call_after_earlyQC_filtering | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
 | variant_call_each_sample | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
 | variant_call_each_sample | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
 | variant_call_each_sample | debug | Boolean  | false | Do not clean up any files and be verbose |  
 | variant_call_each_sample | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
+| variant_call_without_earlyQC | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
+| variant_call_without_earlyQC | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
+| variant_call_without_earlyQC | debug | Boolean  | false | Do not clean up any files and be verbose |  
+| variant_call_without_earlyQC | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
   
   
 ### Runtime attributes  
@@ -117,19 +148,37 @@ These variables adjust runtime attributes, which includes hardware settings. See
 | make_mask_and_diff | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
 | make_mask_and_diff | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
 | make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
 | make_mask_and_diff | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
 | merge_reports | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| profile | addldisk | Int  | 15 | Additional disk size, in GB, on top of auto-scaling disk size. |  
 | profile | cpu | Int  | 2 | Number of CPUs (cores) to request from GCP. |  
 | profile | memory | Int  | 4 | Amount of memory, in GB, to request from GCP. |  
 | profile | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
 | profile | ssd | Boolean  | false | If true, use SSDs for this task instead of HDDs |  
 | pull | disk_size | Int  | 100 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
 | pull | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| variant_call_after_earlyQC_but_not_filtering_samples | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| variant_call_after_earlyQC_but_not_filtering_samples | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
+| variant_call_after_earlyQC_but_not_filtering_samples | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
+| variant_call_after_earlyQC_but_not_filtering_samples | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| variant_call_after_earlyQC_but_not_filtering_samples | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
+| variant_call_after_earlyQC_but_not_filtering_samples | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
+| variant_call_after_earlyQC_filtering | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| variant_call_after_earlyQC_filtering | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
+| variant_call_after_earlyQC_filtering | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
+| variant_call_after_earlyQC_filtering | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| variant_call_after_earlyQC_filtering | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
+| variant_call_after_earlyQC_filtering | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
 | variant_call_each_sample | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
 | variant_call_each_sample | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
 | variant_call_each_sample | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
 | variant_call_each_sample | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
 | variant_call_each_sample | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
 | variant_call_each_sample | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
+| variant_call_without_earlyQC | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| variant_call_without_earlyQC | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
+| variant_call_without_earlyQC | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
+| variant_call_without_earlyQC | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| variant_call_without_earlyQC | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
+| variant_call_without_earlyQC | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
   
