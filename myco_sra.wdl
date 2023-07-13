@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.2/TBfastProfiler.wdl" as earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as earlyQC
 
 
 workflow myco {
@@ -312,7 +312,7 @@ workflow myco {
 		# metadata
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
-		#Array[File?]? fastp_reports          = check_fastqs.fastp_txt # need to update early qc to make that a wf level out
+		Array[File?]? fastp_reports          = check_fastqs.fastp_txt
 		File?         tbprof_bam_depths      = collate_bam_depth.outfile
 		Array[File?]? tbprof_bam_jsons       = profile_bam.tbprofiler_json
 		File?         tbprof_bam_strains     = collate_bam_strains.outfile
