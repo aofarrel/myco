@@ -45,17 +45,17 @@ workflow myco {
 		# phylogenetics
 		Boolean tree_decoration         = false
 		File?   tree_to_decorate
-		Float   tree_max_low_coverage_sites  = 0.05
+		Float   tree_max_low_coverage_sites = 0.05
 		# removed ref genome for tree building
 		# eventually remove tree_decoration, will be redundant with tree_to_decorate
 		
 		# variant caller specifics
-		Int variantcalling_addl_disk
-		Int variantcalling_cpu
-		Int variantcalling_mem_height
-		Int variantcalling_memory
-		Int variantcalling_preemptibles
-		Int variantcalling_retries
+		Int  variantcalling_addl_disk    = 100
+		Int  variantcalling_cpu          =  16
+		Int? variantcalling_mem_height
+		Int  variantcalling_memory       =  32
+		Int  variantcalling_preemptibles =   1
+		Int  variantcalling_retries      =   1
 		
 	}
 
