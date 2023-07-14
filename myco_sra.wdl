@@ -15,6 +15,8 @@ workflow myco {
 	input {
 		File biosample_accessions
 		
+		Int quick_tasks_disk_size = 10
+		
 		# crash the entire pipeline if any sample is being ornery
 		Boolean crash_pipeline_if_varcalling_errors = false
 		Boolean crash_pipeline_if_varcalling_timesout = false
@@ -56,13 +58,16 @@ workflow myco {
 		Int  variantcalling_memory       =  32
 		Int  variantcalling_preemptibles =   1
 		Int  variantcalling_retries      =   1
+		Boolean variantcalling_ssd       = true
 		
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		tree_max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
+		
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
+		tree_to_decorate: "Base tree to use if tree_decoration = true"
+		tree_max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
 		
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
 		early_qc_cutoff_q30: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
@@ -70,15 +75,20 @@ workflow myco {
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		
 		diff_force: "If true and if tree_decoration is false, generate diff files. (Diff files will always be created if tree_decoration is true.)"
-		input_tree: "Base tree to use if tree_decoration = true"
+		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
+		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
+		
+		quick_tasks_disk_size: "Disk size (in GB) for tasks that process metadata. For absolutely massive runs this might be worth increasing for faster delocalization."
+		
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs."
+		
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
-		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
+		
 	}
 
 	# WDL doesn't understand mutual exclusivity, so we have to get a little creative on 
@@ -115,7 +125,8 @@ workflow myco {
 	call sranwrp_processing.cat_strings as merge_reports {
 		input:
 			strings = pull.results,
-			out = "pull_reports.txt"
+			out = "pull_reports.txt",
+			disk_size = quick_tasks_disk_size
 	}
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
@@ -161,6 +172,7 @@ workflow myco {
 								memory = variantcalling_memory,
 								preempt = variantcalling_preemptibles,
 								retries = variantcalling_retries,
+								ssd = variantcalling_ssd,
 								timeout = timeout_variant_caller
 						}
 					}
@@ -183,6 +195,7 @@ workflow myco {
 							memory = variantcalling_memory,
 							preempt = variantcalling_preemptibles,
 							retries = variantcalling_retries,
+							ssd = variantcalling_ssd,
 							timeout = timeout_variant_caller
 					}
 				}
@@ -202,6 +215,7 @@ workflow myco {
 						memory = variantcalling_memory,
 						preempt = variantcalling_preemptibles,
 						retries = variantcalling_retries,
+						ssd = variantcalling_ssd,
 						timeout = timeout_variant_caller
 				}
 			}
@@ -249,19 +263,22 @@ workflow myco {
 		call sranwrp_processing.cat_strings as collate_bam_strains {
 			input:
 				strings = coerced_bam_strains,
-				out = "strain_reports.txt"
+				out = "strain_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 		
 		call sranwrp_processing.cat_strings as collate_bam_resistance {
 			input:
 				strings = coerced_bam_resistance,
-				out = "resistance_reports.txt"
+				out = "resistance_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 
 		call sranwrp_processing.cat_strings as collate_bam_depth {
 			input:
 				strings = coerced_bam_depth,
-				out = "depth_reports.txt"
+				out = "depth_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
   	}
   	
@@ -273,13 +290,15 @@ workflow myco {
 		call sranwrp_processing.cat_strings as collate_fq_strains {
 			input:
 				strings = coerced_fq_strains,
-				out = "strain_reports.txt"
+				out = "strain_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 		
 		call sranwrp_processing.cat_strings as collate_fq_resistance {
 			input:
 				strings = coerced_fq_resistance,
-				out = "resistance_reports.txt"
+				out = "resistance_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
   	}
 
