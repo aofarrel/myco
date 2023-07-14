@@ -12,23 +12,33 @@ workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 
-		Boolean decorate_tree           = false
-		Boolean early_qc_apply_cutoffs  = false
-		Float   early_qc_cutoff_q30     = 0.90
-		Boolean early_qc_skip_entirely  = false
-		Boolean fastqc_on_timeout       = false
-		Boolean force_diff              = false
+		Boolean decorate_tree                   = false
+		Boolean early_qc_apply_cutoffs          = false
+		Float   early_qc_cutoff_q30             =    0.90
+		Boolean early_qc_skip_entirely          = false
+		Boolean fastqc_on_timeout               = false
+		Boolean force_diff                      = false
 		File?   input_tree
-		Float   max_low_coverage_sites  = 0.05
-		Int     min_coverage_per_site   = 10
+		Float   max_low_coverage_sites          =    0.05
+		Int     min_coverage_per_site           =   10
+		Int     quick_tasks_disk_size           =   10 
 		File?   ref_genome_for_tree_building
-		Int     subsample_cutoff        =  450
-		Int     subsample_seed          = 1965
-		Boolean tbprofiler_on_bam       = false
-		Int     timeout_decontam_part1  =    0
-		Int     timeout_decontam_part2  =    0
-		Int     timeout_variant_caller  =    0
+		Int     subsample_cutoff                =  450
+		Int     subsample_seed                  = 1965
+		Boolean tbprofiler_on_bam               = false
+		Int     timeout_decontam_part1          =    0
+		Int     timeout_decontam_part2          =    0
+		Int     timeout_variant_caller          =    0
 		File?   typical_tb_masked_regions
+		Int     variantcalling_addl_disk        =  100
+		Boolean variantcalling_crash_on_error   = false
+		Boolean variantcalling_crash_on_timeout = false
+		Int     variantcalling_cpu              =   16
+		Int?    variantcalling_mem_height
+		Int     variantcalling_memory           =   32
+		Int     variantcalling_preemptibles     =    1
+		Int     variantcalling_retries          =    1
+		Boolean variantcalling_ssd              = true
 	}
 
 	parameter_meta {
@@ -81,7 +91,7 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
 
 			if(!early_qc_skip_entirely) {
-				call earlyQC.TBfastProfiler as check_fastqs {
+				call earlyQC.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -90,12 +100,21 @@ workflow myco {
 				
 				# if we are filtering out samples via earlyQC...
 				if(early_qc_apply_cutoffs) {
-					if(check_fastqs.did_this_sample_pass) {
-						File possibly_fastp_cleaned_fastq1_passed=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-				    	File possibly_fastp_cleaned_fastq2_passed=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					if(qc_fastqs.did_this_sample_pass) {
+						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
 							input:
 								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
+								addldisk = variantcalling_addl_disk,
+								cpu = variantcalling_cpu,
+								crash_on_error = variantcalling_crash_on_error,
+								crash_on_timeout = variantcalling_crash_on_timeout,
+								mem_height = variantcalling_mem_height,
+								memory = variantcalling_memory,
+								preempt = variantcalling_preemptibles,
+								retries = variantcalling_retries,
+								ssd = variantcalling_ssd,
 								timeout = timeout_variant_caller
 						}
 					}
@@ -103,11 +122,20 @@ workflow myco {
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
 				if(!early_qc_apply_cutoffs) {
-					File possibly_fastp_cleaned_fastq1=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
+							addldisk = variantcalling_addl_disk,
+							cpu = variantcalling_cpu,
+							crash_on_error = variantcalling_crash_on_error,
+							crash_on_timeout = variantcalling_crash_on_timeout,
+							mem_height = variantcalling_mem_height,
+							memory = variantcalling_memory,
+							preempt = variantcalling_preemptibles,
+							retries = variantcalling_retries,
+							ssd = variantcalling_ssd,
 							timeout = timeout_variant_caller
 					}
 				}
@@ -118,6 +146,15 @@ workflow myco {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
+						addldisk = variantcalling_addl_disk,
+						cpu = variantcalling_cpu,
+						crash_on_error = variantcalling_crash_on_error,
+						crash_on_timeout = variantcalling_crash_on_timeout,
+						mem_height = variantcalling_mem_height,
+						memory = variantcalling_memory,
+						preempt = variantcalling_preemptibles,
+						retries = variantcalling_retries,
+						ssd = variantcalling_ssd,
 						timeout = timeout_variant_caller
 				}
 			}
@@ -149,34 +186,58 @@ workflow myco {
 		}
 		
 		if(tbprofiler_on_bam) {
-			call profiler.tb_profiler_bam as profile {
+			call profiler.tb_profiler_bam as profile_bam {
 					input:
 						bam = vcfs_and_bams.left
 			}
 		}
 	}
 
-	if(defined(profile.strain)) {
-		Array[String] coerced_strains=select_all(profile.strain)
-		Array[String] coerced_resistance=select_all(profile.resistance)
-		Array[String] coerced_depth=select_all(profile.median_depth)
+	# pull TBProfiler information, if we ran TBProfiler on bams
+	if(defined(profile_bam.strain)) {
+		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
+		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
+		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
 
-		call sranwrp_processing.cat_strings as collate_strains {
+		call sranwrp_processing.cat_strings as collate_bam_strains {
 			input:
-				strings = coerced_strains,
-				out = "strain_reports.txt"
+				strings = coerced_bam_strains,
+				out = "strain_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 		
-		call sranwrp_processing.cat_strings as collate_resistance {
+		call sranwrp_processing.cat_strings as collate_bam_resistance {
 			input:
-				strings = coerced_resistance,
-				out = "resistance_reports.txt"
+				strings = coerced_bam_resistance,
+				out = "resistance_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 
-		call sranwrp_processing.cat_strings as collate_depth {
+		call sranwrp_processing.cat_strings as collate_bam_depth {
 			input:
-				strings = coerced_depth,
-				out = "depth_reports.txt"
+				strings = coerced_bam_depth,
+				out = "depth_reports.txt",
+				disk_size = quick_tasks_disk_size
+		}
+  	}
+  	
+  	# pull TBProfiler information, if we ran TBProfiler on fastqs
+  	if(defined(qc_fastqs.samp_strain)) {
+		Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
+		Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
+
+		call sranwrp_processing.cat_strings as collate_fq_strains {
+			input:
+				strings = coerced_fq_strains,
+				out = "strain_reports.txt",
+				disk_size = quick_tasks_disk_size
+		}
+		
+		call sranwrp_processing.cat_strings as collate_fq_resistance {
+			input:
+				strings = coerced_fq_resistance,
+				out = "resistance_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
   	}
 
@@ -202,9 +263,16 @@ workflow myco {
 		Array[File] vcfs = minos_vcfs
 		
 		# metadata
-		File? depth_report = collate_depth.outfile
-		File? strain_report = collate_strains.outfile
-		File? resistance_report = collate_resistance.outfile
+		Array[File?]? fastp_reports          = qc_fastqs.fastp_txt
+		File?         tbprof_bam_depths      = collate_bam_depth.outfile
+		Array[File?]? tbprof_bam_jsons       = profile_bam.tbprofiler_json
+		File?         tbprof_bam_strains     = collate_bam_strains.outfile
+		Array[File?]? tbprof_bam_summaries   = profile_bam.tbprofiler_txt
+		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		Array[File?]? tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		File?         tbprof_fq_strains      = collate_fq_strains.outfile
+		Array[File?]? tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
+		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 
 		# tree nine
 		File? tree_nwk = trees.tree_nwk

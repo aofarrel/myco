@@ -18,8 +18,8 @@ workflow myco {
 		Int quick_tasks_disk_size = 10
 		
 		# crash the entire pipeline if any sample is being ornery
-		Boolean crash_pipeline_if_varcalling_errors = false
-		Boolean crash_pipeline_if_varcalling_timesout = false
+		Boolean variantcalling_crash_on_error   = false
+		Boolean variantcalling_crash_on_timeout = false
 		
 		# creation + masking of diff files
 		Boolean diff_force                   = false
@@ -166,8 +166,8 @@ workflow myco {
 								
 								addldisk = variantcalling_addl_disk,
 								cpu = variantcalling_cpu,
-								crash_on_error = crash_pipeline_if_varcalling_errors,
-								crash_on_timeout = crash_pipeline_if_varcalling_timesout,
+								crash_on_error = variantcalling_crash_on_error,
+								crash_on_timeout = variantcalling_crash_on_timeout,
 								mem_height = variantcalling_mem_height,
 								memory = variantcalling_memory,
 								preempt = variantcalling_preemptibles,
@@ -189,8 +189,8 @@ workflow myco {
 							
 							addldisk = variantcalling_addl_disk,
 							cpu = variantcalling_cpu,
-							crash_on_error = crash_pipeline_if_varcalling_errors,
-							crash_on_timeout = crash_pipeline_if_varcalling_timesout,
+							crash_on_error = variantcalling_crash_on_error,
+							crash_on_timeout = variantcalling_crash_on_timeout,
 							mem_height = variantcalling_mem_height,
 							memory = variantcalling_memory,
 							preempt = variantcalling_preemptibles,
@@ -209,8 +209,8 @@ workflow myco {
 						
 						addldisk = variantcalling_addl_disk,
 						cpu = variantcalling_cpu,
-						crash_on_error = crash_pipeline_if_varcalling_errors,
-						crash_on_timeout = crash_pipeline_if_varcalling_timesout,
+						crash_on_error = variantcalling_crash_on_error,
+						crash_on_timeout = variantcalling_crash_on_timeout,
 						mem_height = variantcalling_mem_height,
 						memory = variantcalling_memory,
 						preempt = variantcalling_preemptibles,
