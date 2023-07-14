@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as earlyQC
 
 
 workflow myco {
@@ -136,7 +136,7 @@ workflow myco {
 
 			# if we are NOT skipping earlyQC
 			if(!early_qc_skip_entirely) {
-				call earlyQC.TBfastProfiler as check_fastqs {
+				call earlyQC.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -145,9 +145,9 @@ workflow myco {
 				
 				# if we are filtering out samples via earlyQC...
 				if(early_qc_apply_cutoffs) {
-					if(check_fastqs.did_this_sample_pass) {
-						File possibly_fastp_cleaned_fastq1_passed=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-				    	File possibly_fastp_cleaned_fastq2_passed=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					if(qc_fastqs.did_this_sample_pass) {
+						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
 						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
 							input:
@@ -168,8 +168,8 @@ workflow myco {
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
 				if(!early_qc_apply_cutoffs) {
-					File possibly_fastp_cleaned_fastq1=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
 						input:
@@ -240,31 +240,48 @@ workflow myco {
 		}
 	}
 
+	# pull TBProfiler information, if we ran TBProfiler on bams
 	if(defined(profile_bam.strain)) {
-		Array[String] coerced_strains=select_all(profile_bam.strain)
-		Array[String] coerced_resistance=select_all(profile_bam.resistance)
-		Array[String] coerced_depth=select_all(profile_bam.median_depth)
+		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
+		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
+		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
 
 		call sranwrp_processing.cat_strings as collate_bam_strains {
 			input:
-				strings = coerced_strains,
+				strings = coerced_bam_strains,
 				out = "strain_reports.txt"
 		}
 		
 		call sranwrp_processing.cat_strings as collate_bam_resistance {
 			input:
-				strings = coerced_resistance,
+				strings = coerced_bam_resistance,
 				out = "resistance_reports.txt"
 		}
 
 		call sranwrp_processing.cat_strings as collate_bam_depth {
 			input:
-				strings = coerced_depth,
+				strings = coerced_bam_depth,
 				out = "depth_reports.txt"
 		}
   	}
-	
-	
+  	
+  	# pull TBProfiler information, if we ran TBProfiler on fastqs
+  	if(defined(qc_fastqs.samp_strain)) {
+		Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
+		Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
+
+		call sranwrp_processing.cat_strings as collate_fq_strains {
+			input:
+				strings = coerced_fq_strains,
+				out = "strain_reports.txt"
+		}
+		
+		call sranwrp_processing.cat_strings as collate_fq_resistance {
+			input:
+				strings = coerced_fq_resistance,
+				out = "resistance_reports.txt"
+		}
+  	}
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
@@ -312,12 +329,16 @@ workflow myco {
 		# metadata
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
-		Array[File?]? fastp_reports          = check_fastqs.fastp_txt
+		Array[File?]? fastp_reports          = qc_fastqs.fastp_txt
 		File?         tbprof_bam_depths      = collate_bam_depth.outfile
 		Array[File?]? tbprof_bam_jsons       = profile_bam.tbprofiler_json
 		File?         tbprof_bam_strains     = collate_bam_strains.outfile
 		Array[File?]? tbprof_bam_summaries   = profile_bam.tbprofiler_txt
 		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		Array[File?]? tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		File?         tbprof_fq_strains      = collate_fq_strains.outfile
+		Array[File?]? tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
+		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
