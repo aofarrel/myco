@@ -8,63 +8,95 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.2/TBfastProfiler.wdl" as earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as earlyQC
 
 
 workflow myco {
 	input {
 		File biosample_accessions
-
-		Boolean decorate_tree           = false
 		
+		Int quick_tasks_disk_size = 10
+		
+		# crash the entire pipeline if any sample is being ornery
+		Boolean variantcalling_crash_on_error   = false
+		Boolean variantcalling_crash_on_timeout = false
+		
+		# creation + masking of diff files
+		Boolean diff_force                   = false
+		Int     diff_min_coverage_per_site   = 10
+		File?   diff_mask_these_regions
+		
+		# QC
 		Boolean fastqc_on_timeout       = false
 		Boolean early_qc_apply_cutoffs  = false
 		Float   early_qc_cutoff_q30     = 0.90
 		Boolean early_qc_skip_entirely  = false
 		
-		Boolean force_diff              = false
-		File?   input_tree
-		Float   max_low_coverage_sites  = 0.05
-		Int     min_coverage_per_site   = 10
-		File?   ref_genome_for_tree_building
+		# shrink large samples
 		Int     subsample_cutoff        =  450
 		Int     subsample_seed          = 1965
-		Boolean tbprofiler_on_bam       = true
+		
+		# skip samples that take a very long time
 		Int     timeout_decontam_part1  =   20
 		Int     timeout_decontam_part2  =   15
 		Int     timeout_variant_caller  =  120
-		File?   typical_tb_masked_regions
+		
+		# tbprofiler
+		Boolean tbprofiler_on_bam       = true
+		
+		# phylogenetics
+		Boolean tree_decoration         = false
+		File?   tree_to_decorate
+		Float   tree_max_low_coverage_sites = 0.05
+		# removed ref genome for tree building
+		# eventually remove tree_decoration, will be redundant with tree_to_decorate
+		
+		# variant caller specifics
+		Int  variantcalling_addl_disk    = 100
+		Int  variantcalling_cpu          =  16
+		Int? variantcalling_mem_height
+		Int  variantcalling_memory       =  32
+		Int  variantcalling_preemptibles =   1
+		Int  variantcalling_retries      =   1
+		Boolean variantcalling_ssd       = true
+		
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
-		decorate_tree: "Should usher, taxonium, and NextStrain trees be generated?"
+		
+		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
+		tree_to_decorate: "Base tree to use if tree_decoration = true"
+		tree_max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
 		
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
 		early_qc_cutoff_q30: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		
-		force_diff: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
-		input_tree: "Base tree to use if decorate_tree = true"
-		min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
-		ref_genome_for_tree_building: "Ref genome for building trees iff different from ref genome used to call variants -- must have ONLY `>NC_000962.3` on its first line"
+		diff_force: "If true and if tree_decoration is false, generate diff files. (Diff files will always be created if tree_decoration is true.)"
+		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
+		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
+		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
+		
+		quick_tasks_disk_size: "Disk size (in GB) for tasks that process metadata. For absolutely massive runs this might be worth increasing for faster delocalization."
+		
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs."
+		
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
-		typical_tb_masked_regions: "Bed file of regions to mask when making diff files"
+		
 	}
 
 	# WDL doesn't understand mutual exclusivity, so we have to get a little creative on 
 	# our determination of whether or not we want to create diff files.
-	if(decorate_tree)  {  Boolean create_diff_files_   = true  }
-	if(!decorate_tree) {
-		if(!force_diff){  Boolean create_diff_files__  = false }
-		if(force_diff) {  Boolean create_diff_files___ = true  }
+	if(tree_decoration)  {  Boolean create_diff_files_   = true  }
+	if(!tree_decoration) {
+		if(!diff_force){  Boolean create_diff_files__  = false }
+		if(diff_force) {  Boolean create_diff_files___ = true  }
 	}
 	Boolean create_diff_files = select_first([create_diff_files_,
 											  create_diff_files__, 
@@ -93,7 +125,8 @@ workflow myco {
 	call sranwrp_processing.cat_strings as merge_reports {
 		input:
 			strings = pull.results,
-			out = "pull_reports.txt"
+			out = "pull_reports.txt",
+			disk_size = quick_tasks_disk_size
 	}
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
@@ -114,7 +147,7 @@ workflow myco {
 
 			# if we are NOT skipping earlyQC
 			if(!early_qc_skip_entirely) {
-				call earlyQC.TBfastProfiler as check_fastqs {
+				call earlyQC.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -123,13 +156,23 @@ workflow myco {
 				
 				# if we are filtering out samples via earlyQC...
 				if(early_qc_apply_cutoffs) {
-					if(check_fastqs.did_this_sample_pass) {
-						File possibly_fastp_cleaned_fastq1_passed=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-				    	File possibly_fastp_cleaned_fastq2_passed=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					if(qc_fastqs.did_this_sample_pass) {
+						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
 						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
 							input:
 								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
+								
+								addldisk = variantcalling_addl_disk,
+								cpu = variantcalling_cpu,
+								crash_on_error = variantcalling_crash_on_error,
+								crash_on_timeout = variantcalling_crash_on_timeout,
+								mem_height = variantcalling_mem_height,
+								memory = variantcalling_memory,
+								preempt = variantcalling_preemptibles,
+								retries = variantcalling_retries,
+								ssd = variantcalling_ssd,
 								timeout = timeout_variant_caller
 						}
 					}
@@ -137,12 +180,22 @@ workflow myco {
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
 				if(!early_qc_apply_cutoffs) {
-					File possibly_fastp_cleaned_fastq1=select_first([check_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([check_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
+			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
+							
+							addldisk = variantcalling_addl_disk,
+							cpu = variantcalling_cpu,
+							crash_on_error = variantcalling_crash_on_error,
+							crash_on_timeout = variantcalling_crash_on_timeout,
+							mem_height = variantcalling_mem_height,
+							memory = variantcalling_memory,
+							preempt = variantcalling_preemptibles,
+							retries = variantcalling_retries,
+							ssd = variantcalling_ssd,
 							timeout = timeout_variant_caller
 					}
 				}
@@ -153,6 +206,16 @@ workflow myco {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
+						
+						addldisk = variantcalling_addl_disk,
+						cpu = variantcalling_cpu,
+						crash_on_error = variantcalling_crash_on_error,
+						crash_on_timeout = variantcalling_crash_on_timeout,
+						mem_height = variantcalling_mem_height,
+						memory = variantcalling_memory,
+						preempt = variantcalling_preemptibles,
+						retries = variantcalling_retries,
+						ssd = variantcalling_ssd,
 						timeout = timeout_variant_caller
 				}
 			}
@@ -178,44 +241,66 @@ workflow myco {
 			input:
 				bam = vcfs_and_bams.left,
 				vcf = vcfs_and_bams.right,
-				min_coverage_per_site = min_coverage_per_site,
-				tbmf = typical_tb_masked_regions,
+				min_coverage_per_site = diff_min_coverage_per_site,
+				tbmf = diff_mask_these_regions,
 				diffs = create_diff_files
 		}
 		
 		if(tbprofiler_on_bam) {
-			call profiler.tb_profiler_bam as profile {
+			call profiler.tb_profiler_bam as profile_bam {
 					input:
 						bam = vcfs_and_bams.left
 			}
 		}
 	}
 
-	if(defined(profile.strain)) {
-		Array[String] coerced_strains=select_all(profile.strain)
-		Array[String] coerced_resistance=select_all(profile.resistance)
-		Array[String] coerced_depth=select_all(profile.median_depth)
+	# pull TBProfiler information, if we ran TBProfiler on bams
+	if(defined(profile_bam.strain)) {
+		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
+		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
+		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
 
-		call sranwrp_processing.cat_strings as collate_strains {
+		call sranwrp_processing.cat_strings as collate_bam_strains {
 			input:
-				strings = coerced_strains,
-				out = "strain_reports.txt"
+				strings = coerced_bam_strains,
+				out = "strain_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 		
-		call sranwrp_processing.cat_strings as collate_resistance {
+		call sranwrp_processing.cat_strings as collate_bam_resistance {
 			input:
-				strings = coerced_resistance,
-				out = "resistance_reports.txt"
+				strings = coerced_bam_resistance,
+				out = "resistance_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
 
-		call sranwrp_processing.cat_strings as collate_depth {
+		call sranwrp_processing.cat_strings as collate_bam_depth {
 			input:
-				strings = coerced_depth,
-				out = "depth_reports.txt"
+				strings = coerced_bam_depth,
+				out = "depth_reports.txt",
+				disk_size = quick_tasks_disk_size
 		}
   	}
-	
-	
+  	
+  	# pull TBProfiler information, if we ran TBProfiler on fastqs
+  	if(defined(qc_fastqs.samp_strain)) {
+		Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
+		Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
+
+		call sranwrp_processing.cat_strings as collate_fq_strains {
+			input:
+				strings = coerced_fq_strains,
+				out = "strain_reports.txt",
+				disk_size = quick_tasks_disk_size
+		}
+		
+		call sranwrp_processing.cat_strings as collate_fq_resistance {
+			input:
+				strings = coerced_fq_resistance,
+				out = "resistance_reports.txt",
+				disk_size = quick_tasks_disk_size
+		}
+  	}
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
@@ -240,40 +325,45 @@ workflow myco {
 		
 	}
 
-	if(decorate_tree) {
-		# diff files must exist if decorate_tree is true, so we can force the Array[File?]?
+	if(tree_decoration) {
+		# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
 		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
 		Array[File] coerced_diffs = select_first([select_all(make_mask_and_diff.diff), minos_vcfs])
 		Array[File] coerced_reports = select_first([select_all(make_mask_and_diff.report), minos_vcfs])
 		call build_treesWF.Tree_Nine as trees {
 			input:
 				diffs = coerced_diffs,
-				input_tree = input_tree,
-				ref_genome = ref_genome_for_tree_building,
+				input_tree = tree_to_decorate,
 				coverage_reports = coerced_reports,
-				max_low_coverage_sites = max_low_coverage_sites
+				max_low_coverage_sites = tree_max_low_coverage_sites
 		}
 	}
 
 	output {
 		# raw files
 		Array[File?] diffs = make_mask_and_diff.diff
-		Array[File] masks = make_mask_and_diff.mask_file
-		Array[File] vcfs = minos_vcfs
+		Array[File]  masks = make_mask_and_diff.mask_file
+		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File]? fastqc_reports = FastqcWF.reports
-		File? depth_report = collate_depth.outfile
-		File download_report = merge_reports.outfile
-		File? strain_report = collate_strains.outfile
-		File? resistance_report = collate_resistance.outfile
-		Array[File?]? tbprofiler_texts = profile.tbprofiler_txt
+		File          download_report        = merge_reports.outfile
+		Array[File]?  fastqc_reports         = FastqcWF.reports
+		Array[File?]? fastp_reports          = qc_fastqs.fastp_txt
+		File?         tbprof_bam_depths      = collate_bam_depth.outfile
+		Array[File?]? tbprof_bam_jsons       = profile_bam.tbprofiler_json
+		File?         tbprof_bam_strains     = collate_bam_strains.outfile
+		Array[File?]? tbprof_bam_summaries   = profile_bam.tbprofiler_txt
+		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		Array[File?]? tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		File?         tbprof_fq_strains      = collate_fq_strains.outfile
+		Array[File?]? tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
+		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
 		# tree nine
-		File? tree_nwk = trees.tree_nwk
-		File? tree_usher = trees.tree_usher_raw
-		File? tree_taxonium = trees.tree_taxonium
-		File? tree_nextstrain = trees.tree_nextstrain
+		File?        tree_nwk         = trees.tree_nwk
+		File?        tree_usher       = trees.tree_usher_raw
+		File?        tree_taxonium    = trees.tree_taxonium
+		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 	}
 }
