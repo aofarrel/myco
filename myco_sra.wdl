@@ -8,7 +8,8 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/main/covstats.wdl" as covstatsWF
 
 
 workflow myco {
@@ -21,6 +22,11 @@ workflow myco {
 		Boolean variantcalling_crash_on_error   = false
 		Boolean variantcalling_crash_on_timeout = false
 		
+		# TODO: REPLACE WITH BETTER DEFAULTS
+		Float covstats_qc_cutoff_unmapped = 0.10
+		Float covstats_qc_cutoff_coverages = 0.10
+		Boolean covstats_qc_skip_entirely = false
+		
 		# creation + masking of diff files
 		Boolean diff_force                   = false
 		Int     diff_min_coverage_per_site   = 10
@@ -30,7 +36,7 @@ workflow myco {
 		Boolean fastqc_on_timeout       = false
 		Boolean early_qc_apply_cutoffs  = false
 		Float   early_qc_cutoff_q30     = 0.90
-		Boolean early_qc_skip_entirely  = false
+		Boolean early_qc_skip_entirely  = true
 		
 		# shrink large samples
 		Int     subsample_cutoff        =  450
@@ -147,7 +153,7 @@ workflow myco {
 
 			# if we are NOT skipping earlyQC
 			if(!early_qc_skip_entirely) {
-				call earlyQC.TBfastProfiler as qc_fastqs {
+				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -237,15 +243,46 @@ workflow myco {
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
-		call diff.make_mask_and_diff as make_mask_and_diff {
-			input:
-				bam = vcfs_and_bams.left,
-				vcf = vcfs_and_bams.right,
-				min_coverage_per_site = diff_min_coverage_per_site,
-				tbmf = diff_mask_these_regions,
-				diffs = create_diff_files
+	
+		if(!covstats_qc_skip_entirely) {
+	
+			# covstats to check coverage and percent mapped to reference
+			call covstatsWF.Covstats as covstats {
+				input:
+					bamsOrCrams = [vcfs_and_bams.left]
+			}
+			
+			if(covstats.percentUnmapped[0] > covstats_qc_cutoff_unmapped) {
+				if(covstats.coverages[0] > covstats_qc_cutoff_coverages) {
+					
+					# make diff files
+					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
+						input:
+							bam = vcfs_and_bams.left,
+							vcf = vcfs_and_bams.right,
+							min_coverage_per_site = diff_min_coverage_per_site,
+							tbmf = diff_mask_these_regions,
+							diffs = create_diff_files
+					}
+				}
+				
+			}
 		}
 		
+		if(covstats_qc_skip_entirely) {
+		
+			# make diff files
+			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
+				input:
+					bam = vcfs_and_bams.left,
+					vcf = vcfs_and_bams.right,
+					min_coverage_per_site = diff_min_coverage_per_site,
+					tbmf = diff_mask_these_regions,
+					diffs = create_diff_files
+			}
+		}
+		
+		# TBProfiler (will run even if fails covstats qc)
 		if(tbprofiler_on_bam) {
 			call profiler.tb_profiler_bam as profile_bam {
 					input:
@@ -253,6 +290,10 @@ workflow myco {
 			}
 		}
 	}
+	
+	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])
+	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
+	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	if(defined(profile_bam.strain)) {
@@ -326,10 +367,11 @@ workflow myco {
 	}
 
 	if(tree_decoration) {
-		# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
-		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
-		Array[File] coerced_diffs = select_first([select_all(make_mask_and_diff.diff), minos_vcfs])
-		Array[File] coerced_reports = select_first([select_all(make_mask_and_diff.report), minos_vcfs])
+		# diff files must exist if tree_decoration is true (unless no samples passed) 
+		# so we can force the Array[File?]? into an Array[File] with the classic 
+		# "select_first() with a bogus fallback" hack
+		Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
+		Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
 		call build_treesWF.Tree_Nine as trees {
 			input:
 				diffs = coerced_diffs,
@@ -341,8 +383,8 @@ workflow myco {
 
 	output {
 		# raw files
-		Array[File?] diffs = make_mask_and_diff.diff
-		Array[File]  masks = make_mask_and_diff.mask_file
+		Array[File?] diffs = real_diffs
+		Array[File?]  masks = real_masks
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata

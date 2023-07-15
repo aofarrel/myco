@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 
 workflow myco {
 	input {
@@ -91,7 +91,7 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
 
 			if(!early_qc_skip_entirely) {
-				call earlyQC.TBfastProfiler as qc_fastqs {
+				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
