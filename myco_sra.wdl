@@ -1,14 +1,14 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/output-bais/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/covstats.wdl" as covstatsWF
 
 
@@ -264,6 +264,18 @@ workflow myco {
 	# bams_per_bais might look like this: [[SAM1234.bam, SAM1234.bam.bai], [SAM1235.bam, SAM1235.bam.bai]]
 
 	scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) {
+	# scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) is now sort of a three-way scatter:
+	# * bam file accessible via vcfs_and_bams.left[0]
+	# * bai file accessible via vcfs_and_bams.left[1]
+	# * vcf file accessible via vcfs_and_bams.right
+	
+	# This relies on your WDL executor being consistent with how it orders arrays. That SHOULD always be the case per
+	# the spec, but if things break catastrophically, let me save you some debug time: I wrote covstats such that it
+	# can take in an array of possible bai files and try to match it to your bam. You can always revert to the scatter
+	# method used in version 4.4.1 or earlier, not scattering on bais at all, then can insert the bais array as the
+	# input for baisOrCrais. This does mean that EVERY sample's bai file will get localized per instance of the
+	# scatter, but that is probably worth for runs up to ~100 samples. Beyond that you may want to avoid passing in
+	# indexes at all, which covstats should be able to handle by indexing the bams itself (but this will be slower).
 	
 		if(!covstats_qc_skip_entirely) {
 	
@@ -404,11 +416,14 @@ workflow myco {
 
 	output {
 		# raw files
+		Array[File]  bais = bais
+		Array[File]  bams  = bams
 		Array[File?] diffs = real_diffs
-		Array[File?]  masks = real_masks
+		Array[File?] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
+		Array[File?]  diff_reports           = real_reports
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
 		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
