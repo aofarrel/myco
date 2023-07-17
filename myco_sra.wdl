@@ -245,17 +245,33 @@ workflow myco {
 	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
 	Array[File] bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
 	Array[File] bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
+	
+	# Now we need to essentially scatter on three arrays: minos_vcfs, bams, and bais. This is trivial in CWL, but
+	# isn't intutive in WDL -- in fact, it's arguably not possible!
+	#
+	# In WDL, you *should* be able to define a custom struct (think of it like a Python object), which can be seen
+	# in the WDL spec (https://github.com/openwdl/wdl/blob/main/versions/1.0/SPEC.md#struct-definition), and
+	# scatter on that struct. However, in my experience, Cromwell gets pretty buggy when you try to scatter on structs
+	# especially if those structs contain files (and our structs most definitely contain files). We can't use zip() 
+	# either, because that only works if you have two arrays, not three.
+	#
+	# So, naturally, we're going to do something cheesy.
+	
+	Array[Array[File]] bams_and_bais = [bams, bais]
+	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
+	
+	# bams_and_bais might look like this: [[SAM1234.bam, SAM1235.bam], [SAM1234.bam.bai, SAM1235.bam.bai]]
+	# bams_per_bais might look like this: [[SAM1234.bam, SAM1234.bam.bai], [SAM1235.bam, SAM1235.bam.bai]]
 
-
-	scatter(vcfs_and_bams in zip(bams, minos_vcfs)) {
+	scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) {
 	
 		if(!covstats_qc_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
 			call covstatsWF.Covstats as covstats {
 				input:
-					bamsOrCrams = [vcfs_and_bams.left],
-					baisOrCrais = bais # not ideal, but will do for now
+					bamsOrCrams = [vcfs_and_bams.left[0]],
+					baisOrCrais = [vcfs_and_bams.left[1]]
 					
 			}
 			
@@ -265,7 +281,7 @@ workflow myco {
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
-							bam = vcfs_and_bams.left,
+							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diff_min_coverage_per_site,
 							tbmf = diff_mask_these_regions,
@@ -281,7 +297,7 @@ workflow myco {
 			# make diff files
 			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
 				input:
-					bam = vcfs_and_bams.left,
+					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diff_min_coverage_per_site,
 					tbmf = diff_mask_these_regions,
@@ -293,7 +309,7 @@ workflow myco {
 		if(tbprofiler_on_bam) {
 			call profiler.tb_profiler_bam as profile_bam {
 					input:
-						bam = vcfs_and_bams.left
+						bam = vcfs_and_bams.left[0]
 			}
 		}
 	}
