@@ -1,7 +1,7 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/output-bais/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
@@ -9,7 +9,7 @@ import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wd
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
-import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/main/covstats.wdl" as covstatsWF
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/small-improvements/covstats.wdl" as covstatsWF
 
 
 workflow myco {
@@ -230,26 +230,33 @@ workflow myco {
 	}
 
 	# do some wizardry to deal with optionals
-	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.vcf_final_call_set)
-	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.vcf_final_call_set)
-	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.vcf_final_call_set)
+	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
+	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
+	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
 	
-	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.mapped_to_ref)
-	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.mapped_to_ref)
-	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.mapped_to_ref)
+	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bam)
+	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bam)
+	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
+	
+	Array[File] bais_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bai)
+	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
+	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
 	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
-	Array[File] bams_to_ref = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
+	Array[File] bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
+	Array[File] bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
 
 
-	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
+	scatter(vcfs_and_bams in zip(bams, minos_vcfs)) {
 	
 		if(!covstats_qc_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
 			call covstatsWF.Covstats as covstats {
 				input:
-					bamsOrCrams = [vcfs_and_bams.left]
+					bamsOrCrams = [vcfs_and_bams.left],
+					baisOrCrais = bais # not ideal, but will do for now
+					
 			}
 			
 			if(covstats.percentUnmapped[0] > covstats_qc_cutoff_unmapped) {
@@ -390,15 +397,15 @@ workflow myco {
 		# metadata
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
-		Array[File?]? fastp_reports          = qc_fastqs.fastp_txt
+		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
 		File?         tbprof_bam_depths      = collate_bam_depth.outfile
-		Array[File?]? tbprof_bam_jsons       = profile_bam.tbprofiler_json
+		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
 		File?         tbprof_bam_strains     = collate_bam_strains.outfile
-		Array[File?]? tbprof_bam_summaries   = profile_bam.tbprofiler_txt
+		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
 		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
-		Array[File?]? tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		File?         tbprof_fq_strains      = collate_fq_strains.outfile
-		Array[File?]? tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
+		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
 		# tree nine
