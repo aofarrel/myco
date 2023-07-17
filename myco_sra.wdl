@@ -243,8 +243,8 @@ workflow myco {
 	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
 	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
-	Array[File] bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
-	Array[File] bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
+	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
+	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
 	
 	# Now we need to essentially scatter on three arrays: minos_vcfs, bams, and bais. This is trivial in CWL, but
 	# isn't intutive in WDL -- in fact, it's arguably not possible!
@@ -257,7 +257,7 @@ workflow myco {
 	#
 	# So, naturally, we're going to do something cheesy.
 	
-	Array[Array[File]] bams_and_bais = [bams, bais]
+	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
 	
 	# bams_and_bais might look like this: [[SAM1234.bam, SAM1235.bam], [SAM1234.bam.bai, SAM1235.bam.bai]]
@@ -270,12 +270,10 @@ workflow myco {
 	# * vcf file accessible via vcfs_and_bams.right
 	
 	# This relies on your WDL executor being consistent with how it orders arrays. That SHOULD always be the case per
-	# the spec, but if things break catastrophically, let me save you some debug time: I wrote covstats such that it
-	# can take in an array of possible bai files and try to match it to your bam. You can always revert to the scatter
-	# method used in version 4.4.1 or earlier, not scattering on bais at all, then can insert the bais array as the
-	# input for baisOrCrais. This does mean that EVERY sample's bai file will get localized per instance of the
-	# scatter, but that is probably worth for runs up to ~100 samples. Beyond that you may want to avoid passing in
-	# indexes at all, which covstats should be able to handle by indexing the bams itself (but this will be slower).
+	# the spec, but if things break catastrophically, let me save you some debug time: As of 2.9.2, clockwork-wdl's
+	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
+	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
+	# untar things, of course.
 	
 		if(!covstats_qc_skip_entirely) {
 	
@@ -416,13 +414,14 @@ workflow myco {
 
 	output {
 		# raw files
-		Array[File]  bais = bais
-		Array[File]  bams  = bams
+		Array[File]  bais = final_bais
+		Array[File]  bams  = final_bams
 		Array[File?] diffs = real_diffs
 		Array[File?] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
+		Array[File?]  covstats_reports       = covstats.covstatsReport
 		Array[File?]  diff_reports           = real_reports
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
