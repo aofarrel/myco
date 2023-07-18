@@ -49,7 +49,7 @@ workflow myco {
 
 	parameter_meta {
 		covstats_qc_cutoff_coverages: "If covstats thinks coverage is below this, throw out this sample"
-		covstats_qc_cutoff_unmapped: "If covstats thinks this porportion (as float, 0.5 = 50%) of data does not map to H37Rv, throw out this sample"
+		covstats_qc_cutoff_unmapped: "If covstats thinks this porportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
 		diff_force: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
