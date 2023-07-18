@@ -9,7 +9,7 @@ import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wd
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
-import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/covstats.wdl" as covstatsWF
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
 workflow myco {
@@ -278,14 +278,14 @@ workflow myco {
 		if(!covstats_qc_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
-			call covstatsWF.Covstats as covstats {
+			call goleft.covstats as covstats {
 				input:
-					bamsOrCrams = [vcfs_and_bams.left[0]],
-					baisOrCrais = [vcfs_and_bams.left[1]]
+					inputBamOrCram = vcfs_and_bams.left[0],
+					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if(covstats.percentUnmapped[0] > covstats_qc_cutoff_unmapped) {
-				if(covstats.coverages[0] > covstats_qc_cutoff_coverages) {
+			if(covstats.percentUnmapped > covstats_qc_cutoff_unmapped) {
+				if(covstats.coverage > covstats_qc_cutoff_coverages) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
@@ -421,7 +421,7 @@ workflow myco {
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?]  covstats_reports       = covstats.covstatsReport
+		Array[File?]  covstats_reports       = covstats.covstatsOutfile
 		Array[File?]  diff_reports           = real_reports
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
