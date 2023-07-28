@@ -1,5 +1,7 @@
 # WIP -- not currently used
-#
+exit 0
+
+
 # relies on https://github.com/Nicceboy/python-markdown-generator
 
 python3 << CODE

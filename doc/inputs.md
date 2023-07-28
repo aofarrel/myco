@@ -43,38 +43,37 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 ### Timeouts  
 When working with data of unknown quality such as SRA data, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
 
- myco_raw and myco_cleaned default to not using this heuristic at all.  
   
-| name | type | default | description | workflow |  
-|:---:|:---:|:---:|:---:|:---:|  
-| timeout_decontam_part1 | Int  | 0 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout | myco_raw, myco_cleaned |  
-| timeout_decontam_part1 | Int  | 20 | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout | myco_sra |  
-| timeout_decontam_part2 | Int  | 0 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) | myco_raw, myco_cleaned |  
-| timeout_decontam_part2 | Int  | 15 | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) | myco_sra |  
-| timeout_variant_caller | Int  | 0 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) | myco_raw, myco_cleaned |  
-| timeout_variant_caller | Int  | 120 | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) | myco_sra |  
+| name | type | myco_sra default | description |  
+|:---:|:---:|:---:|:---:|  
+| timeout_decontam_part1 | Int  | 20<sup>†</sup> | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout |
+| timeout_decontam_part2 | Int  | 15<sup>†</sup>  | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) |  
+| timeout_variant_caller | Int  | 120<sup>†</sup> | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) | 
+
+<sup>†</sup> myco_raw and myco_cleaned default to not using this heuristic at all, so their defaults are 0.
   
   
 ### Miscellanous workflow-level inputs  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
-| decorate_tree | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? |  
+| diff_force | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
+| diff_mask_these_regions | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | Bed file of regions to mask when making diff files |  
+| diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
 | early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
 | early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
 | early_qc_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
-| fastqc_on_timeout | Boolean  | false | If true, fastqc one read from a sample when decontamination or variant calling times out |  
-| force_diff | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
-| input_tree | File? |  | Base tree to use if decorate_tree = true |  
-| max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
-| min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |  
-| ref_genome_for_tree_building | File? |  | Ref genome for building trees -- must have ONLY '>NC_000962.3' on its first line |  
+| fastqc_on_timeout | Boolean  | false | (myco_sra only) If true, fastqc one read from a sample when decontamination or variant calling times out |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
-| tbprofiler_on_bam | Boolean  | false | If true, run TBProfiler on BAMs |  
-| tbprofiler_on_bam | Boolean  | true | If true, run TBProfiler on BAMs |  
-| typical_tb_masked_regions | File? |  | Bed file of regions to mask when making diff files |  
+| tbprofiler_on_bam | Boolean  | varies<sup>†</sup> | If true, run TBProfiler on BAMs |  
+| tree_decoration | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? |  
+| tree_max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
+| tree_to_decorate | File? | [this draft tree](https://console.cloud.google.com/storage/browser/_details/topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb;tab=live_object) | Base tree to use if decorate_tree = true |  
+
+<sup>†</sup> Defaults to true for myco_sra and false for myco_raw for historical reasons
   
+
   
 ## Task-level inputs  
   
