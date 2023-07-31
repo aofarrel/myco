@@ -42,7 +42,6 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
   
 ### Timeouts  
 When working with data of unknown quality such as SRA data, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
-
   
 | name | type | myco_sra default | description |  
 |:---:|:---:|:---:|:---:|  
@@ -51,9 +50,25 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 | timeout_variant_caller | Int  | 120<sup>†</sup> | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) | 
 
 <sup>†</sup> myco_raw and myco_cleaned default to not using this heuristic at all, so their defaults are 0.
+
+
+### Variant caller inputs
+
+| name | type | myco_sra default | description |  
+|:---:|:---:|:---:|:---:|  
+| variantcalling_addl_disk        | Int     | 100   | Additional disk size, in GB, on top of auto-scaling disk size. |
+| variantcalling_crash_on_error   | Boolean | false | If this task errors out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
+| variantcalling_crash_on_timeout | Boolean | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? | 
+| variantcalling_cpu              | Int     | 16    | Number of CPUs (cores) to request from GCP. |
+| variantcalling_debug            | Boolean | false | Do not clean up any files and be verbose |  
+| variantcalling_mem_height       | Int?    |       | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) | 
+| variantcalling_memory           | Int     | 32    | Amount of memory, in GB, to request from GCP. |
+| variantcalling_preemptibles     | Int     |  1    | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| variantcalling_retries          | Int     |  1    | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? | 
+| variantcalling_ssd              | Boolean | true  | If true, use SSDs for this task instead of HDDs  | 
+
   
-  
-### Miscellanous workflow-level inputs  
+### Miscellanous inputs  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
@@ -75,31 +90,55 @@ When working with data of unknown quality such as SRA data, it can be helpful to
   
 
   
-## Task-level inputs  
-  
-### Software settings  
-  
+## Task-level inputs 
+
+Many of these settings just change the name of output files or runtime attributes, but for the sake of ease-of-use we wanted to include them on a single list in the alphabetical order they show up in on Terra. As such, settings that DO NOT relate to filename outputs nor runtime attributes are in bold.
+
+For more info on runtime settings, see https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/
+
+
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  
-| FastqcWF | limits | File? |  |  |  
-| check_fastqs | output_fastps_cleaned_fastqs | Boolean  | false |  |  
-| decontam_each_sample | contam_out_1 | String? |  | Override default output file name with this string |  
-| decontam_each_sample | contam_out_2 | String? |  | Override default output file name with this string |  
-| decontam_each_sample | counts_out | String? |  | Override default output file name with this string |  
-| decontam_each_sample | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
-| decontam_each_sample | done_file | String? |  | Override default output file name with this string |  
-| decontam_each_sample | no_match_out_1 | String? |  | Override default output file name with this string |  
-| decontam_each_sample | no_match_out_2 | String? |  | Override default output file name with this string |  
-| decontam_each_sample | subsample_cutoff | Int  | -1 | If a FASTQ file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
-| decontam_each_sample | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
-| decontam_each_sample | threads | Int? |  | Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware. |  
-| decontam_each_sample | verbose | Boolean  | true |  |  
-| make_mask_and_diff | histograms | Boolean  | false | Should coverage histograms be output? |  
+| **check_fastqs** | **output_fastps_cleaned_fastqs** | Boolean  | false | Use fastp's cleaned fastqs for subsequent tasks (true) instead of discarding them (false). Setting this to false means you are effectively only using fastp to check if a sample is valid, keeping or throwing out the entire sample based on this information. |  
+| collate_depth | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA.  |  
+| collate_resistance | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA.  |  
+| collate_strains | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA. |  
+| decontam_each_sample | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| decontam_each_sample | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
+| decontam_each_sample | contam_out_1 | String? |  |  |  
+| decontam_each_sample | contam_out_2 | String? |  |  |  
+| decontam_each_sample | counts_out | String? |  |  |  
+| **decontam_each_sample** | **crash_on_timeout** | **Boolean**  | **false** | **If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)?** |  
+| decontam_each_sample | done_file | String? |  |  |  
+| decontam_each_sample | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
+| decontam_each_sample | no_match_out_1 | String? |  | |  
+| decontam_each_sample | no_match_out_2 | String? |  |  |  
+| decontam_each_sample | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| decontam_each_sample | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
+| **decontam_each_sample** | **subsample_cutoff** | **Int**  | **-1** | **If a FASTQ file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)** |  
+| **decontam_each_sample** | **subsample_seed**   | **Int**  | **1965** | **Seed used for subsampling with seqtk** |  
+| **decontam_each_sample** | **threads**          | **Int?** |  | **Try to use this many threads for decontamination. Note that actual number of threads also relies on your hardware.** |  
+| **decontam_each_sample** | **verbose**          | **Boolean**  | **true** | **Enable/Disable debug mode** |  
+| **FastqcWF** | **limits** | **File?** |  | **Limits file defining fastQC cutoffs** |  
+| get_sample_IDs | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| make_mask_and_diff | addldisk | Int  | 10 | Additional disk size, in GB, on top of auto-scaling disk size. |  
+| make_mask_and_diff | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
+| **make_mask_and_diff** | **histograms** | **Boolean**  | **false** | **Should coverage histograms be output?** |  
+| make_mask_and_diff | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
+| make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| make_mask_and_diff | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
+| merge_reports | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA. |  
 | profile | bam_suffix | String? |  |  |  
-| trees | detailed_clades | Boolean  | false |  |  
+| profile | cpu | Int  | 2 | Number of CPUs (cores) to request from GCP. |  
+| profile | memory | Int  | 4 | Amount of memory, in GB, to request from GCP. |  
+| profile | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| profile | ssd | Boolean  | false | If true, use SSDs for this task instead of HDDs |  
+| pull | disk_size | Int  | 100 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA. |  
+| pull | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
+| **trees** | **detailed_clades** | **Boolean**  | **false** |  |  
 | trees | in_prefix_summary | String? |  |  |  
-| trees | make_nextstrain_subtrees | Boolean  | true |  |  
-| trees | metadata_tsv | File? |  |  |  
+| **trees** | **make_nextstrain_subtrees** | **Boolean**  | **true** | S**hould our Nextstrain (Auspice-compatiable) output tree consist of multiple subtrees (true), or just one big tree (false)? Setting this to true might be useful if you have trouble loading very large trees into Auspice.** |  
+| **trees** | **metadata_tsv** | **File?** |  | **Metadata TSV to annotate the input tree with** |  
 | trees | out_diffs | String  | \'_combined\' |  |  
 | trees | out_prefix | String  | \'tree\' |  |  
 | trees | out_prefix_summary | String? |  |  |  
@@ -108,76 +147,6 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 | trees | out_tree_nwk | String  | \'_nwk\' |  |  
 | trees | out_tree_raw_pb | String  | \'_raw\' |  |  
 | trees | out_tree_taxonium | String  | \'_taxonium\' |  |  
-| trees | reroot_to_this_node | String? |  |  |  
-| trees | subtree_only_new_samples | Boolean  | true |  |  
-| trees | summarize_input_mat | Boolean  | true |  |  
-| variant_call_after_earlyQC_but_not_filtering_samples | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
-| variant_call_after_earlyQC_but_not_filtering_samples | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
-| variant_call_after_earlyQC_but_not_filtering_samples | debug | Boolean  | false | Do not clean up any files and be verbose |  
-| variant_call_after_earlyQC_but_not_filtering_samples | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
-| variant_call_after_earlyQC_filtering | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
-| variant_call_after_earlyQC_filtering | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
-| variant_call_after_earlyQC_filtering | debug | Boolean  | false | Do not clean up any files and be verbose |  
-| variant_call_after_earlyQC_filtering | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
-| variant_call_each_sample | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
-| variant_call_each_sample | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
-| variant_call_each_sample | debug | Boolean  | false | Do not clean up any files and be verbose |  
-| variant_call_each_sample | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
-| variant_call_without_earlyQC | crash_on_error | Boolean  | false | If this task, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
-| variant_call_without_earlyQC | crash_on_timeout | Boolean  | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? |  
-| variant_call_without_earlyQC | debug | Boolean  | false | Do not clean up any files and be verbose |  
-| variant_call_without_earlyQC | mem_height | Int? |  | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) |  
-  
-  
-### Runtime attributes  
-These variables adjust runtime attributes, which includes hardware settings. See https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/ for more information.  
-  
-| task | name | type | default | description |  
-|:---:|:---:|:---:|:---:|:---:|  
-| collate_depth | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| collate_resistance | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| collate_strains | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| decontam_each_sample | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| decontam_each_sample | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
-| decontam_each_sample | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
-| decontam_each_sample | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| decontam_each_sample | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
-| get_sample_IDs | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| make_mask_and_diff | addldisk | Int  | 10 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| make_mask_and_diff | cpu | Int  | 8 | Number of CPUs (cores) to request from GCP. |  
-| make_mask_and_diff | memory | Int  | 16 | Amount of memory, in GB, to request from GCP. |  
-| make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| make_mask_and_diff | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| make_mask_and_diff | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
-| merge_reports | disk_size | Int  | 10 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| profile | cpu | Int  | 2 | Number of CPUs (cores) to request from GCP. |  
-| profile | memory | Int  | 4 | Amount of memory, in GB, to request from GCP. |  
-| profile | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| profile | ssd | Boolean  | false | If true, use SSDs for this task instead of HDDs |  
-| pull | disk_size | Int  | 100 | Disk size, in GB. Note that since cannot auto-scale as it cannot anticipate the size of reads from SRA. |  
-| pull | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| variant_call_after_earlyQC_but_not_filtering_samples | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| variant_call_after_earlyQC_but_not_filtering_samples | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
-| variant_call_after_earlyQC_but_not_filtering_samples | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
-| variant_call_after_earlyQC_but_not_filtering_samples | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| variant_call_after_earlyQC_but_not_filtering_samples | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
-| variant_call_after_earlyQC_but_not_filtering_samples | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
-| variant_call_after_earlyQC_filtering | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| variant_call_after_earlyQC_filtering | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
-| variant_call_after_earlyQC_filtering | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
-| variant_call_after_earlyQC_filtering | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| variant_call_after_earlyQC_filtering | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
-| variant_call_after_earlyQC_filtering | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
-| variant_call_each_sample | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| variant_call_each_sample | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
-| variant_call_each_sample | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
-| variant_call_each_sample | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| variant_call_each_sample | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
-| variant_call_each_sample | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
-| variant_call_without_earlyQC | addldisk | Int  | 100 | Additional disk size, in GB, on top of auto-scaling disk size. |  
-| variant_call_without_earlyQC | cpu | Int  | 16 | Number of CPUs (cores) to request from GCP. |  
-| variant_call_without_earlyQC | memory | Int  | 32 | Amount of memory, in GB, to request from GCP. |  
-| variant_call_without_earlyQC | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| variant_call_without_earlyQC | retries | Int  | 1 | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? |  
-| variant_call_without_earlyQC | ssd | Boolean  | true | If true, use SSDs for this task instead of HDDs |  
-  
+| **trees** | **reroot_to_this_node** | **String?** |  | **ID of the node you want to reroot to. Usually, this ID is a BioSample accession.** |  
+| **trees** | **subtree_only_new_samples** | **Boolean**  | **true** | **Iff make_nextstrain_subtrees is true, the subtrees are focused only on newly-added samples (eg, samples that went through this run of the pipeline, rather than samples that were already on the pre-existing tree)** |  
+| **trees** | **summarize_input_mat** | **Boolean**  | **true** | **Run `matutils summary` on the input tree before adding new samples to it, and output that summary** |  
