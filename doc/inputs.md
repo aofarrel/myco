@@ -32,6 +32,21 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
      * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: [Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_cleaned** or **myco_cleaned_1samp** 
      * a list of SRA BioSamples whose FASTQs you'd like to use **myco_sra** 
  * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: [convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then **myco_sra**)   
+ 
+## Quality control
+| name | type | myco_sra default | description |  
+|:---:|:---:|:---:|:---:|  
+| covstats_qc_cutoff_coverages | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
+| covstats_qc_cutoff_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
+| covstats_qc_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
+| diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
+| early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
+| early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
+| early_qc_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
+| fastqc_on_timeout | Boolean  | false | (myco_sra only) If true, fastqc one read from a sample when decontamination or variant calling times out |  
+| tree_max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree (irrelevant if tree_decoration is false) |  
+
+Note that diff_min_coverage_per_site works on a per-site basis. Other forms of QC will throw out entire samples, while this one is masking only particular regions in a sample.
   
 ## Timeouts  
 When working with data of unknown quality such as SRA data, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
@@ -68,16 +83,11 @@ Usually, I write WDLs in a way that makes their runtime attributes and rarely-us
 |:---:|:---:|:---:|:---:|  
 | diff_force | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
 | diff_mask_these_regions | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | Bed file of regions to mask when making diff files |  
-| diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
-| early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
-| early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
-| early_qc_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
-| fastqc_on_timeout | Boolean  | false | (myco_sra only) If true, fastqc one read from a sample when decontamination or variant calling times out |  
+| quick_tasks_disk_size | Int  | 10 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)isk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
 | tbprofiler_on_bam | Boolean  | varies<sup>†</sup> | If true, run TBProfiler on BAMs |  
 | tree_decoration | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? |  
-| tree_max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree |  
 | tree_to_decorate | File? | [this draft tree](https://console.cloud.google.com/storage/browser/_details/topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb;tab=live_object) | Base tree to use if decorate_tree = true |  
 
 <sup>†</sup> Defaults to true for myco_sra and false for myco_raw for historical reasons

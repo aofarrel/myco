@@ -16,7 +16,7 @@ workflow myco {
 		
 		# TODO: REPLACE WITH BETTER DEFAULTS
 		Float   covstats_qc_cutoff_coverages    =   10.00
-		Float   covstats_qc_cutoff_unmapped     =    0.10
+		Float   covstats_qc_cutoff_unmapped     =    2.00
 		Boolean covstats_qc_skip_entirely       = false
 		
 		Boolean diff_force                      = false

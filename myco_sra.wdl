@@ -23,8 +23,8 @@ workflow myco {
 		Boolean variantcalling_crash_on_timeout = false
 		
 		# TODO: REPLACE WITH BETTER DEFAULTS
-		Float covstats_qc_cutoff_unmapped = 0.10
-		Float covstats_qc_cutoff_coverages = 0.10
+		Float covstats_qc_cutoff_unmapped = 10
+		Float covstats_qc_cutoff_coverages = 2
 		Boolean covstats_qc_skip_entirely = false
 		
 		# creation + masking of diff files
