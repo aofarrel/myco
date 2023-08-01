@@ -1,18 +1,11 @@
-## Table of Contents  
-    * [Workflow-level inputs](#workflow-level-inputs)
-      * [FASTQs](#fastqs)
-      * [More info on each version of myco's use case](#more-info-on-each-version-of-mycos-use-case)
-      * [Timeouts](#timeouts)
-      * [Miscellanous workflow-level inputs](#miscellanous-workflow-level-inputs)
-    * [Task-level inputs](#task-level-inputs)
-      * [Software settings](#software-settings)
-      * [Runtime attributes](#runtime-attributes)
+### A quick introduction to input variables in WDL
+There are two kinds of input user-accessible variables in WDL: Workflow-level inputs and task-level inputs. If you are using Terra, you probably don't need to know anything about the difference between them except that task-level inputs get alphabetically sorted in Terra's UI below workflow-level inputs. 
+
+This pipeline uses a lot of external tools, and I tend to WDLize every possible input variable, so there are a lot of input variables in this pipeline. **The vast majority of them are optional.** What's most important is your fastqs.
+
+# Workflow-level inputs  
   
-See /inputs/example_inputs.json for examples.  
-  
-## Workflow-level inputs  
-  
-### FASTQs  
+## FASTQs  
 Each version of myco has a slightly different way of inputting FASTQs. A basic explanation for each workflow is in the table below. You can find more detailed explanations in each workflow's workflow-level readme.  
   
 | name | type | workflow | description |  
@@ -32,15 +25,15 @@ It is recommend that you also keep an eye on the total size of your FASTQs. Indi
 myco_cleaned expects that the FASTQs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
   
 ### More info on each version of myco's use case  
-* pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it**myco_cleaned** 
+* pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it: **myco_cleaned** 
   * if these are in Terra data table format, you may want to use **myco_cleaned_1samp** 
- * pairs of FASTQs which have yet to be decontaminated or merged
- * if each sample has its FASTQs in a single array**myco_raw** 
- * if each sample has its forward FASTQs in one array and reverse FASTQs in another array[Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_cleaned** or **myco_cleaned_1samp** 
- * a list of SRA BioSamples whose FASTQs you'd like to use**myco_sra** 
- * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use[convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then **myco_sra**)   
+ * pairs of FASTQs which have yet to be decontaminated or merged: 
+     * if each sample has its FASTQs in a single array: **myco_raw** 
+     * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: [Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_cleaned** or **myco_cleaned_1samp** 
+     * a list of SRA BioSamples whose FASTQs you'd like to use **myco_sra** 
+ * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: [convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then **myco_sra**)   
   
-### Timeouts  
+## Timeouts  
 When working with data of unknown quality such as SRA data, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
   
 | name | type | myco_sra default | description |  
@@ -52,14 +45,15 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 <sup>†</sup> myco_raw and myco_cleaned default to not using this heuristic at all, so their defaults are 0.
 
 
-### Variant caller inputs
+## Variant caller inputs
+Usually, I write WDLs in a way that makes their runtime attributes and rarely-used optional arguments task-level, and everything else workflow-level. However, myco uses some workarounds that require it to technically have three copies of the variant caller task, which means that if I didn't make the variant caller's inputs workflow-level, there would be three sets of task-level inputs for the variant caller.
 
 | name | type | myco_sra default | description |  
 |:---:|:---:|:---:|:---:|  
 | variantcalling_addl_disk        | Int     | 100   | Additional disk size, in GB, on top of auto-scaling disk size. |
+| variantcalling_cpu              | Int     | 16    | Number of CPUs (cores) to request from GCP. |
 | variantcalling_crash_on_error   | Boolean | false | If this task errors out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
 | variantcalling_crash_on_timeout | Boolean | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? | 
-| variantcalling_cpu              | Int     | 16    | Number of CPUs (cores) to request from GCP. |
 | variantcalling_debug            | Boolean | false | Do not clean up any files and be verbose |  
 | variantcalling_mem_height       | Int?    |       | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) | 
 | variantcalling_memory           | Int     | 32    | Amount of memory, in GB, to request from GCP. |
@@ -68,7 +62,7 @@ When working with data of unknown quality such as SRA data, it can be helpful to
 | variantcalling_ssd              | Boolean | true  | If true, use SSDs for this task instead of HDDs  | 
 
   
-### Miscellanous inputs  
+## Miscellanous workflow-level inputs  
   
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
@@ -90,7 +84,7 @@ When working with data of unknown quality such as SRA data, it can be helpful to
   
 
   
-## Task-level inputs 
+# Task-level inputs 
 
 Many of these settings just change the name of output files or runtime attributes, but for the sake of ease-of-use we wanted to include them on a single list in the alphabetical order they show up in on Terra. As such, settings that DO NOT relate to filename outputs nor runtime attributes are in bold.
 
@@ -99,7 +93,7 @@ For more info on runtime settings, see https://cromwell.readthedocs.io/en/stable
 
 | task | name | type | default | description |  
 |:---:|:---:|:---:|:---:|:---:|  
-| **check_fastqs** | **output_fastps_cleaned_fastqs** | Boolean  | false | Use fastp's cleaned fastqs for subsequent tasks (true) instead of discarding them (false). Setting this to false means you are effectively only using fastp to check if a sample is valid, keeping or throwing out the entire sample based on this information. |  
+| **check_fastqs** | **output_fastps_cleaned_fastqs** | **Boolean**  | **false** | **Use fastp's cleaned fastqs for subsequent tasks (true) instead of discarding them (false). Setting this to false means you are effectively only using fastp to check if a sample is valid, keeping or throwing out the entire sample based on this information.** |  
 | collate_depth | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA.  |  
 | collate_resistance | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA.  |  
 | collate_strains | disk_size | Int  | 10 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA. |  
@@ -135,9 +129,9 @@ For more info on runtime settings, see https://cromwell.readthedocs.io/en/stable
 | profile | ssd | Boolean  | false | If true, use SSDs for this task instead of HDDs |  
 | pull | disk_size | Int  | 100 | Disk size, in GB. This task cannot autoscale as it cannot anticipate the size of reads from SRA. |  
 | pull | preempt | Int  | 1 | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| **trees** | **detailed_clades** | **Boolean**  | **false** |  |  
+| **trees** | **detailed_clades** | **Boolean**  | **false** | **If true, run usher sampled diff with `-D` flag** |  
 | trees | in_prefix_summary | String? |  |  |  
-| **trees** | **make_nextstrain_subtrees** | **Boolean**  | **true** | S**hould our Nextstrain (Auspice-compatiable) output tree consist of multiple subtrees (true), or just one big tree (false)? Setting this to true might be useful if you have trouble loading very large trees into Auspice.** |  
+| **trees** | **make_nextstrain_subtrees** | **Boolean**  | **true** | **Should our Nextstrain (Auspice-compatiable) output tree consist of multiple subtrees (true), or just one big tree (false)? Setting this to true might be useful if you have trouble loading very large trees into Auspice.** |  
 | **trees** | **metadata_tsv** | **File?** |  | **Metadata TSV to annotate the input tree with** |  
 | trees | out_diffs | String  | \'_combined\' |  |  
 | trees | out_prefix | String  | \'tree\' |  |  
