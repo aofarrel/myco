@@ -1,14 +1,15 @@
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.4/TBfastProfiler.wdl" as earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.5/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
 workflow myco {
@@ -21,6 +22,11 @@ workflow myco {
 		Boolean variantcalling_crash_on_error   = false
 		Boolean variantcalling_crash_on_timeout = false
 		
+		# TODO: REPLACE WITH BETTER DEFAULTS
+		Float covstats_qc_cutoff_unmapped = 10
+		Float covstats_qc_cutoff_coverages = 2
+		Boolean covstats_qc_skip_entirely = false
+		
 		# creation + masking of diff files
 		Boolean diff_force                   = false
 		Int     diff_min_coverage_per_site   = 10
@@ -30,7 +36,7 @@ workflow myco {
 		Boolean fastqc_on_timeout       = false
 		Boolean early_qc_apply_cutoffs  = false
 		Float   early_qc_cutoff_q30     = 0.90
-		Boolean early_qc_skip_entirely  = false
+		Boolean early_qc_skip_entirely  = true
 		
 		# shrink large samples
 		Int     subsample_cutoff        =  450
@@ -67,10 +73,10 @@ workflow myco {
 		
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
-		tree_max_low_coverage_sites: "If a diff file has higher than this percent (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
+		tree_max_low_coverage_sites: "If a diff file has higher than this porportion (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
 		
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this porportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		
@@ -81,9 +87,9 @@ workflow myco {
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		
-		quick_tasks_disk_size: "Disk size (in GB) for tasks that process metadata. For absolutely massive runs this might be worth increasing for faster delocalization."
+		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		
-		tbprofiler_on_bam: "If true, run TBProfiler on BAMs."
+		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
 		
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
@@ -147,7 +153,7 @@ workflow myco {
 
 			# if we are NOT skipping earlyQC
 			if(!early_qc_skip_entirely) {
-				call earlyQC.TBfastProfiler as qc_fastqs {
+				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -224,35 +230,101 @@ workflow myco {
 	}
 
 	# do some wizardry to deal with optionals
-	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.vcf_final_call_set)
-	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.vcf_final_call_set)
-	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.vcf_final_call_set)
+	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
+	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
+	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
 	
-	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.mapped_to_ref)
-	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.mapped_to_ref)
-	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.mapped_to_ref)
+	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bam)
+	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bam)
+	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
+	
+	Array[File] bais_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bai)
+	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
+	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
 	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
-	Array[File] bams_to_ref = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
+	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
+	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
+	
+	# Now we need to essentially scatter on three arrays: minos_vcfs, bams, and bais. This is trivial in CWL, but
+	# isn't intutive in WDL -- in fact, it's arguably not possible!
+	#
+	# In WDL, you *should* be able to define a custom struct (think of it like a Python object), which can be seen
+	# in the WDL spec (https://github.com/openwdl/wdl/blob/main/versions/1.0/SPEC.md#struct-definition), and
+	# scatter on that struct. However, in my experience, Cromwell gets pretty buggy when you try to scatter on structs
+	# especially if those structs contain files (and our structs most definitely contain files). We can't use zip() 
+	# either, because that only works if you have two arrays, not three.
+	#
+	# So, naturally, we're going to do something cheesy.
+	
+	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
+	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
+	
+	# bams_and_bais might look like this: [[SAM1234.bam, SAM1235.bam], [SAM1234.bam.bai, SAM1235.bam.bai]]
+	# bams_per_bais might look like this: [[SAM1234.bam, SAM1234.bam.bai], [SAM1235.bam, SAM1235.bam.bai]]
 
-
-	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
-		call diff.make_mask_and_diff as make_mask_and_diff {
-			input:
-				bam = vcfs_and_bams.left,
-				vcf = vcfs_and_bams.right,
-				min_coverage_per_site = diff_min_coverage_per_site,
-				tbmf = diff_mask_these_regions,
-				diffs = create_diff_files
+	scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) {
+	# scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) is now sort of a three-way scatter:
+	# * bam file accessible via vcfs_and_bams.left[0]
+	# * bai file accessible via vcfs_and_bams.left[1]
+	# * vcf file accessible via vcfs_and_bams.right
+	
+	# This relies on your WDL executor being consistent with how it orders arrays. That SHOULD always be the case per
+	# the spec, but if things break catastrophically, let me save you some debug time: As of 2.9.2, clockwork-wdl's
+	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
+	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
+	# untar things, of course.
+	
+		if(!covstats_qc_skip_entirely) {
+	
+			# covstats to check coverage and percent mapped to reference
+			call goleft.covstats as covstats {
+				input:
+					inputBamOrCram = vcfs_and_bams.left[0],
+					allInputIndexes = [vcfs_and_bams.left[1]]
+			}
+			
+			if(covstats.percentUnmapped > covstats_qc_cutoff_unmapped) {
+				if(covstats.coverage > covstats_qc_cutoff_coverages) {
+					
+					# make diff files
+					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
+						input:
+							bam = vcfs_and_bams.left[0],
+							vcf = vcfs_and_bams.right,
+							min_coverage_per_site = diff_min_coverage_per_site,
+							tbmf = diff_mask_these_regions,
+							diffs = create_diff_files
+					}
+				}
+			}
 		}
 		
+		if(covstats_qc_skip_entirely) {
+		
+			# make diff files
+			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
+				input:
+					bam = vcfs_and_bams.left[0],
+					vcf = vcfs_and_bams.right,
+					min_coverage_per_site = diff_min_coverage_per_site,
+					tbmf = diff_mask_these_regions,
+					diffs = create_diff_files
+			}
+		}
+		
+		# TBProfiler (will run even if fails covstats qc)
 		if(tbprofiler_on_bam) {
 			call profiler.tb_profiler_bam as profile_bam {
 					input:
-						bam = vcfs_and_bams.left
+						bam = vcfs_and_bams.left[0]
 			}
 		}
 	}
+	
+	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])
+	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
+	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	if(defined(profile_bam.strain)) {
@@ -326,10 +398,11 @@ workflow myco {
 	}
 
 	if(tree_decoration) {
-		# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
-		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
-		Array[File] coerced_diffs = select_first([select_all(make_mask_and_diff.diff), minos_vcfs])
-		Array[File] coerced_reports = select_first([select_all(make_mask_and_diff.report), minos_vcfs])
+		# diff files must exist if tree_decoration is true (unless no samples passed) 
+		# so we can force the Array[File?]? into an Array[File] with the classic 
+		# "select_first() with a bogus fallback" hack
+		Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
+		Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
 		call build_treesWF.Tree_Nine as trees {
 			input:
 				diffs = coerced_diffs,
@@ -341,22 +414,26 @@ workflow myco {
 
 	output {
 		# raw files
-		Array[File?] diffs = make_mask_and_diff.diff
-		Array[File]  masks = make_mask_and_diff.mask_file
+		Array[File]  bais = final_bais
+		Array[File]  bams  = final_bams
+		Array[File?] diffs = real_diffs
+		Array[File?] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
+		Array[File?]  covstats_reports       = covstats.covstatsOutfile
+		Array[File?]  diff_reports           = real_reports
 		File          download_report        = merge_reports.outfile
 		Array[File]?  fastqc_reports         = FastqcWF.reports
-		Array[File?]? fastp_reports          = qc_fastqs.fastp_txt
+		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
 		File?         tbprof_bam_depths      = collate_bam_depth.outfile
-		Array[File?]? tbprof_bam_jsons       = profile_bam.tbprofiler_json
+		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
 		File?         tbprof_bam_strains     = collate_bam_strains.outfile
-		Array[File?]? tbprof_bam_summaries   = profile_bam.tbprofiler_txt
+		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
 		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
-		Array[File?]? tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		File?         tbprof_fq_strains      = collate_fq_strains.outfile
-		Array[File?]? tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
+		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
 		# tree nine

@@ -1,3 +1,7 @@
+### DEPRECATED ###
+exit 0
+
+
 # This is very much a Works On My Machine sort of script!
 # To run this elsewhere, point to your own version of womtool,
 # change ghead to head (unless you're using Mac w/ coreutils),
@@ -70,7 +74,7 @@ filename_vars = [
 def strip_junk(string):
 	"""
 	The python to markdown converter we're using seems to do some character replacements to ensure
-	greater markdown compatiability, but they render awfully GitHub. This function undos that.
+	greater markdown compatiability, but they render awfully on GitHub. This function undos that.
 	"""
 	return string.replace("&gt;", ">").replace("&quot;", "'").replace(": ", "").replace("&#x27;", "\`").replace("&lt;", "<").replace("\`", "\'")
 
@@ -244,6 +248,7 @@ with open("myco_cleaned.wdl", "r") as myco:
 fastq_inputs = []
 for input_variable in workflow_level:
 	value = input_variable["name"]
+	print(input_variable)
 	if value == "biosample_accessions":
 		input_variable["workflow"] = "myco_sra"
 		del input_variable["default"]
