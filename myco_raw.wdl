@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/error-codes/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/error-codes/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
@@ -190,9 +190,14 @@ workflow myco {
 	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
 	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
+	Array[String] varcall_error_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
+	Array[String] varcall_error_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
+	Array[String] varcall_error_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
+	
 	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
 	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
 	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
+	Array[String] final_varcall_error = flatten([varcall_error_if_earlyQC_filtered, varcall_error_if_earlyQC_but_not_filtering, varcall_error_if_no_earlyQC])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -321,6 +326,28 @@ workflow myco {
 				max_low_coverage_sites = tree_max_low_coverage_sites
 		}
 	}
+	
+	# error reporting for Terra data tables
+	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
+	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
+	# for an individual sample as workflow-level output, which gets written to the Terra data table. 
+	String pass = "PASS"
+	if(length(paired_fastq_sets) != 1) {                  # is there only one sample?
+		if(defined(decontam_each_sample.errorcode)) {          # did the decontamination step actually run?
+			if(!(decontam_each_sample.errorcode[0] == pass)) {      # did the decontamination step return an error?
+				String decontam_ERR = decontam_each_sample.errorcode[0] # get the first (0th) value, eg only value since there's just one sample
+			}
+		}
+		if(defined(final_varcall_error)) {                # did the variant caller actually run?
+			if(!(final_varcall_error[0] == pass)) {            # did the variant caller return an error?
+				String varcall_ERR = final_varcall_error[0] # get the first (0th) value, eg only value since there's just one sample
+			}
+		}
+		String finalcode = select_first([decontam_ERR, varcall_ERR, pass])
+	}
+		
+	#Array[String] status = flatten(select_first([decontam_error, earlyqc_error, varcall_error, covstats_error, vcftodiff_error, "PASS"]))
+	#Array[Array[String]] status = select_first([decontam_each_sample.decontam_error, ["PASS"]])
 
 	output {
 		# raw files
@@ -344,9 +371,8 @@ workflow myco {
 		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
-		# status of each sample
-		#Array[String] status = flatten(select_first([decontam_error, earlyqc_error, varcall_error, covstats_error, vcftodiff_error, "PASS"]))
-		Array[String] status = flatten(select_first([decontam_each_sample.decontam_error, "PASS"]))
+		# status of sample, iff this ran on only one sample
+		String? error_code = finalcode
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
