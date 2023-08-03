@@ -346,7 +346,7 @@ workflow myco {
 		
 		# status of each sample
 		#Array[String] status = flatten(select_first([decontam_error, earlyqc_error, varcall_error, covstats_error, vcftodiff_error, "PASS"]))
-		Array[String] status = flatten(select_first([decontam_error, "PASS"]))
+		Array[String] status = flatten(select_first([decontam_each_sample.decontam_error, "PASS"]))
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
