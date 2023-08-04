@@ -19,10 +19,11 @@ workflow myco {
 		Float   covstats_qc_cutoff_unmapped     =    2.00
 		Boolean covstats_qc_skip_entirely       = false
 		
-		Boolean diff_force                      = false
+		#Boolean diff_force                      = false
 		File?   diff_mask_these_regions
 		Int     diff_min_coverage_per_site      =   10
 		Boolean early_qc_apply_cutoffs          = false
+		Int     early_qc_cutoff_median_coverage =    5
 		Float   early_qc_cutoff_q30             =    0.90
 		Boolean early_qc_skip_entirely          = false
 		Int     quick_tasks_disk_size           =   10 
@@ -104,7 +105,8 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = early_qc_cutoff_q30
+						q30_cutoff = early_qc_cutoff_q30,
+						median_coverage_cutoff = early_qc_cutoff_median_coverage
 				}
 				
 				# if we are filtering out samples via earlyQC...
