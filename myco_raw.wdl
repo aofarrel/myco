@@ -178,6 +178,25 @@ workflow myco {
 	}
 
 	# do some wizardry to deal with optionals
+	#
+	# In order to account for different use cases, this workflow has three versions of the variant caller. They are mutually
+	# exclusive, eg, only one can ever be called by a given sample. In fact, there are cases where NONE of them get called.
+	# Additionally, each version of the variant caller technically gives optional output. This is to prevent the entire
+	# pipeline from crashing if a single garbage sample starts the variant calling task but cannot make a VCF.
+	#
+	# Unfortunately, this means I have created multiple optional outputs from optional tasks. Mutually exclusive outputs from
+	# mutually exclusive tasks, yes, but WDL doesn't quite understand mutual exclusivity. WDL and/or Cromwell (it's hard to 
+	# know if the issue is the langauge or its implementation since the spec is not very specific) also gets finicky when we try
+	# to do certain things with optional arrays. So, we want to turn those optionals into not-optionals ASAP. That's what this
+	# block of variable definitions does. WDL does not allow you to overwrite variables, so we need to declare a ton of variables
+	# with unique names. Yes, this could in theory be done more "cleanly" by calling a task, but why spin up a Docker image to do
+	# microseconds worth of work?
+	#
+	# Interestingly, even if the variant caller didn't run, this code block does not cause a crash. Somehow, we can create 
+	# non-optional variables that have no content. This little mystery is mostly good because it means the 
+	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
+	# we cannot use anything here to test if any version of the variant caller actually ran at all!
+	# 
 	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
 	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
 	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
@@ -190,14 +209,9 @@ workflow myco {
 	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
 	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
-	Array[String] varcall_error_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
-	Array[String] varcall_error_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
-	Array[String] varcall_error_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
-	
 	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
 	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
 	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
-	Array[String] final_varcall_error = flatten([varcall_error_if_earlyQC_filtered, varcall_error_if_earlyQC_but_not_filtering, varcall_error_if_no_earlyQC])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -263,7 +277,6 @@ workflow myco {
 	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])
 	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
 	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
-
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	if(defined(profile_bam.strain)) {
@@ -346,22 +359,41 @@ workflow myco {
 	# for an individual sample as workflow-level output, which gets written to the Terra data table. 
 	String pass = "PASS"
 	if(length(paired_fastq_sets) == 1) {                  # is there only one sample?
-		if(defined(decontam_each_sample.errorcode)) {          # did the decontamination step actually run?
-			if(!(decontam_each_sample.errorcode[0] == pass)) {      # did the decontamination step return an error?
+	
+		if(defined(decontam_each_sample.errorcode)) {                   # did the decontamination step actually run?
+			if(!(decontam_each_sample.errorcode[0] == pass)) {          # did the decontamination step return an error?
 				String decontam_ERR = decontam_each_sample.errorcode[0] # get the first (0th) value, eg only value since there's just one sample
 			}
 		}
-		if(defined(final_varcall_error)) {                # did the variant caller actually run?
-			if(!(final_varcall_error[0] == pass)) {            # did the variant caller return an error?
-				String varcall_ERR = final_varcall_error[0] # get the first (0th) value, eg only value since there's just one sample
+		
+		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
+		# have to use the bogus select_first() fallback, because WDL doesn't understand that if you are in a block that only 
+		# executes if X is defined, then X must be defined. (This isn't a Cromwell thing; miniwdl also catches this.)
+		#
+		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {                          # did the "if earlyQC filtered" variant caller run?
+			if(!(variant_call_after_earlyQC_filtering.errorcode[0] == pass)) {                 # did the "if earlyQC filtered" variant caller return an error?
+				String varcall_error_if_earlyQC_filtered = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
 			}
 		}
+		if(defined(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)) {           # did the "if earlyQC but not filtered" variant caller run?
+			if(!(variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0] == pass)) {  # did the "if earlyQC but not filtered" variant caller return an error?
+				String varcall_error_if_earlyQC_but_not_filtering = select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
+			}
+		}
+		if(defined(variant_call_without_earlyQC.errorcode)) {                                   # did the "no earlyQC" variant caller run?
+			if(!(variant_call_without_earlyQC.errorcode[0] == pass)) {                          # did the "no earlyQC" variant caller return an error?
+				String varcall_error_if_no_earlyQC = select_first([variant_call_without_earlyQC.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
+			}
+		}
+		
+		# if the variant caller did not run, the fallback is pass, even though the sample shouldn't be considered a pass, so
+		# the final-final-final error code needs to have decontam's error come before the variant caller error
+		String varcall_ERR = select_first([varcall_error_if_earlyQC_filtered, varcall_error_if_earlyQC_but_not_filtering, varcall_error_if_no_earlyQC, pass])
+	
+		# final-final-final error code
 		String finalcode = select_first([decontam_ERR, varcall_ERR, pass])
 	}
 		
-	#Array[String] status = flatten(select_first([decontam_error, earlyqc_error, varcall_error, covstats_error, vcftodiff_error, "PASS"]))
-	#Array[Array[String]] status = select_first([decontam_each_sample.decontam_error, ["PASS"]])
-
 	output {
 		# raw files
 		Array[File]  bais = final_bais
