@@ -371,11 +371,12 @@ workflow myco {
 		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; miniwdl 
 		# also catches this.)
 		#
-		# But what miniwdl (although this may be a Cromwell limitation, I'm not sure) and womtool don't find is this: we gotta use
+		# But what miniwdl (although this may be a Cromwell-runtime thing, I'm not sure) and womtool don't find is this: we gotta use
 		# the bogus select_first() workaround not only to define our new strings, but also the statement immediately prior
-		# that checks if the errorcode is "PASS", or else Cromwell will return "Failed to evaluate 'if_condition'" with reason
+		# that checks if the errorcode is "PASS", or else at runtime Cromwell will return "Failed to evaluate 'if_condition'", b/c
 		# "Evaluating !((variant_call_without_earlyQC.errorcode[0] == pass)) failed: Sorry! Operation == is not supported on
-		# empty optional values. You might resolve this using select_first([optional, default]) to guarantee that you have a filled value.""
+		# empty optional values. You might resolve this using select_first([optional, default]) to guarantee that you have a
+		# filled value."" I'm not sure why this can't be detected before runtime.
 		#
 		
 		# did the "if earlyQC filtered" variant caller run?
@@ -395,7 +396,7 @@ workflow myco {
 		# did the "no earlyQC" variant caller run?
 		if(defined(variant_call_without_earlyQC.errorcode)) {       
 			# did the "no earlyQC" variant caller return an error?
-			if(!(select_first([variant_call_without_earlyQC.errorcode[0] == pass, "silly bogus fallback"]) == pass)) {
+			if(!(select_first([variant_call_without_earlyQC.errorcode[0], "silly bogus fallback"]) == pass)) {
 				String varcall_error_if_no_earlyQC = select_first([variant_call_without_earlyQC.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
 			}
 		}
