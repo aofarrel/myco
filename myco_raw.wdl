@@ -332,7 +332,7 @@ workflow myco {
 	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
 	# for an individual sample as workflow-level output, which gets written to the Terra data table. 
 	String pass = "PASS"
-	if(length(paired_fastq_sets) != 1) {                  # is there only one sample?
+	if(length(paired_fastq_sets) == 1) {                  # is there only one sample?
 		if(defined(decontam_each_sample.errorcode)) {          # did the decontamination step actually run?
 			if(!(decontam_each_sample.errorcode[0] == pass)) {      # did the decontamination step return an error?
 				String decontam_ERR = decontam_each_sample.errorcode[0] # get the first (0th) value, eg only value since there's just one sample
