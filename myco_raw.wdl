@@ -371,8 +371,8 @@ workflow myco {
 		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
-		# status of sample, iff this ran on only one sample
-		String? error_code = finalcode
+		# status of sample, only valid iff this ran on only one sample
+		String error_code = select_first([finalcode, pass])
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
