@@ -367,21 +367,35 @@ workflow myco {
 		}
 		
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
-		# have to use the bogus select_first() fallback, because WDL doesn't understand that if you are in a block that only 
-		# executes if X is defined, then X must be defined. (This isn't a Cromwell thing; miniwdl also catches this.)
+		# have to use the bogus select_first() fallback to define the new strings, because WDL doesn't understand that if you 
+		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; miniwdl 
+		# also catches this.)
 		#
-		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {                          # did the "if earlyQC filtered" variant caller run?
-			if(!(variant_call_after_earlyQC_filtering.errorcode[0] == pass)) {                 # did the "if earlyQC filtered" variant caller return an error?
+		# But what miniwdl (although this may be a Cromwell limitation, I'm not sure) and womtool don't find is this: we gotta use
+		# the bogus select_first() workaround not only to define our new strings, but also the statement immediately prior
+		# that checks if the errorcode is "PASS", or else Cromwell will return "Failed to evaluate 'if_condition'" with reason
+		# "Evaluating !((variant_call_without_earlyQC.errorcode[0] == pass)) failed: Sorry! Operation == is not supported on
+		# empty optional values. You might resolve this using select_first([optional, default]) to guarantee that you have a filled value.""
+		#
+		
+		# did the "if earlyQC filtered" variant caller run?
+		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {
+			# did the "if earlyQC filtered" variant caller return an error?
+			if(!(select_first([variant_call_after_earlyQC_filtering.errorcode[0], "silly bogus fallback"]) == pass)) {
 				String varcall_error_if_earlyQC_filtered = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
 			}
 		}
-		if(defined(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)) {           # did the "if earlyQC but not filtered" variant caller run?
-			if(!(variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0] == pass)) {  # did the "if earlyQC but not filtered" variant caller return an error?
+		# did the "if earlyQC but not filtered" variant caller run?
+		if(defined(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)) {
+			# did the "if earlyQC but not filtered" variant caller return an error?
+			if(!(select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "silly bogus fallback"]) == pass)) {
 				String varcall_error_if_earlyQC_but_not_filtering = select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
 			}
 		}
-		if(defined(variant_call_without_earlyQC.errorcode)) {                                   # did the "no earlyQC" variant caller run?
-			if(!(variant_call_without_earlyQC.errorcode[0] == pass)) {                          # did the "no earlyQC" variant caller return an error?
+		# did the "no earlyQC" variant caller run?
+		if(defined(variant_call_without_earlyQC.errorcode)) {       
+			# did the "no earlyQC" variant caller return an error?
+			if(!(select_first([variant_call_without_earlyQC.errorcode[0] == pass, "silly bogus fallback"]) == pass)) {
 				String varcall_error_if_no_earlyQC = select_first([variant_call_without_earlyQC.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
 			}
 		}
