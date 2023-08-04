@@ -267,29 +267,42 @@ workflow myco {
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	if(defined(profile_bam.strain)) {
+	
+		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
-		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
-
-		call sranwrp_processing.cat_strings as collate_bam_strains {
-			input:
-				strings = coerced_bam_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
+		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
+		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
+		
+		# if there is more than one sample, run some tasks to concatenate the outputs
+		if(length(paired_fastq_sets) != 1) {
+	
+			call sranwrp_processing.cat_strings as collate_bam_strains {
+				input:
+					strings = coerced_bam_strains,
+					out = "strain_reports.txt",
+					disk_size = quick_tasks_disk_size
+			}
+			
+			call sranwrp_processing.cat_strings as collate_bam_resistance {
+				input:
+					strings = coerced_bam_resistances,
+					out = "resistance_reports.txt",
+					disk_size = quick_tasks_disk_size
+			}
+	
+			call sranwrp_processing.cat_strings as collate_bam_depth {
+				input:
+					strings = coerced_bam_depths,
+					out = "depth_reports.txt",
+					disk_size = quick_tasks_disk_size
+			}
 		}
 		
-		call sranwrp_processing.cat_strings as collate_bam_resistance {
-			input:
-				strings = coerced_bam_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-
-		call sranwrp_processing.cat_strings as collate_bam_depth {
-			input:
-				strings = coerced_bam_depth,
-				out = "depth_reports.txt",
-				disk_size = quick_tasks_disk_size
+		# if there is only one sample, there's no need to run tasks
+		if(length(paired_fastq_sets) == 1) {
+			Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
+			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
+			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 		}
   	}
   	
@@ -361,15 +374,22 @@ workflow myco {
 		Array[File?]  covstats_reports       = covstats.covstatsOutfile
 		Array[File?]  diff_reports           = real_reports
 		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
-		File?         tbprof_bam_depths      = collate_bam_depth.outfile
 		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
-		File?         tbprof_bam_strains     = collate_bam_strains.outfile
 		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
-		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
 		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		File?         tbprof_fq_strains      = collate_fq_strains.outfile
 		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
+		
+		# these outputs only exist if there are multiple samples
+		File?         tbprof_bam_depths      = collate_bam_depth.outfile
+		File?         tbprof_bam_strains     = collate_bam_strains.outfile
+		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		
+		# these outputs only exist if we ran on a single sample
+		Int?            tbprof_bam_depth      = single_sample_tbprof_bam_depth
+		String?         tbprof_bam_strain     = single_sample_tbprof_bam_strain
+		String?         tbprof_bam_resistance = single_sample_tbprof_bam_resistance
 		
 		# status of sample, only valid iff this ran on only one sample
 		String error_code = select_first([finalcode, pass])
