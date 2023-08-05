@@ -290,7 +290,7 @@ workflow myco {
 		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
 		
 		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
-		if(!length(coerced_bam_strains) == 0) {
+		if(!(length(coerced_bam_strains) == 0)) {
 		
 			# if there is more than one sample, run some tasks to concatenate the outputs
 			if(length(paired_fastq_sets) != 1) {
