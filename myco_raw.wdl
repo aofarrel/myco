@@ -279,6 +279,9 @@ workflow myco {
 	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
+	# For reasons I don't understand, if no variant caller runs (ergo there's no bam and profile_bam also does not run),
+	# the following code block will still execute. coerced_bam_strains etc will be arrays with length 0. So this check
+	# isn't sufficient on its own, but as always, I have a workaround for this!
 	if(defined(profile_bam.strain)) {
 	
 		# coerce optional types into required types
@@ -286,36 +289,40 @@ workflow myco {
 		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
 		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
 		
-		# if there is more than one sample, run some tasks to concatenate the outputs
-		if(length(paired_fastq_sets) != 1) {
-	
-			call sranwrp_processing.cat_strings as collate_bam_strains {
-				input:
-					strings = coerced_bam_strains,
-					out = "strain_reports.txt",
-					disk_size = quick_tasks_disk_size
+		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
+		if(!length(coerced_bam_strains) == 0) {
+		
+			# if there is more than one sample, run some tasks to concatenate the outputs
+			if(length(paired_fastq_sets) != 1) {
+		
+				call sranwrp_processing.cat_strings as collate_bam_strains {
+					input:
+						strings = coerced_bam_strains,
+						out = "strain_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_bam_resistance {
+					input:
+						strings = coerced_bam_resistances,
+						out = "resistance_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+		
+				call sranwrp_processing.cat_strings as collate_bam_depth {
+					input:
+						strings = coerced_bam_depths,
+						out = "depth_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
 			}
 			
-			call sranwrp_processing.cat_strings as collate_bam_resistance {
-				input:
-					strings = coerced_bam_resistances,
-					out = "resistance_reports.txt",
-					disk_size = quick_tasks_disk_size
+			# if there is only one sample, there's no need to run tasks
+			if(length(paired_fastq_sets) == 1) {
+				Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
+				String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
+				String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 			}
-	
-			call sranwrp_processing.cat_strings as collate_bam_depth {
-				input:
-					strings = coerced_bam_depths,
-					out = "depth_reports.txt",
-					disk_size = quick_tasks_disk_size
-			}
-		}
-		
-		# if there is only one sample, there's no need to run tasks
-		if(length(paired_fastq_sets) == 1) {
-			Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
-			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
-			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 		}
   	}
   	
@@ -358,7 +365,7 @@ workflow myco {
 	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
 	# for an individual sample as workflow-level output, which gets written to the Terra data table. 
 	String pass = "PASS"
-	if(length(paired_fastq_sets) == 1) {                  # is there only one sample?
+	if(length(paired_fastq_sets) == 1) {    # is there only one sample?
 	
 		if(defined(decontam_each_sample.errorcode)) {                   # did the decontamination step actually run?
 			if(!(decontam_each_sample.errorcode[0] == pass)) {          # did the decontamination step return an error?
