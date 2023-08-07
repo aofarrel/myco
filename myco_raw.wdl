@@ -82,7 +82,7 @@ workflow myco {
 											  create_diff_files__, 
 											  create_diff_files___])
 											  
-	String pass = "PASS"
+	String pass = "PASS" # used later... much later
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -368,15 +368,15 @@ workflow myco {
 		}
 	}
 	
-	# error reporting for Terra data tables
+	#########################################
+	# error reporting for Terra data tables #
+	#########################################
+	#
+	# Warning: Due to how 
+	
 	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
 	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
 	# for an individual sample as workflow-level output, which gets written to the Terra data table.
-	
-	# Notes:
-	# Even if (defined(decontam_each_sample.errorcode) is true, we can't really access it. If you create a task that takes in 
-	# decontam_each_sample.errorcode, it will fail command instantiation with "Cannot interpolate Array[String?] into a command
-	# string with attribute set [PlaceholderAttributeSet(None,None,None,Some( ))]".
 	
 	# is there only one sample?
 	if(length(paired_fastq_sets) == 1) {    
@@ -387,15 +387,31 @@ workflow myco {
 			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
 			String coerced_decontam_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
 			
-			call debug as BBBBBBB {
+			# Here's where we have to use even more select_first() even though we really shouldn't have to. It turns out that
+			# if (defined(decontam_each_sample.errorcode) is true, we can't really access it. If you create a task that takes
+			# in decontam_each_sample.errorcode, it will fail command instantiation with "Cannot interpolate Array[String?]
+			# into a command string with attribute set [PlaceholderAttributeSet(None,None,None,Some( ))]".
+			#
+			# I don't quite understand why, but this seems to also be the case for coerced_decontam_errorcode, even though we
+			# already used select_first() to coerce it into a non-optional.
+			#
+			# In other words, these don't work:
+			# * calling a task with the coerced inputs like this:
+			#   * [coerced_decontam_errorcode]
+			#   * coerced_decontam_errorcode
+			# * calling a task without the coerced inputs like this:
+			#   * [select_first([decontam_each_sample.errorcode[0], "foo"])]
+			#   * select_first([decontam_each_sample.errorcode[0], "bar"])
+			# * calling a task with coerced inputs AND select first, if it's an array:
+			#   * all_errors = [select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])],
+			
+			call debug as CCCCCCC {
 				input:
-					all_errors = [select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])],
 					index_zero_error = select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
 			}
 		
 			call debug as debugdecontam {
 				input:
-					all_errors = [coerced_decontam_errorcode],
 					index_zero_error = coerced_decontam_errorcode
 			}
 		
@@ -515,12 +531,10 @@ workflow myco {
 
 task debug {
 	input {
-		Array[String?]? all_errors
 		String? index_zero_error
 	}
 	
 	command  <<<
-	echo "~{sep=' ' all_errors}"
 	echo "~{index_zero_error}"
 	>>>
 	
