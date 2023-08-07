@@ -135,7 +135,7 @@ workflow myco {
 					}
 					# if we are filtering via earlyQC but did not pass, we can declare a failure here
 					if(!(qc_fastqs.pass_or_errorcode == pass)) {
-						String earlyqc_ERR = qc_fastqs.pass_or_errorcode
+						String earlyqc_definitely_errored = qc_fastqs.pass_or_errorcode
 					}
 				}
 				
@@ -378,22 +378,34 @@ workflow myco {
 	# decontam_each_sample.errorcode, it will fail command instantiation with "Cannot interpolate Array[String?] into a command
 	# string with attribute set [PlaceholderAttributeSet(None,None,None,Some( ))]".
 	
-	if(length(paired_fastq_sets) == 1) {    # is there only one sample?
+	# is there only one sample?
+	if(length(paired_fastq_sets) == 1) {    
 	
-		if(defined(decontam_each_sample.errorcode)) {                   # did the decontamination step actually run?
+		# did the decontamination step actually run?
+		if(defined(decontam_each_sample.errorcode)) {
 		
 			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
-			String coerced_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			String coerced_decontam_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
 		
 			call debug as debugdecontam {
 				input:
-					all_errors = [coerced_errorcode],
-					index_zero_error = coerced_errorcode
+					all_errors = [coerced_decontam_errorcode],
+					index_zero_error = coerced_decontam_errorcode
 			}
 		
-			if(!(coerced_errorcode == pass)) {          # did the decontamination step return an error?
-				String decontam_ERR = coerced_errorcode
+			# did the decontamination step return an error?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String decontam_ERR = coerced_decontam_errorcode
 			}
+		}
+		
+		# We already set earlyqc_definitely_errored earlier, but since this workflow can run on multiple samples it's going to have
+		# type Array[String?], Array[String?]?, or Array[String]? (should probably be Array[String?]? but optionals are so messy it
+		# can be hard to predict what the interpreter thinks).
+		# No need to check if it equals PASS or not because we already did that earlier and found it did not.
+		if (defined(earlyqc_definitely_errored)) {
+			String coerced_earlyqc_errorcode = select_first([earlyqc_definitely_errored[0], "WORKFLOW_ERROR_8_REPORT_TO_DEV"])
+			String earlyqc_ERR = coerced_earlyqc_errorcode
 		}
 
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
@@ -411,30 +423,37 @@ workflow myco {
 		
 		# did the "if earlyQC filtered" variant caller run?
 		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {
+			
+			# get the first (0th) value and coerce it into type String
+			String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
+			
 			# did the "if earlyQC filtered" variant caller return an error?
-			if(!(select_first([variant_call_after_earlyQC_filtering.errorcode[0], "silly bogus fallback"]) == pass)) {
-				String varcall_error_if_earlyQC_filtered = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
+			if(!(coerced_vc_filtered_errorcode == pass)) {
+				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode, "WORKFLOW_ERROR_3_REPORT_TO_DEV"])
 			}
 		}
 		# did the "if earlyQC but not filtered" variant caller run?
 		if(defined(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)) {
-			# did the "if earlyQC but not filtered" variant caller return an error?
+		
+			# get the first (0th) value and coerce it into type String
+			String coerced_vc_notfiltered_errorcode = select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "WORKFLOW_ERROR_4_REPORT_TO_DEV"])
 			
-			call debug as debugvarcall {
-				input:
-					all_errors = decontam_each_sample.errorcode,
-					index_zero_error = decontam_each_sample.errorcode[0]
-			}
-			
-			if(!(select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "silly bogus fallback"]) == pass)) {
-				String varcall_error_if_earlyQC_but_not_filtering = select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
+			# did the "if earlyQC but not filtered" variant caller return an error?		
+			# TODO: do we need this select_first()?
+			if(!(select_first([coerced_vc_notfiltered_errorcode, "silly bogus fallback"]) == pass)) {
+				String varcall_error_if_earlyQC_but_not_filtering = select_first([coerced_vc_notfiltered_errorcode, "WORKFLOW_ERROR_5_REPORT_TO_DEV"])
 			}
 		}
 		# did the "no earlyQC" variant caller run?
-		if(defined(variant_call_without_earlyQC.errorcode)) {       
+		if(defined(variant_call_without_earlyQC.errorcode)) {
+		
+			# get the first (0th) value and coerce it into type String
+			String coerced_vc_noearlyqc_errorcode = select_first([variant_call_without_earlyQC.errorcode[0], "WORKFLOW_ERROR_6_REPORT_TO_DEV"])
+		
 			# did the "no earlyQC" variant caller return an error?
-			if(!(select_first([variant_call_without_earlyQC.errorcode[0], "silly bogus fallback"]) == pass)) {
-				String varcall_error_if_no_earlyQC = select_first([variant_call_without_earlyQC.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
+			# TODO: do we need select_first()?
+			if(!(select_first([coerced_vc_noearlyqc_errorcode, "silly bogus fallback"]) == pass)) {
+				String varcall_error_if_no_earlyQC = select_first([coerced_vc_noearlyqc_errorcode, "WORKFLOW_ERROR_7_REPORT_TO_DEV"])
 			}
 		}
 		
@@ -444,6 +463,7 @@ workflow myco {
 	
 		# final-final-final error code
 		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, pass])
+
 	}
 		
 	output {
