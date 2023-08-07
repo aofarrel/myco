@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.5/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/record-if-sample-fails-qc/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -81,6 +81,8 @@ workflow myco {
 	Boolean create_diff_files = select_first([create_diff_files_,
 											  create_diff_files__, 
 											  create_diff_files___])
+											  
+	String pass = "PASS"
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -109,7 +111,7 @@ workflow myco {
 				
 				# if we are filtering out samples via earlyQC...
 				if(early_qc_apply_cutoffs) {
-					if(qc_fastqs.did_this_sample_pass) {
+					if(qc_fastqs.pass_or_errorcode == pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
@@ -364,21 +366,27 @@ workflow myco {
 	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
 	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
 	# for an individual sample as workflow-level output, which gets written to the Terra data table. 
-	String pass = "PASS"
 	if(length(paired_fastq_sets) == 1) {    # is there only one sample?
 	
 		if(defined(decontam_each_sample.errorcode)) {                   # did the decontamination step actually run?
 		
+			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
+			String coerced_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+		
 			call debug as debugdecontam {
 				input:
 					all_errors = decontam_each_sample.errorcode,
-					index_zero_error = decontam_each_sample.errorcode[0]
+					index_zero_error = coerced_errorcode
 			}
 		
-			if(!(decontam_each_sample.errorcode[0] == pass)) {          # did the decontamination step return an error?
-				String decontam_ERR = decontam_each_sample.errorcode[0] # get the first (0th) value, eg only value since there's just one sample
+			if(!(coerced_errorcode == pass)) {          # did the decontamination step return an error?
+				String decontam_ERR = coerced_errorcode
 			}
 		}
+		
+		# if early_qc_apply_cutoffs
+		# if qc_fastqs.pass_or_errorcode == pass
+		# String earlyqc_ERR
 		
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
 		# have to use the bogus select_first() fallback to define the new strings, because WDL doesn't understand that if you 
@@ -423,10 +431,11 @@ workflow myco {
 		}
 		
 		# if the variant caller did not run, the fallback is pass, even though the sample shouldn't be considered a pass, so
-		# the final-final-final error code needs to have decontam's error come before the variant caller error
+		# the final-final-final error code needs to have decontam's error come before the variant caller error.
 		String varcall_ERR = select_first([varcall_error_if_earlyQC_filtered, varcall_error_if_earlyQC_but_not_filtering, varcall_error_if_no_earlyQC, pass])
 	
 		# final-final-final error code
+		# TODO: figure out way to write qc_fastqs.pass_or_errorcode but only if we are applying earlyQC 
 		String finalcode = select_first([decontam_ERR, varcall_ERR, pass])
 	}
 		
