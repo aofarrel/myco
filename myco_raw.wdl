@@ -395,7 +395,7 @@ workflow myco {
 			# I don't quite understand why, but this seems to also be the case for coerced_decontam_errorcode, even though we
 			# already used select_first() to coerce it into a non-optional.
 			#
-			# In other words, these don't work:
+			# This can be demonstrated best by the weirdness that occurs when you try to call a task here:
 			# * calling a task with the coerced inputs like this:
 			#   * [coerced_decontam_errorcode]
 			#   * coerced_decontam_errorcode
@@ -403,18 +403,13 @@ workflow myco {
 			#   * [select_first([decontam_each_sample.errorcode[0], "foo"])]
 			#   * select_first([decontam_each_sample.errorcode[0], "bar"])
 			# * calling a task with coerced inputs AND select first, if it's an array:
-			#   * all_errors = [select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])],
+			#   * all_errors = [select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])]
+			# and yet, calling a task with a non-array input like this DOES work:
+			# index_zero_error = select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			#
+			# But we don't need to call a task here, thankfully. And for some reason, since we're not calling
+			# a task with input type String?, we can just rely on the coercion without an additional select_first.
 			
-			call debug as CCCCCCC {
-				input:
-					index_zero_error = select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
-			}
-		
-			call debug as debugdecontam {
-				input:
-					index_zero_error = coerced_decontam_errorcode
-			}
-		
 			# did the decontamination step return an error?
 			if(!(coerced_decontam_errorcode == pass)) {          
 				String decontam_ERR = coerced_decontam_errorcode
@@ -526,23 +521,5 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
-	}
-}
-
-task debug {
-	input {
-		String? index_zero_error
-	}
-	
-	command  <<<
-	echo "~{index_zero_error}"
-	>>>
-	
-	runtime {
-		cpu: 2
-		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
-		disks: "local-disk " + 10 + " HDD"
-		memory: "4 GB"
-		preemptible: "1"
 	}
 }
