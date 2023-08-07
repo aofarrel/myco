@@ -386,6 +386,12 @@ workflow myco {
 		
 			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
 			String coerced_decontam_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			
+			call debug as AAAAAA {
+				input:
+					all_errors = [select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])],
+					index_zero_error = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			}
 		
 			call debug as debugdecontam {
 				input:
