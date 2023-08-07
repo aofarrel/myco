@@ -372,8 +372,6 @@ workflow myco {
 	# error reporting for Terra data tables #
 	#########################################
 	#
-	# Warning: Due to how 
-	
 	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
 	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
 	# for an individual sample as workflow-level output, which gets written to the Terra data table.
@@ -384,31 +382,12 @@ workflow myco {
 		# did the decontamination step actually run?
 		if(defined(decontam_each_sample.errorcode)) {
 		
+			# Sidenote: If you have a task taking in decontam_each_sample.errorcode, even after this defined check, it will fail
+			# command instantiation with "Cannot interpolate Array[String?] into a command string with attribute set 
+			# [PlaceholderAttributeSet(None,None,None,Some( ))]".
+		
 			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
 			String coerced_decontam_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
-			
-			# Here's where we have to use even more select_first() even though we really shouldn't have to. It turns out that
-			# if (defined(decontam_each_sample.errorcode) is true, we can't really access it. If you create a task that takes
-			# in decontam_each_sample.errorcode, it will fail command instantiation with "Cannot interpolate Array[String?]
-			# into a command string with attribute set [PlaceholderAttributeSet(None,None,None,Some( ))]".
-			#
-			# I don't quite understand why, but this seems to also be the case for coerced_decontam_errorcode, even though we
-			# already used select_first() to coerce it into a non-optional.
-			#
-			# This can be demonstrated best by the weirdness that occurs when you try to call a task here:
-			# * calling a task with the coerced inputs like this:
-			#   * [coerced_decontam_errorcode]
-			#   * coerced_decontam_errorcode
-			# * calling a task without the coerced inputs like this:
-			#   * [select_first([decontam_each_sample.errorcode[0], "foo"])]
-			#   * select_first([decontam_each_sample.errorcode[0], "bar"])
-			# * calling a task with coerced inputs AND select first, if it's an array:
-			#   * all_errors = [select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])]
-			# and yet, calling a task with a non-array input like this DOES work:
-			# index_zero_error = select_first([coerced_decontam_errorcode, "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
-			#
-			# But we don't need to call a task here, thankfully. And for some reason, since we're not calling
-			# a task with input type String?, we can just rely on the coercion without an additional select_first.
 			
 			# did the decontamination step return an error?
 			if(!(coerced_decontam_errorcode == pass)) {          
