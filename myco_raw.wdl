@@ -368,6 +368,13 @@ workflow myco {
 	if(length(paired_fastq_sets) == 1) {    # is there only one sample?
 	
 		if(defined(decontam_each_sample.errorcode)) {                   # did the decontamination step actually run?
+		
+			call debug as debugdecontam {
+				input:
+					all_errors = decontam_each_sample.errorcode,
+					index_zero_error = decontam_each_sample.errorcode[0]
+			}
+		
 			if(!(decontam_each_sample.errorcode[0] == pass)) {          # did the decontamination step return an error?
 				String decontam_ERR = decontam_each_sample.errorcode[0] # get the first (0th) value, eg only value since there's just one sample
 			}
@@ -396,6 +403,13 @@ workflow myco {
 		# did the "if earlyQC but not filtered" variant caller run?
 		if(defined(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)) {
 			# did the "if earlyQC but not filtered" variant caller return an error?
+			
+			call debug as debugvarcall {
+				input:
+					all_errors = decontam_each_sample.errorcode,
+					index_zero_error = decontam_each_sample.errorcode[0]
+			}
+			
 			if(!(select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "silly bogus fallback"]) == pass)) {
 				String varcall_error_if_earlyQC_but_not_filtering = select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "WORKFLOW_ERROR_REPORT_TO_DEV"])
 			}
@@ -454,5 +468,25 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+	}
+}
+
+task debug {
+	input {
+		Array[String?]? all_errors
+		String? index_zero_error
+	}
+	
+	command  <<<
+	echo "~{sep=' ' all_errors}"
+	echo "~{index_zero_error}"
+	>>>
+	
+	runtime {
+		cpu: 2
+		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
+		disks: "local-disk " + 10 + " HDD"
+		memory: "4 GB"
+		preemptible: "1"
 	}
 }
