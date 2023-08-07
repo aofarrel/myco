@@ -111,6 +111,8 @@ workflow myco {
 				
 				# if we are filtering out samples via earlyQC...
 				if(early_qc_apply_cutoffs) {
+				
+					# and this sample passes...
 					if(qc_fastqs.pass_or_errorcode == pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
@@ -130,6 +132,10 @@ workflow myco {
 								tarball_bams_and_bais = false,
 								timeout = timeout_variant_caller
 						}
+					}
+					# if we are filtering via earlyQC but did not pass, we can declare a failure here
+					if(!(qc_fastqs.pass_or_errorcode == pass)) {
+						String earlyqc_ERR = qc_fastqs.pass_or_errorcode
 					}
 				}
 				
@@ -365,7 +371,13 @@ workflow myco {
 	# error reporting for Terra data tables
 	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
 	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
-	# for an individual sample as workflow-level output, which gets written to the Terra data table. 
+	# for an individual sample as workflow-level output, which gets written to the Terra data table.
+	
+	# Notes:
+	# Even if (defined(decontam_each_sample.errorcode) is true, we can't really access it. If you create a task that takes in 
+	# decontam_each_sample.errorcode, it will fail command instantiation with "Cannot interpolate Array[String?] into a command
+	# string with attribute set [PlaceholderAttributeSet(None,None,None,Some( ))]".
+	
 	if(length(paired_fastq_sets) == 1) {    # is there only one sample?
 	
 		if(defined(decontam_each_sample.errorcode)) {                   # did the decontamination step actually run?
@@ -375,7 +387,7 @@ workflow myco {
 		
 			call debug as debugdecontam {
 				input:
-					all_errors = decontam_each_sample.errorcode,
+					all_errors = [coerced_errorcode],
 					index_zero_error = coerced_errorcode
 			}
 		
@@ -383,11 +395,7 @@ workflow myco {
 				String decontam_ERR = coerced_errorcode
 			}
 		}
-		
-		# if early_qc_apply_cutoffs
-		# if qc_fastqs.pass_or_errorcode == pass
-		# String earlyqc_ERR
-		
+
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
 		# have to use the bogus select_first() fallback to define the new strings, because WDL doesn't understand that if you 
 		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; miniwdl 
@@ -435,8 +443,7 @@ workflow myco {
 		String varcall_ERR = select_first([varcall_error_if_earlyQC_filtered, varcall_error_if_earlyQC_but_not_filtering, varcall_error_if_no_earlyQC, pass])
 	
 		# final-final-final error code
-		# TODO: figure out way to write qc_fastqs.pass_or_errorcode but only if we are applying earlyQC 
-		String finalcode = select_first([decontam_ERR, varcall_ERR, pass])
+		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, pass])
 	}
 		
 	output {
