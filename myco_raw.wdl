@@ -421,12 +421,22 @@ workflow myco {
 		# did the "if earlyQC filtered" variant caller run?
 		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {
 			
+			# I think what's happening is that the variable is incorrectly being considered defined when it shouldn't be, since I get 
+			# error two when running with skipping early qc. so varcall_ERR selects varcall_error_if_earlyQC_filtered's fallback, even though
+			# varcall_error_if_no_earlyQC is valid...
+			if(length(variant_call_after_earlyQC_filtering.errorcode) > 0) {
 			# get the first (0th) value and coerce it into type String
 			String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
+			}
+			if(!(length(variant_call_after_earlyQC_filtering.errorcode) > 0)) {
+			# get the first (0th) value and coerce it into type String
+			String coerced_vc_filtered_errorcode_alt = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
+			}
 			
 			# did the "if earlyQC filtered" variant caller return an error?
-			if(!(coerced_vc_filtered_errorcode == pass)) {
-				String varcall_error_if_earlyQC_filtered = coerced_vc_filtered_errorcode
+			String foo = select_first([coerced_vc_filtered_errorcode, coerced_vc_filtered_errorcode_alt, "ARGH"])
+			if(!(foo == pass)) {
+				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode, coerced_vc_filtered_errorcode_alt, "AAAA"])
 			}
 		}
 		# did the "if earlyQC but not filtered" variant caller run?
