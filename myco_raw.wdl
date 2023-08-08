@@ -396,7 +396,7 @@ workflow myco {
 		# can be hard to predict what the interpreter thinks).
 		
 		if (defined(qc_fastqs.pass_or_errorcode)) {
-			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_8_REPORT_TO_DEV"])
+			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
 			
 			# did the sample pass earlyqc?
 			if(!(coerced_decontam_errorcode == pass)) {          
@@ -425,18 +425,18 @@ workflow myco {
 			# error two when running with skipping early qc. so varcall_ERR selects varcall_error_if_earlyQC_filtered's fallback, even though
 			# varcall_error_if_no_earlyQC is valid...
 			if(length(variant_call_after_earlyQC_filtering.errorcode) > 0) {
-			# get the first (0th) value and coerce it into type String
-			String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
+				# get the first (0th) value and coerce it into type String
+				String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
 			}
 			if(!(length(variant_call_after_earlyQC_filtering.errorcode) > 0)) {
-			# get the first (0th) value and coerce it into type String
-			String coerced_vc_filtered_errorcode_alt = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
+				# get the first (0th) value and coerce it into type String
+				String coerced_vc_filtered_errorcode_alt = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
 			}
 			
 			# did the "if earlyQC filtered" variant caller return an error?
-			String foo = select_first([coerced_vc_filtered_errorcode, coerced_vc_filtered_errorcode_alt, "ARGH"])
+			String foo = select_first([coerced_vc_filtered_errorcode_alt, coerced_vc_filtered_errorcode, "ARGH"])
 			if(!(foo == pass)) {
-				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode, coerced_vc_filtered_errorcode_alt, "AAAA"])
+				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode_alt, coerced_vc_filtered_errorcode, "AAAA"])
 			}
 		}
 		# did the "if earlyQC but not filtered" variant caller run?
