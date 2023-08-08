@@ -5,7 +5,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/var
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/throw-out-bad-samples/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
@@ -28,9 +28,9 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely = false
 		
 		# creation + masking of diff files
-		Boolean diff_force                   = false
-		Int     diff_min_coverage_per_site   = 10
+		Int     diff_min_coverage_per_site         = 10
 		File?   diff_mask_these_regions
+		Float   diff_min_coverage_ratio_per_sample = 0.05
 		
 		# QC
 		Boolean fastqc_on_timeout       = false
@@ -53,7 +53,6 @@ workflow myco {
 		# phylogenetics
 		Boolean tree_decoration         = false
 		File?   tree_to_decorate
-		Float   tree_max_low_coverage_sites = 0.05
 		# removed ref genome for tree building
 		# eventually remove tree_decoration, will be redundant with tree_to_decorate
 		
@@ -73,17 +72,15 @@ workflow myco {
 		
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
-		tree_max_low_coverage_sites: "If a diff file has higher than this porportion (as float, eg 0.5 = 50%) bad data, do not include it in the tree"
 		
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
 		early_qc_cutoff_q30: "Decontaminated samples with less than this porportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		
-		diff_force: "If true and if tree_decoration is false, generate diff files. (Diff files will always be created if tree_decoration is true.)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
-		
+		diff_min_coverage_ratio_per_sample: "Samples who have more than this porportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		
@@ -96,17 +93,6 @@ workflow myco {
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
 		
 	}
-
-	# WDL doesn't understand mutual exclusivity, so we have to get a little creative on 
-	# our determination of whether or not we want to create diff files.
-	if(tree_decoration)  {  Boolean create_diff_files_   = true  }
-	if(!tree_decoration) {
-		if(!diff_force){  Boolean create_diff_files__  = false }
-		if(diff_force) {  Boolean create_diff_files___ = true  }
-	}
-	Boolean create_diff_files = select_first([create_diff_files_,
-											  create_diff_files__, 
-											  create_diff_files___])
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -294,7 +280,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diff_min_coverage_per_site,
 							tbmf = diff_mask_these_regions,
-							diffs = create_diff_files
+							discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_coverage_ratio_per_sample
 					}
 				}
 			}
@@ -309,7 +295,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diff_min_coverage_per_site,
 					tbmf = diff_mask_these_regions,
-					diffs = create_diff_files
+					discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_coverage_ratio_per_sample
 			}
 		}
 		
@@ -398,17 +384,18 @@ workflow myco {
 	}
 
 	if(tree_decoration) {
-		# diff files must exist if tree_decoration is true (unless no samples passed) 
-		# so we can force the Array[File?]? into an Array[File] with the classic 
-		# "select_first() with a bogus fallback" hack
-		Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
-		Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
-		call build_treesWF.Tree_Nine as trees {
-			input:
-				diffs = coerced_diffs,
-				input_tree = tree_to_decorate,
-				coverage_reports = coerced_reports,
-				max_low_coverage_sites = tree_max_low_coverage_sites
+		if(length(real_diffs)>0) {
+			# diff files must exist if tree_decoration is true (unless no samples passed) 
+			# so we can force the Array[File?]? into an Array[File] with the classic 
+			# "select_first() with a bogus fallback" hack
+			Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
+			Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
+			call build_treesWF.Tree_Nine as trees {
+				input:
+					diffs = coerced_diffs,
+					input_tree = tree_to_decorate,
+					coverage_reports = coerced_reports
+			}
 		}
 	}
 
@@ -431,7 +418,6 @@ workflow myco {
 		File?         tbprof_bam_strains     = collate_bam_strains.outfile
 		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
 		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
-		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
 		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
