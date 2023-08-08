@@ -133,10 +133,6 @@ workflow myco {
 								timeout = timeout_variant_caller
 						}
 					}
-					# if we are filtering via earlyQC but did not pass, we can declare a failure here
-					if(!(qc_fastqs.pass_or_errorcode == pass)) {
-						String earlyqc_definitely_errored = qc_fastqs.pass_or_errorcode
-					}
 				}
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
@@ -399,9 +395,14 @@ workflow myco {
 		# type Array[String?], Array[String?]?, or Array[String]? (should probably be Array[String?]? but optionals are so messy it
 		# can be hard to predict what the interpreter thinks).
 		# No need to check if it equals PASS or not because we already did that earlier and found it did not.
-		if (defined(earlyqc_definitely_errored)) {
-			String coerced_earlyqc_errorcode = select_first([earlyqc_definitely_errored[0], "WORKFLOW_ERROR_8_REPORT_TO_DEV"])
-			String earlyqc_ERR = coerced_earlyqc_errorcode
+		
+		if (defined(qc_fastqs.pass_or_errorcode)) {
+			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_8_REPORT_TO_DEV"])
+			
+			# did the sample pass earlyqc?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String earlyqc_ERR = coerced_earlyqc_errorcode
+			}
 		}
 
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
