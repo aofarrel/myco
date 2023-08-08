@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/implement-existing-json-parser/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -432,6 +432,9 @@ workflow myco {
 		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
 		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
 		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
+		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
+		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
 		File?         tbprof_fq_strains      = collate_fq_strains.outfile
 		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
