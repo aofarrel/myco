@@ -394,7 +394,6 @@ workflow myco {
 		# We already set earlyqc_definitely_errored earlier, but since this workflow can run on multiple samples it's going to have
 		# type Array[String?], Array[String?]?, or Array[String]? (should probably be Array[String?]? but optionals are so messy it
 		# can be hard to predict what the interpreter thinks).
-		# No need to check if it equals PASS or not because we already did that earlier and found it did not.
 		
 		if (defined(qc_fastqs.pass_or_errorcode)) {
 			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_8_REPORT_TO_DEV"])
@@ -418,6 +417,7 @@ workflow myco {
 		# filled value."" I'm not sure why this can't be detected before runtime.
 		#
 		
+		# TODO: this keeps falling back to error code 2. I'm hoping it's a call cache bug?
 		# did the "if earlyQC filtered" variant caller run?
 		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {
 			
@@ -426,7 +426,7 @@ workflow myco {
 			
 			# did the "if earlyQC filtered" variant caller return an error?
 			if(!(coerced_vc_filtered_errorcode == pass)) {
-				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode, "WORKFLOW_ERROR_3_REPORT_TO_DEV"])
+				String varcall_error_if_earlyQC_filtered = coerced_vc_filtered_errorcode
 			}
 		}
 		# did the "if earlyQC but not filtered" variant caller run?
