@@ -420,7 +420,7 @@ workflow myco {
 		# TODO: this keeps falling back to error code 2. I'm hoping it's a call cache bug?
 		# did the "if earlyQC filtered" variant caller run?
 		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {
-			
+
 			# I think what's happening is that the variable is incorrectly being considered defined when it shouldn't be, since I get 
 			# error two when running with skipping early qc. so varcall_ERR selects varcall_error_if_earlyQC_filtered's fallback, even though
 			# varcall_error_if_no_earlyQC is valid...
@@ -437,6 +437,7 @@ workflow myco {
 			String foo = select_first([coerced_vc_filtered_errorcode_alt, coerced_vc_filtered_errorcode, "ARGH"])
 			if(!(foo == pass)) {
 				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode_alt, coerced_vc_filtered_errorcode, "AAAA"])
+
 			}
 		}
 		# did the "if earlyQC but not filtered" variant caller run?
