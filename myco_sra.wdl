@@ -28,9 +28,9 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely = false
 		
 		# creation + masking of diff files
-		Int     diff_min_coverage_per_site         = 10
+		Int     diff_min_cov_per_site         = 10
 		File?   diff_mask_these_regions
-		Float   diff_min_coverage_ratio_per_sample = 0.05
+		Float   diff_min_cov_ratio_per_sample = 0.05
 		
 		# QC
 		Boolean fastqc_on_timeout       = false
@@ -278,9 +278,9 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diff_min_coverage_per_site,
+							min_coverage_per_site = diff_min_cov_per_site,
 							tbmf = diff_mask_these_regions,
-							discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_coverage_ratio_per_sample
+							discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_cov_ratio_per_sample
 					}
 				}
 			}
@@ -293,9 +293,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diff_min_coverage_per_site,
+					min_coverage_per_site = diff_min_cov_per_site,
 					tbmf = diff_mask_these_regions,
-					discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_coverage_ratio_per_sample
+					discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_cov_ratio_per_sample
 			}
 		}
 		
