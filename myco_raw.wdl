@@ -423,9 +423,9 @@ workflow myco {
 		Array[String] errorcode_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
 		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
 		
-		# if the variant caller did not run, the fallback will be selected, even though the sample shouldn't be considered a pass, so
+		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC, ["PASS"]])
 		String varcall_ERR = varcall_errorcode_array[0]
 	
 		# final-final-final error code
