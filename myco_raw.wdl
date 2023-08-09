@@ -20,8 +20,8 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely       = false
 		
 		File?   diff_mask_these_regions
+		Float   diff_max_low_cov_pct_per_sample =    0.20
 		Int     diff_min_cov_per_site           =   10
-		Float   diff_min_cov_ratio_per_sample   =    0.20
 		Boolean early_qc_apply_cutoffs          = false
 		Float   early_qc_cutoff_q30             =    0.90
 		Boolean early_qc_skip_entirely          = false
@@ -33,7 +33,6 @@ workflow myco {
 		Int     timeout_decontam_part2          =    0
 		Int     timeout_variant_caller          =    0
 		Boolean tree_decoration                 = false
-		Float   tree_max_low_coverage_sites     =    0.05
 		File?   tree_to_decorate
 		Int     variantcalling_addl_disk        =  100
 		Boolean variantcalling_crash_on_error   = false
@@ -52,8 +51,8 @@ workflow myco {
 		covstats_qc_cutoff_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
+		diff_max_low_cov_pct_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		diff_min_cov_per_site: "Positions with coverage below this value will be masked in diff files"
-		diff_min_cov_ratio_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
 		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
@@ -215,7 +214,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diff_min_cov_per_site,
 							tbmf = diff_mask_these_regions,
-							max_ratio_low_coverage_sites_per_sample = diff_min_cov_ratio_per_sample
+							max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
 					}
 				}
 			}
@@ -230,7 +229,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diff_min_cov_per_site,
 					tbmf = diff_mask_these_regions,
-					max_ratio_low_coverage_sites_per_sample = diff_min_cov_ratio_per_sample
+					max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
 			}
 		}
 		
@@ -306,8 +305,7 @@ workflow myco {
 				input:
 					diffs = coerced_diffs,
 					input_tree = tree_to_decorate,
-					coverage_reports = coerced_reports,
-					max_low_coverage_sites = tree_max_low_coverage_sites
+					coverage_reports = coerced_reports
 			}
 		}
 	}
