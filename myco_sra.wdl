@@ -5,7 +5,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/var
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/throw-out-bad-samples/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
@@ -17,10 +17,6 @@ workflow myco {
 		File biosample_accessions
 		
 		Int quick_tasks_disk_size = 10
-		
-		# crash the entire pipeline if any sample is being ornery
-		Boolean variantcalling_crash_on_error   = false
-		Boolean variantcalling_crash_on_timeout = false
 		
 		# TODO: REPLACE WITH BETTER DEFAULTS
 		Float covstats_qc_cutoff_unmapped = 10
@@ -59,6 +55,8 @@ workflow myco {
 		# variant caller specifics
 		Int  variantcalling_addl_disk    = 100
 		Int  variantcalling_cpu          =  16
+		Boolean variantcalling_crash_on_error   = false
+		Boolean variantcalling_crash_on_timeout = false
 		Int? variantcalling_mem_height
 		Int  variantcalling_memory       =  32
 		Int  variantcalling_preemptibles =   1
@@ -74,13 +72,13 @@ workflow myco {
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 		
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this porportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		force_diff: "Make a diff file even if sample fails diff_min_coverage_ratio_per_sample (will not create diff if any other QC fails)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
-		diff_min_coverage_ratio_per_sample: "Samples who have more than this porportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diff_min_coverage_ratio_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		
@@ -280,7 +278,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diff_min_cov_per_site,
 							tbmf = diff_mask_these_regions,
-							min_porportion_low_coverage_per_sample = diff_min_cov_ratio_per_sample
+							max_ratio_low_coverage_sites_per_sample = diff_min_cov_ratio_per_sample
 					}
 				}
 			}
@@ -295,7 +293,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diff_min_cov_per_site,
 					tbmf = diff_mask_these_regions,
-					min_porportion_low_coverage_per_sample = diff_min_cov_ratio_per_sample
+					max_ratio_low_coverage_sites_per_sample = diff_min_cov_ratio_per_sample
 			}
 		}
 		

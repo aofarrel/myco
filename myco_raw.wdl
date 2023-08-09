@@ -4,7 +4,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/com
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/throw-out-bad-samples/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
@@ -49,13 +49,13 @@ workflow myco {
 
 	parameter_meta {
 		covstats_qc_cutoff_coverages: "If covstats thinks coverage is below this, throw out this sample"
-		covstats_qc_cutoff_unmapped: "If covstats thinks this porportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		covstats_qc_cutoff_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_cov_per_site: "Positions with coverage below this value will be masked in diff files"
-		diff_min_cov_ratio_per_sample: "amples who have more than this porportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diff_min_cov_ratio_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this porportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
@@ -215,7 +215,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diff_min_cov_per_site,
 							tbmf = diff_mask_these_regions,
-							discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_cov_ratio_per_sample
+							max_ratio_low_coverage_sites_per_sample = diff_min_cov_ratio_per_sample
 					}
 				}
 			}
@@ -230,7 +230,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diff_min_cov_per_site,
 					tbmf = diff_mask_these_regions,
-					discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_cov_ratio_per_sample
+					max_ratio_low_coverage_sites_per_sample = diff_min_cov_ratio_per_sample
 			}
 		}
 		
@@ -297,16 +297,18 @@ workflow myco {
   	}
 
 	if(tree_decoration) {
-		# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
-		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
-		Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
-		Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
-		call build_treesWF.Tree_Nine as trees {
-			input:
-				diffs = coerced_diffs,
-				input_tree = tree_to_decorate,
-				coverage_reports = coerced_reports,
-				max_low_coverage_sites = tree_max_low_coverage_sites
+		if(length(real_diffs)>0) {
+			# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
+			# into an Array[File] with the classic "select_first() with a bogus fallback" hack
+			Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
+			Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
+			call build_treesWF.Tree_Nine as trees {
+				input:
+					diffs = coerced_diffs,
+					input_tree = tree_to_decorate,
+					coverage_reports = coerced_reports,
+					max_low_coverage_sites = tree_max_low_coverage_sites
+			}
 		}
 	}
 
