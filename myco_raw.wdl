@@ -428,8 +428,8 @@ workflow myco {
 			if(length(variant_call_after_earlyQC_filtering.errorcode) > 0) {
 				# get the first (0th) value and coerce it into type String
 				String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
-				call echo {input: integer=length(variant_call_after_earlyQC_filtering.errorcode), string=coerced_vc_filtered_errorcode}
-				call echo_array {input: array=variant_call_after_earlyQC_filtering.errorcode}
+				call echo {input: integer=length(variant_call_after_earlyQC_filtering.errorcode), string=variant_call_after_earlyQC_filtering.errorcode}
+				call echo_array {input: array=[coerced_vc_filtered_errorcode]}
 			}
 			if(!(length(variant_call_after_earlyQC_filtering.errorcode) > 0)) {
 				# get the first (0th) value and coerce it into type String
