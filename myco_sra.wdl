@@ -77,7 +77,7 @@ workflow myco {
 		early_qc_cutoff_q30: "Decontaminated samples with less than this porportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
-		
+		force_diff: "Make a diff file even if sample fails diff_min_coverage_ratio_per_sample (will not create diff if any other QC fails)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
 		diff_min_coverage_ratio_per_sample: "Samples who have more than this porportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
@@ -280,7 +280,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diff_min_cov_per_site,
 							tbmf = diff_mask_these_regions,
-							discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_cov_ratio_per_sample
+							min_porportion_low_coverage_per_sample = diff_min_cov_ratio_per_sample
 					}
 				}
 			}
@@ -295,7 +295,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diff_min_cov_per_site,
 					tbmf = diff_mask_these_regions,
-					discard_sample_if_more_than_this_percent_is_low_coverage = diff_min_cov_ratio_per_sample
+					min_porportion_low_coverage_per_sample = diff_min_cov_ratio_per_sample
 			}
 		}
 		
