@@ -424,13 +424,16 @@ workflow myco {
 			# I think what's happening is that the variable is incorrectly being considered defined when it shouldn't be, since I get 
 			# error two when running with skipping early qc. so varcall_ERR selects varcall_error_if_earlyQC_filtered's fallback, even though
 			# varcall_error_if_no_earlyQC is valid...
+			
 			if(length(variant_call_after_earlyQC_filtering.errorcode) > 0) {
 				# get the first (0th) value and coerce it into type String
 				String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
+				call echo {input: integer=length(variant_call_after_earlyQC_filtering.errorcode), string=coerced_vc_filtered_errorcode}
+				call echo_array {input: array=variant_call_after_earlyQC_filtering.errorcode}
 			}
 			if(!(length(variant_call_after_earlyQC_filtering.errorcode) > 0)) {
 				# get the first (0th) value and coerce it into type String
-				String coerced_vc_filtered_errorcode_alt = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
+				String coerced_vc_filtered_errorcode_alt = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_3_REPORT_TO_DEV"])
 			}
 			
 			# did the "if earlyQC filtered" variant caller return an error?
@@ -512,5 +515,43 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+	}
+}
+
+task echo {
+	input {
+		Int? integer
+		String? string
+	}
+	
+	command  <<<
+	echo "~{integer}"
+	echo "~{string}"
+	>>>
+	
+	runtime {
+		cpu: 2
+		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
+		disks: "local-disk " + 10 + " HDD"
+		memory: "4 GB"
+		preemptible: "1"
+	}
+}
+
+task echo_array {
+	input {
+		Array[String?] array
+	}
+	
+	command  <<<
+	echo "~{sep=' ' array}"
+	>>>
+	
+	runtime {
+		cpu: 2
+		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
+		disks: "local-disk " + 10 + " HDD"
+		memory: "4 GB"
+		preemptible: "1"
 	}
 }
