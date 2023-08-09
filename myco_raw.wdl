@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/error-codes/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/error-codes/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/record-if-sample-fails-qc/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -68,6 +68,8 @@ workflow myco {
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
+											  
+	String pass = "PASS" # used later... much later
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -96,7 +98,9 @@ workflow myco {
 				
 				# if we are filtering out samples via earlyQC...
 				if(early_qc_apply_cutoffs) {
-					if(qc_fastqs.did_this_sample_pass) {
+				
+					# and this sample passes...
+					if(qc_fastqs.pass_or_errorcode == pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
@@ -165,6 +169,25 @@ workflow myco {
 	}
 
 	# do some wizardry to deal with optionals
+	#
+	# In order to account for different use cases, this workflow has three versions of the variant caller. They are mutually
+	# exclusive, eg, only one can ever be called by a given sample. In fact, there are cases where NONE of them get called.
+	# Additionally, each version of the variant caller technically gives optional output. This is to prevent the entire
+	# pipeline from crashing if a single garbage sample starts the variant calling task but cannot make a VCF.
+	#
+	# Unfortunately, this means I have created multiple optional outputs from optional tasks. Mutually exclusive outputs from
+	# mutually exclusive tasks, yes, but WDL doesn't quite understand mutual exclusivity. WDL and/or Cromwell (it's hard to 
+	# know if the issue is the langauge or its implementation since the spec is not very specific) also gets finicky when we try
+	# to do certain things with optional arrays. So, we want to turn those optionals into not-optionals ASAP. That's what this
+	# block of variable definitions does. WDL does not allow you to overwrite variables, so we need to declare a ton of variables
+	# with unique names. Yes, this could in theory be done more "cleanly" by calling a task, but why spin up a Docker image to do
+	# microseconds worth of work?
+	#
+	# Interestingly, even if the variant caller didn't run, this code block does not cause a crash. Somehow, we can create 
+	# non-optional variables that have no content. This little mystery is mostly good because it means the 
+	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
+	# we cannot use anything here to test if any version of the variant caller actually ran at all!
+	# 
 	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
 	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
 	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
@@ -246,32 +269,51 @@ workflow myco {
 	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
 	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
 
-
 	# pull TBProfiler information, if we ran TBProfiler on bams
+	# For reasons I don't understand, if no variant caller runs (ergo there's no bam and profile_bam also does not run),
+	# the following code block will still execute. coerced_bam_strains etc will be arrays with length 0. So this check
+	# isn't sufficient on its own, but as always, I have a workaround for this!
 	if(defined(profile_bam.strain)) {
+	
+		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
-		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
-
-		call sranwrp_processing.cat_strings as collate_bam_strains {
-			input:
-				strings = coerced_bam_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
+		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
+		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
 		
-		call sranwrp_processing.cat_strings as collate_bam_resistance {
-			input:
-				strings = coerced_bam_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-
-		call sranwrp_processing.cat_strings as collate_bam_depth {
-			input:
-				strings = coerced_bam_depth,
-				out = "depth_reports.txt",
-				disk_size = quick_tasks_disk_size
+		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
+		if(!(length(coerced_bam_strains) == 0)) {
+		
+			# if there is more than one sample, run some tasks to concatenate the outputs
+			if(length(paired_fastq_sets) != 1) {
+		
+				call sranwrp_processing.cat_strings as collate_bam_strains {
+					input:
+						strings = coerced_bam_strains,
+						out = "strain_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_bam_resistance {
+					input:
+						strings = coerced_bam_resistances,
+						out = "resistance_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+		
+				call sranwrp_processing.cat_strings as collate_bam_depth {
+					input:
+						strings = coerced_bam_depths,
+						out = "depth_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+			}
+			
+			# if there is only one sample, there's no need to run tasks
+			if(length(paired_fastq_sets) == 1) {
+				Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
+				String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
+				String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+			}
 		}
   	}
   	
@@ -309,7 +351,76 @@ workflow myco {
 			}
 		}
 	}
+	
+	#########################################
+	# error reporting for Terra data tables #
+	#########################################
+	#
+	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
+	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
+	# for an individual sample as workflow-level output, which gets written to the Terra data table.
+	
+	# is there only one sample?
+	if(length(paired_fastq_sets) == 1) {    
+	
+		# did the decontamination step actually run?
+		if(defined(decontam_each_sample.errorcode)) {
+		
+			# Sidenote: If you have a task taking in decontam_each_sample.errorcode, even after this defined check, it will fail
+			# command instantiation with "Cannot interpolate Array[String?] into a command string with attribute set 
+			# [PlaceholderAttributeSet(None,None,None,Some( ))]".
+		
+			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
+			String coerced_decontam_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			
+			# did the decontamination step return an error?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String decontam_ERR = coerced_decontam_errorcode
+			}
+		}
+		
+		# We already set earlyqc_definitely_errored earlier, but since this workflow can run on multiple samples it's going to have
+		# type Array[String?], Array[String?]?, or Array[String]? (should probably be Array[String?]? but optionals are so messy it
+		# can be hard to predict what the interpreter thinks).
+		
+		#TODO: issues with defined() may indicate this should be replaced
+		if (defined(qc_fastqs.pass_or_errorcode)) {
+			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
+			
+			# did the sample pass earlyqc?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String earlyqc_ERR = coerced_earlyqc_errorcode
+			}
+		}
 
+		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
+		# have to use the bogus select_first() fallback to define the new strings, because WDL doesn't understand that if you 
+		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; the lack of
+		# mutual exclusivity in the spec (except in a variable declaration) implies this, and miniwdl also flags this.)
+		#
+		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
+		# For example, if(defined(variant_call_after_earlyQC_filtering.errorcode)) returns true even if NO variant callers
+		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
+		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
+		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
+		# defined() checks. In any case, here's the Cromwell ticket: https://github.com/broadinstitute/cromwell/issues/7201
+		#
+		# I've decided to instead use a variation of how we coerce the VCF outputs into required types - relying entirely on
+		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
+		Array[String] errorcode_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
+		Array[String] errorcode_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
+		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
+		
+		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
+		# the final-final-final error code needs to have decontam's error come before the variant caller error.
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC, ["PASS"]])
+		String varcall_ERR = varcall_errorcode_array[0]
+	
+		# final-final-final error code
+		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, pass])
+
+	}
+		
 	output {
 		# raw files
 		Array[File]  bais = final_bais
@@ -322,11 +433,8 @@ workflow myco {
 		Array[File?]  covstats_reports       = covstats.covstatsOutfile
 		Array[File?]  diff_reports           = real_reports
 		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
-		File?         tbprof_bam_depths      = collate_bam_depth.outfile
 		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
-		File?         tbprof_bam_strains     = collate_bam_strains.outfile
 		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
-		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
 		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
 		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
@@ -335,11 +443,62 @@ workflow myco {
 		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
+		# these outputs only exist if there are multiple samples
+		File?         tbprof_bam_depths      = collate_bam_depth.outfile
+		File?         tbprof_bam_strains     = collate_bam_strains.outfile
+		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		
+		# these outputs only exist if we ran on a single sample
+		Int?            tbprof_bam_depth      = single_sample_tbprof_bam_depth
+		String?         tbprof_bam_strain     = single_sample_tbprof_bam_strain
+		String?         tbprof_bam_resistance = single_sample_tbprof_bam_resistance
+		
+		# status of sample, only valid iff this ran on only one sample
+		String error_code = select_first([finalcode, pass])
+		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
 		File?        tree_usher       = trees.tree_usher_raw
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+	}
+}
+
+task echo {
+	input {
+		Int? integer
+		String? string
+	}
+	
+	command  <<<
+	echo "~{integer}"
+	echo "~{string}"
+	>>>
+	
+	runtime {
+		cpu: 2
+		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
+		disks: "local-disk " + 10 + " HDD"
+		memory: "4 GB"
+		preemptible: "1"
+	}
+}
+
+task echo_array {
+	input {
+		Array[String?] array
+	}
+	
+	command  <<<
+	echo "~{sep=' ' array}"
+	>>>
+	
+	runtime {
+		cpu: 2
+		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
+		disks: "local-disk " + 10 + " HDD"
+		memory: "4 GB"
+		preemptible: "1"
 	}
 }
