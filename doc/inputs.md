@@ -39,17 +39,19 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 | covstats_qc_cutoff_coverages | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
 | covstats_qc_cutoff_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
 | covstats_qc_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
+| diff_max_low_cov_pct_per_sample | Float  | 0.05 | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
 | diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
 | early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
 | early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
 | early_qc_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
 | fastqc_on_timeout | Boolean  | false | (myco_sra only) If true, fastqc one read from a sample when decontamination or variant calling times out |  
-| tree_max_low_coverage_sites | Float  | 0.05 | If a diff file has higher than this percent (0.5 = 50%) bad data, do not include it in the tree (irrelevant if tree_decoration is false) |  
 
-Note that diff_min_coverage_per_site works on a per-site basis. Other forms of QC will throw out entire samples, while this one is masking only particular regions in a sample.
+Note that all forms of QC will throw out entire samples, with two exceptions: 
+  * `diff_min_coverage_per_site` works on a per-site basis, masking individual sites below that value but not throwing out the entire sample (unless so many sites get masked that `diff_max_low_cov_pct_per_sample` kicks in)
+  * `fastqc_on_timeout` will run fastQC if true, but does not parse its output - the samples have already been discarded upstream when they timed out
   
 ## Timeouts  
-When working with data of unknown quality such as SRA data, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
+When working with data of unknown quality, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
   
 | name | type | myco_sra default | description |  
 |:---:|:---:|:---:|:---:|  
