@@ -4,7 +4,7 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/com
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.9/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
@@ -19,9 +19,9 @@ workflow myco {
 		Float   covstats_qc_cutoff_unmapped     =    2.00
 		Boolean covstats_qc_skip_entirely       = false
 		
-		Boolean diff_force                      = false
 		File?   diff_mask_these_regions
-		Int     diff_min_coverage_per_site      =   10
+		Float   diff_max_low_cov_pct_per_sample =    0.20
+		Int     diff_min_cov_per_site           =   10
 		Boolean early_qc_apply_cutoffs          = false
 		Float   early_qc_cutoff_q30             =    0.90
 		Boolean early_qc_skip_entirely          = false
@@ -33,7 +33,6 @@ workflow myco {
 		Int     timeout_decontam_part2          =    0
 		Int     timeout_variant_caller          =    0
 		Boolean tree_decoration                 = false
-		Float   tree_max_low_coverage_sites     =    0.05
 		File?   tree_to_decorate
 		Int     variantcalling_addl_disk        =  100
 		Boolean variantcalling_crash_on_error   = false
@@ -49,13 +48,13 @@ workflow myco {
 
 	parameter_meta {
 		covstats_qc_cutoff_coverages: "If covstats thinks coverage is below this, throw out this sample"
-		covstats_qc_cutoff_unmapped: "If covstats thinks this porportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		covstats_qc_cutoff_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
-		diff_force: "If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
-		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
+		diff_max_low_cov_pct_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diff_min_cov_per_site: "Positions with coverage below this value will be masked in diff files"
 		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this porportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
@@ -67,20 +66,8 @@ workflow myco {
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
-		tree_max_low_coverage_sites: "If a diff file has higher than this porportion (0.5 = 50%) bad data, do not include it in the tree"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
-
-	# WDL doesn't understand mutual exclusivity, so we have to get a little creative on 
-	# our determination of whether or not we want to create diff files.
-	if(tree_decoration)  {  Boolean create_diff_files_   = true  }
-	if(!tree_decoration) {
-		if(!tree_decoration){  Boolean create_diff_files__  = false }
-		if(tree_decoration) {  Boolean create_diff_files___ = true  }
-	}
-	Boolean create_diff_files = select_first([create_diff_files_,
-											  create_diff_files__, 
-											  create_diff_files___])
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -225,9 +212,9 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diff_min_coverage_per_site,
+							min_coverage_per_site = diff_min_cov_per_site,
 							tbmf = diff_mask_these_regions,
-							diffs = create_diff_files
+							max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
 					}
 				}
 			}
@@ -240,9 +227,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diff_min_coverage_per_site,
+					min_coverage_per_site = diff_min_cov_per_site,
 					tbmf = diff_mask_these_regions,
-					diffs = create_diff_files
+					max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
 			}
 		}
 		
@@ -309,16 +296,17 @@ workflow myco {
   	}
 
 	if(tree_decoration) {
-		# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
-		# into an Array[File] with the classic "select_first() with a bogus fallback" hack
-		Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
-		Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
-		call build_treesWF.Tree_Nine as trees {
-			input:
-				diffs = coerced_diffs,
-				input_tree = tree_to_decorate,
-				coverage_reports = coerced_reports,
-				max_low_coverage_sites = tree_max_low_coverage_sites
+		if(length(real_diffs)>0) {
+			# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
+			# into an Array[File] with the classic "select_first() with a bogus fallback" hack
+			Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
+			Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
+			call build_treesWF.Tree_Nine as trees {
+				input:
+					diffs = coerced_diffs,
+					input_tree = tree_to_decorate,
+					coverage_reports = coerced_reports
+			}
 		}
 	}
 
