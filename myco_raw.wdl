@@ -395,6 +395,7 @@ workflow myco {
 		# type Array[String?], Array[String?]?, or Array[String]? (should probably be Array[String?]? but optionals are so messy it
 		# can be hard to predict what the interpreter thinks).
 		
+		#TODO: issues with defined() may indicate this should be replaced
 		if (defined(qc_fastqs.pass_or_errorcode)) {
 			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
 			
@@ -406,71 +407,26 @@ workflow myco {
 
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
 		# have to use the bogus select_first() fallback to define the new strings, because WDL doesn't understand that if you 
-		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; miniwdl 
-		# also catches this.)
+		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; the lack of
+		# mutual exclusivity in the spec (except in a variable declaration) implies this, and miniwdl also flags this.)
 		#
-		# But what miniwdl (although this may be a Cromwell-runtime thing, I'm not sure) and womtool don't find is this: we gotta use
-		# the bogus select_first() workaround not only to define our new strings, but also the statement immediately prior
-		# that checks if the errorcode is "PASS", or else at runtime Cromwell will return "Failed to evaluate 'if_condition'", b/c
-		# "Evaluating !((variant_call_without_earlyQC.errorcode[0] == pass)) failed: Sorry! Operation == is not supported on
-		# empty optional values. You might resolve this using select_first([optional, default]) to guarantee that you have a
-		# filled value."" I'm not sure why this can't be detected before runtime.
+		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
+		# For example, if(defined(variant_call_after_earlyQC_filtering.errorcode)) returns true even if NO variant callers
+		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
+		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
+		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
+		# defined() checks. In any case, here's the Cromwell ticket: https://github.com/broadinstitute/cromwell/issues/7201
 		#
+		# I've decided to instead use a variation of how we coerce the VCF outputs into required types - relying entirely on
+		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
+		Array[String] errorcode_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
+		Array[String] errorcode_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
+		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
 		
-		# TODO: this keeps falling back to error code 2. I'm hoping it's a call cache bug?
-		# did the "if earlyQC filtered" variant caller run?
-		if(defined(variant_call_after_earlyQC_filtering.errorcode)) {
-
-			# I think what's happening is that the variable is incorrectly being considered defined when it shouldn't be, since I get 
-			# error two when running with skipping early qc. so varcall_ERR selects varcall_error_if_earlyQC_filtered's fallback, even though
-			# varcall_error_if_no_earlyQC is valid...
-			
-			if(length(variant_call_after_earlyQC_filtering.errorcode) > 0) {
-				# get the first (0th) value and coerce it into type String
-				String coerced_vc_filtered_errorcode = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
-				call echo {input: integer=length(variant_call_after_earlyQC_filtering.errorcode), string=variant_call_after_earlyQC_filtering.errorcode[0]}
-				call echo_array {input: array=[coerced_vc_filtered_errorcode]}
-			}
-			if(!(length(variant_call_after_earlyQC_filtering.errorcode) > 0)) {
-				# get the first (0th) value and coerce it into type String
-				String coerced_vc_filtered_errorcode_alt = select_first([variant_call_after_earlyQC_filtering.errorcode[0], "WORKFLOW_ERROR_3_REPORT_TO_DEV"])
-			}
-			
-			# did the "if earlyQC filtered" variant caller return an error?
-			String foo = select_first([coerced_vc_filtered_errorcode_alt, coerced_vc_filtered_errorcode, "ARGH"])
-			if(!(foo == pass)) {
-				String varcall_error_if_earlyQC_filtered = select_first([coerced_vc_filtered_errorcode_alt, coerced_vc_filtered_errorcode, "AAAA"])
-
-			}
-		}
-		# did the "if earlyQC but not filtered" variant caller run?
-		if(defined(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)) {
-		
-			# get the first (0th) value and coerce it into type String
-			String coerced_vc_notfiltered_errorcode = select_first([variant_call_after_earlyQC_but_not_filtering_samples.errorcode[0], "WORKFLOW_ERROR_4_REPORT_TO_DEV"])
-			
-			# did the "if earlyQC but not filtered" variant caller return an error?		
-			# TODO: do we need this select_first()?
-			if(!(select_first([coerced_vc_notfiltered_errorcode, "silly bogus fallback"]) == pass)) {
-				String varcall_error_if_earlyQC_but_not_filtering = select_first([coerced_vc_notfiltered_errorcode, "WORKFLOW_ERROR_5_REPORT_TO_DEV"])
-			}
-		}
-		# did the "no earlyQC" variant caller run?
-		if(defined(variant_call_without_earlyQC.errorcode)) {
-		
-			# get the first (0th) value and coerce it into type String
-			String coerced_vc_noearlyqc_errorcode = select_first([variant_call_without_earlyQC.errorcode[0], "WORKFLOW_ERROR_6_REPORT_TO_DEV"])
-		
-			# did the "no earlyQC" variant caller return an error?
-			# TODO: do we need select_first()?
-			if(!(select_first([coerced_vc_noearlyqc_errorcode, "silly bogus fallback"]) == pass)) {
-				String varcall_error_if_no_earlyQC = select_first([coerced_vc_noearlyqc_errorcode, "WORKFLOW_ERROR_7_REPORT_TO_DEV"])
-			}
-		}
-		
-		# if the variant caller did not run, the fallback is pass, even though the sample shouldn't be considered a pass, so
+		# if the variant caller did not run, the fallback will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		String varcall_ERR = select_first([varcall_error_if_earlyQC_filtered, varcall_error_if_earlyQC_but_not_filtering, varcall_error_if_no_earlyQC, pass])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC])
+		String varcall_ERR = varcall_errorcode_array[0]
 	
 		# final-final-final error code
 		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, pass])
