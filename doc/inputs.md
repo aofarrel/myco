@@ -39,7 +39,7 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 | covstats_qc_cutoff_coverages | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
 | covstats_qc_cutoff_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
 | covstats_qc_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
-| diff_max_low_cov_pct_per_sample | Float  | 0.05 | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
+| diff_max_low_cov_pct_per_sample | Float  | 0.05 (myco_sra), 0.20 (myco_raw) | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
 | diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
 | early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
 | early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  

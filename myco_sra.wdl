@@ -30,8 +30,10 @@ workflow myco {
 		
 		# QC
 		Boolean fastqc_on_timeout       = false
-		Boolean early_qc_apply_cutoffs  = false
+		Boolean early_qc_cutoffs        = false
 		Float   early_qc_cutoff_q30     = 0.90
+		Float   early_qc_trimming       = false
+		Float   early_qc_trim_qual_below= 30
 		Boolean early_qc_skip_entirely  = true
 		
 		# shrink large samples
@@ -141,7 +143,9 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = early_qc_cutoff_q30
+						q30_cutoff = early_qc_cutoff_q30,
+						average_qual = early_qc_trim_qual_below,
+						output_fastps_cleaned_fastqs = early_qc_trimming
 				}
 				
 				# if we are filtering out samples via earlyQC...

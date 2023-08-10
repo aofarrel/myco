@@ -14,7 +14,7 @@
 |   | myco_sra, myco_raw               | early_qc                 | the percentage (as float between 0 and 1) of reads in this sample's fqs below a quality score of 30 is > `early_qc_cutoff_q30`  | yes, disabled by default                | no                                                    |
 |   | myco_sra, myco_raw, myco_cleaned | variant_call_each_sample | sample takes ≥ `timeout_variant_caller` minutes to map to the decontamination reference via `clockwork variant_call_one_sample` | yes, via `timeout_variant_caller` = 0   | yes, via `variant_call_each_sample.crash_on_timeout`  |
 |   | myco_sra, myco_raw, myco_cleaned | variant_call_each_sample | non-timeout error in `clockwork variant_call_one_sample`                                                                        | no                                      | yes, via `variant_call_each_sample.crash_on_error`    |
-|   | myco_sra, myco_raw, myco_cleaned | trees.cat_diff_files     | porportion of low coverage sites in a sample's diff file ≥ `max_low_coverage_sites`                                             | yes, via `max_low_coverage_sites` = 1.0 | no                                                    |
+|   | myco_sra, myco_raw, myco_cleaned | trees.cat_diff_files     | porportion of low coverage sites in a sample's diff file ≥ `diff_max_low_cov_pct_per_sample`                                             | yes, via `max_low_coverage_sites` = 1.0 | no                                                    |
 
 
 Miscellanous notes:
