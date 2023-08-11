@@ -20,8 +20,8 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely       = false
 		
 		File?   diff_mask_these_regions
-		Float   diff_max_low_cov_pct_per_sample =    0.20
-		Int     diff_min_cov_per_site           =   10
+		Float   diff_max_pct_low_coverage =    0.20
+		Int     diff_min_site_coverage           =   10
 		Boolean early_qc_cutoffs                = false
 		Float   early_qc_cutoff_q30             =    0.90
 		Boolean early_qc_skip_entirely          = false
@@ -53,8 +53,8 @@ workflow myco {
 		covstats_qc_cutoff_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
-		diff_max_low_cov_pct_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
-		diff_min_cov_per_site: "Positions with coverage below this value will be masked in diff files"
+		diff_max_pct_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diff_min_site_coverage: "Positions with coverage below this value will be masked in diff files"
 		early_qc_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
 		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_cutoffs is also true."
 		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_cutoffs."
@@ -239,9 +239,9 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diff_min_cov_per_site,
+							min_coverage_per_site = diff_min_site_coverage,
 							tbmf = diff_mask_these_regions,
-							max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
+							max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
 					}
 				}
 			}
@@ -255,9 +255,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diff_min_cov_per_site,
+					min_coverage_per_site = diff_min_site_coverage,
 					tbmf = diff_mask_these_regions,
-					max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
+					max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
 			}
 		}
 		
@@ -426,15 +426,17 @@ workflow myco {
 		# handle covstats
 		if (!covstats_qc_skip_entirely) {
 			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
-				# covstats must have run, time to select_all()
-				Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
-				Float percentUnmapped = percentsUnmapped[0]
-				Array[Float] meanCoverages = select_all(covstats.coverage)
-				Float meanCoverage = meanCoverages[0]
-				
-				if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-				if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } }
-				if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+				if(defined(covstats.percentUnmapped)) {
+					# covstats must have run, time to select_all()
+					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+					Float percentUnmapped = percentsUnmapped[0]
+					Array[Float] meanCoverages = select_all(covstats.coverage)
+					Float meanCoverage = meanCoverages[0]
+					
+					if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
+					if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } }
+					if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+				}
 			}
 			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
 			if(!(coerced_covstats_error == pass)) {          

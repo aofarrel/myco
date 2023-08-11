@@ -24,9 +24,9 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely = false
 		
 		# creation + masking of diff files
-		Int     diff_min_cov_per_site         = 10
+		Int     diff_min_site_coverage         = 10
 		File?   diff_mask_these_regions
-		Float   diff_max_low_cov_pct_per_sample = 0.05
+		Float   diff_max_pct_low_coverage = 0.05
 		
 		# QC
 		Boolean fastqc_on_timeout       = false
@@ -80,7 +80,7 @@ workflow myco {
 		force_diff: "Make a diff file even if sample fails diff_min_coverage_ratio_per_sample (will not create diff if any other QC fails)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
-		diff_max_low_cov_pct_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diff_max_pct_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		
@@ -280,9 +280,9 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diff_min_cov_per_site,
+							min_coverage_per_site = diff_min_site_coverage,
 							tbmf = diff_mask_these_regions,
-							max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
+							max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
 					}
 				}
 			}
@@ -295,9 +295,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diff_min_cov_per_site,
+					min_coverage_per_site = diff_min_site_coverage,
 					tbmf = diff_mask_these_regions,
-					max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
+					max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
 			}
 		}
 		

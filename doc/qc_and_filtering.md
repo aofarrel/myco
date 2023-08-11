@@ -23,11 +23,11 @@ EarlyQC merges TBProfiler (in fastq-input-mode) and fastp into one WDL step whic
 The variant caller used by all forms of myco uses clockwork, which itself leverages minos. minos will generate VCFs using two different methods, then compare the two of them, then output a final ajudicated VCF.
 
 ### VCF to diff
-Lily Karim's VCF to diff script will mask any sites that are below `diff_min_cov_per_site` (default: 10) from appearing in the final diff file output. It does not affect the VCF.
+Lily Karim's VCF to diff script will mask any sites that are below `diff_min_site_coverage` (default: 10) from appearing in the final diff file output. It does not affect the VCF.
 
 ## Sample filtering
 
-### myco_sra only
+### FASTQ download (myco_sra only)
 | status code               | situation                                                             | togglable?         | can crash pipeline?         |
 |---------------------------|-----------------------------------------------------------------------|--------------------|-----------------------------|
 | SRA_BAD_BIOSAMPLE_ID      | BioSample accession appears to be invalid                             | no                 | no                          |
@@ -40,8 +40,6 @@ Notes:
 * myco_sra does not support sample-level status code outputs; they are defined only in documentation for ease of writing
 * SRA_FAIL_TO_DOWNLOAD_ALL usually means that data is corrupt, but it could also mean your network is having issues or SRA is having an outage. If your data is also on ENA, you can try ENABrowserTools or [my WDlization of it](https://github.com/aofarrel/enaBrowserTools-wdl).
 * These timers apply to the same WDL task but are for different processes within that task -- `timeout_decontam_part1` is 20 and `timeout_decontam_part1` is 15, and a sample spends 19 minutes mapping plus another 14 minutes finishing the decontamination process, it will *not* be filtered out.
-
-
 
 ### decontamination
 Entire samples do not get filtered out here unless the decontamination task errors out, or you have timeouts -- specifically `timeout_decontam_part1` and `timeout_decontam_part2` -- set to a nonzero value. The reason for timeouts filtering out samples is that a sample taking a long time is itself a sign that the sample is heavily contaminated, and a heavily decontaminated sample is more likely to have too many sites removed for variant calling to work properly, which is useful if processing tens of thousands of samples from SRA of varying degrees of quality. It is, however, a lot fuzzier than most other forms of QC in this pipeline, so timeouts are turned off (set to 0) by default for myco_raw. For more information on the circumstances that can cause the decontamination task to error out, please see [status_codes.md](./status_codes.md).
@@ -56,7 +54,7 @@ As with decontamination, entire samples do not get filtered out here unless the 
 TODO
 
 ### VCF to diff
-The site-specific filtering of VCF-to-diff informs the sample-level filtering. If too many of a sample's sites are masked for having coverage below `diff_min_cov_per_site`, the entire sample will be throw out instead. "Too many" is defined as float `diff_max_low_cov_pct_per_sample`, where 0.5=50%. You can effecitvely turn off this filter by setting `diff_max_low_cov_pct_per_sample` to 1.01 or higher.
+The site-specific filtering of VCF-to-diff informs the sample-level filtering. If too many of a sample's sites are masked for having coverage below `diff_min_site_coverage`, the entire sample will be throw out instead. "Too many" is defined as float `diff_max_pct_low_coverage`, where 0.5=50%. You can effecitvely turn off this filter by setting `diff_max_pct_low_coverage` to 1.01 or higher.
 
 ### Tree Nine
 myco_cleaned does not support VCF-to-diff's ability to filter out samples based on having too many low coverages sites, so it technically does that filtering in Tree Nine instead. It's the same filter, just done in a different task. To avoid redundancy, myco_raw and myco_sra do not allow the user to attempt to do this filtering in Tree Nine, since for them it's already being done earlier.
