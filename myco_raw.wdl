@@ -22,10 +22,11 @@ workflow myco {
 		File?   diff_mask_these_regions
 		Float   diff_max_low_cov_pct_per_sample =    0.20
 		Int     diff_min_cov_per_site           =   10
-		Boolean early_qc_apply_cutoffs          = false
+		Boolean early_qc_cutoffs                = false
 		Float   early_qc_cutoff_q30             =    0.90
 		Boolean early_qc_skip_entirely          = false
-		Boolean early_qc_fastp_cleaning         = false
+		Boolean early_qc_trimming               = false
+		Int     early_qc_trim_qual_below        =   30
 		Int     quick_tasks_disk_size           =   10 
 		Int     subsample_cutoff                =   -1
 		Int     subsample_seed                  = 1965
@@ -54,9 +55,9 @@ workflow myco {
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_max_low_cov_pct_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		diff_min_cov_per_site: "Positions with coverage below this value will be masked in diff files"
-		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
-		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
+		early_qc_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
+		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_cutoffs is also true."
+		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_cutoffs."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
@@ -100,7 +101,7 @@ workflow myco {
 				}
 				
 				# if we are filtering out samples via earlyQC...
-				if(early_qc_apply_cutoffs) {
+				if(early_qc_cutoffs) {
 				
 					# and this sample passes...
 					if(qc_fastqs.pass_or_errorcode == pass) {
@@ -126,7 +127,7 @@ workflow myco {
 				}
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(!early_qc_apply_cutoffs) {
+				if(!early_qc_cutoffs) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
@@ -244,6 +245,7 @@ workflow myco {
 					}
 				}
 			}
+			
 		}
 		
 		if(covstats_qc_skip_entirely) {
@@ -417,10 +419,40 @@ workflow myco {
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
 		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC, ["PASS"]])
-		String varcall_ERR = varcall_errorcode_array[0]
-	
+		if(!(varcall_errorcode_array[0] == pass)) {          
+				String varcall_ERR = varcall_errorcode_array[0]
+		}
+		
+		# handle covstats
+		if (!covstats_qc_skip_entirely) {
+			if (varcall_ERR == "PASS") {
+				# covstats must have run, time to select_all()
+				Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+				Float percentUnmapped = percentsUnmapped[0]
+				Array[Float] meanCoverages = select_all(covstats.coverage)
+				Float meanCoverage = meanCoverages[0]
+				
+				if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
+				if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } }
+				if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+			}
+			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
+			if(!(coerced_covstats_error == pass)) {          
+					String covstats_ERR = coerced_covstats_error
+			}
+		}
+		
+		# handle vcf to diff
+		# will use the same workaround as the variant caller
+		Array[String] errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
+		Array[String] errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_array = flatten([errorcode_if_covstats, errorcode_if_no_covstats, ["PASS"]])
+		if(!(vcfdiff_errorcode_array[0] == pass)) {          
+				String vcfdiff_ERR = varcall_errorcode_array[0]
+		}
+		
 		# final-final-final error code
-		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, pass])
+		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
 
 	}
 		
@@ -458,6 +490,11 @@ workflow myco {
 		
 		# status of sample, only valid iff this ran on only one sample
 		String error_code = select_first([finalcode, pass])
+		String? debug_decontam_ERR = decontam_ERR
+		String? debug_earlyqc_ERR = earlyqc_ERR
+		String? debug_varcall_ERR = varcall_ERR
+		String? debug_covstats_ERR = covstats_ERR
+		String? debug_vcfdiff_ERR = vcfdiff_ERR
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
@@ -465,43 +502,5 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
-	}
-}
-
-task echo {
-	input {
-		Int? integer
-		String? string
-	}
-	
-	command  <<<
-	echo "~{integer}"
-	echo "~{string}"
-	>>>
-	
-	runtime {
-		cpu: 2
-		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
-		disks: "local-disk " + 10 + " HDD"
-		memory: "4 GB"
-		preemptible: "1"
-	}
-}
-
-task echo_array {
-	input {
-		Array[String?] array
-	}
-	
-	command  <<<
-	echo "~{sep=' ' array}"
-	>>>
-	
-	runtime {
-		cpu: 2
-		docker: "ashedpotatoes/iqbal-unofficial-clockwork-mirror:v0.11.3"
-		disks: "local-disk " + 10 + " HDD"
-		memory: "4 GB"
-		preemptible: "1"
 	}
 }

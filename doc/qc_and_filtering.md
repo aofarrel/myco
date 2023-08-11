@@ -7,6 +7,9 @@ Beause there is so much QC going on in this pipeline, it can be helpful to divid
 
 ## Site-specific filtering
 
+### subsampling
+If a FASTQ is above `subsample_cutoff` MB, it will get downsampled by seqtk. `subsample_cutoff` is turned off (set to -1) by default in myco_raw, and set to 450 by default in myco_sra. myco_cleaned does not support subsampling.
+
 ### decontamination
 An entire WDL task of myco (except myco_cleaned) is dedicated just to decontaminating reads. The decontamination workflow starts with `clockwork map_reads` to map to a decontamination reference, and then uses `clockwork rm_contam` to generate decontaminated FASTQs. It is worth noting that how long a sample spends in this decontamination step roughly correlates with how much contamination is in it, but input file size is also a factor. If you're seeing a batch of samples that are roughly the same size (or subject to default downsampling settings) as typical, but take unusually long to decontaminate, that batch of samples might be considered suspect.
 
@@ -33,7 +36,12 @@ Lily Karim's VCF to diff script will mask any sites that are below `diff_min_cov
 | SRA_ONE_FASTQ_ALL         | ALL of a BioSample's run accessions have only one fastq               | no                 | `pull.fail_on_invalid`=true |
 | SRA_ONE_FASTQ_SOME        | ≥1 of a BioSample's run accessions have only one fastq                | yes (default: off) | `pull.fail_on_invalid`=true |
 
-myco_sra does not support sample-level status codes; they are defined only in documentation for ease of writing. Be aware that SRA_FAIL_TO_DOWNLOAD_ALL might fire if you or SRA are having connection issues -- if a sample you suspect is good is not getting downloaded, check the logs!
+Notes: 
+* myco_sra does not support sample-level status code outputs; they are defined only in documentation for ease of writing
+* SRA_FAIL_TO_DOWNLOAD_ALL usually means that data is corrupt, but it could also mean your network is having issues or SRA is having an outage. If your data is also on ENA, you can try ENABrowserTools or [my WDlization of it](https://github.com/aofarrel/enaBrowserTools-wdl).
+* These timers apply to the same WDL task but are for different processes within that task -- `timeout_decontam_part1` is 20 and `timeout_decontam_part1` is 15, and a sample spends 19 minutes mapping plus another 14 minutes finishing the decontamination process, it will *not* be filtered out.
+
+
 
 ### decontamination
 Entire samples do not get filtered out here unless the decontamination task errors out, or you have timeouts -- specifically `timeout_decontam_part1` and `timeout_decontam_part2` -- set to a nonzero value. The reason for timeouts filtering out samples is that a sample taking a long time is itself a sign that the sample is heavily contaminated, and a heavily decontaminated sample is more likely to have too many sites removed for variant calling to work properly, which is useful if processing tens of thousands of samples from SRA of varying degrees of quality. It is, however, a lot fuzzier than most other forms of QC in this pipeline, so timeouts are turned off (set to 0) by default for myco_raw. For more information on the circumstances that can cause the decontamination task to error out, please see [status_codes.md](./status_codes.md).
@@ -42,7 +50,7 @@ Entire samples do not get filtered out here unless the decontamination task erro
 If more than `early_qc_cutoff_q30` (as float where 0.5=50%) of your decontaminated FASTQs's calls are below Q30 and if `early_qc_apply_cutoffs` is true, the sample will be removed with status `EARLYQC_TOO_MANY_BELOW_Q30`. This is independent of fastp's site-specific filtering (eg, `early_qc_trimming`, and `early_qc_trim_qual_below`).
 
 ### variant calling
-As with decontamination, entire samples do not get filtered out here unless the variant caller errors or times out.
+As with decontamination, entire samples do not get filtered out here unless the variant caller has an error or times out.
 
 ### covstats
 TODO
