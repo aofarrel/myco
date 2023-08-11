@@ -368,7 +368,8 @@ workflow myco {
 	# is there only one sample?
 	if(length(paired_fastq_sets) == 1) {    
 	
-		# did the decontamination step actually run?
+		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
+		# in the workflow this should be okay for now)
 		if(defined(decontam_each_sample.errorcode)) {
 		
 			# Sidenote: If you have a task taking in decontam_each_sample.errorcode, even after this defined check, it will fail
@@ -426,16 +427,18 @@ workflow myco {
 		# handle covstats
 		if (!covstats_qc_skip_entirely) {
 			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
-				if(defined(covstats.percentUnmapped)) {
-					# covstats must have run, time to select_all()
-					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
-					Float percentUnmapped = percentsUnmapped[0]
-					Array[Float] meanCoverages = select_all(covstats.coverage)
-					Float meanCoverage = meanCoverages[0]
-					
-					if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-					if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } }
-					if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+				if(defined(covstats.percentUnmapped)) { # this seems to always be true, unfortunately!
+					if(length(covstats.percentUnmapped) > 0) {
+						# covstats must have run, time to select_all()
+						Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+						Float percentUnmapped = percentsUnmapped[0]
+						Array[Float] meanCoverages = select_all(covstats.coverage)
+						Float meanCoverage = meanCoverages[0]
+						
+						if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
+						if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } }
+						if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+					}
 				}
 			}
 			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
