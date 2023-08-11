@@ -49,7 +49,7 @@ workflow myco {
 	}
 
 	parameter_meta {
-		covstats_qc_cutoff_coverages: "If covstats thinks coverage is below this, throw out this sample"
+		covstats_qc_cutoff_coverages: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		covstats_qc_cutoff_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
@@ -425,7 +425,7 @@ workflow myco {
 		
 		# handle covstats
 		if (!covstats_qc_skip_entirely) {
-			if (varcall_ERR == "PASS") {
+			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
 				# covstats must have run, time to select_all()
 				Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
 				Float percentUnmapped = percentsUnmapped[0]
@@ -444,9 +444,9 @@ workflow myco {
 		
 		# handle vcf to diff
 		# will use the same workaround as the variant caller
-		Array[String] errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
-		Array[String] errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
-		Array[String] vcfdiff_errorcode_array = flatten([errorcode_if_covstats, errorcode_if_no_covstats, ["PASS"]])
+		Array[String] vcfdiff_errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_array = flatten([vcfdiff_errorcode_if_covstats, vcfdiff_errorcode_if_no_covstats, ["PASS"]])
 		if(!(vcfdiff_errorcode_array[0] == pass)) {          
 				String vcfdiff_ERR = varcall_errorcode_array[0]
 		}
