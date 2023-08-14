@@ -385,16 +385,19 @@ workflow myco {
 			}
 		}
 		
-		# We already set earlyqc_definitely_errored earlier, but since this workflow can run on multiple samples it's going to have
-		# type Array[String?], Array[String?]?, or Array[String]? (should probably be Array[String?]? but optionals are so messy it
-		# can be hard to predict what the interpreter thinks).
+		# TODO: this defined() check might not be robust if decontaminator fails; consider switching to what the variant caller uses
+		# eg,
+		#Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
+		#Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]])
+		#if(!(earlyqc_errorcode_array[0] == pass)) {          
+		#		String varcall_ERR = earlyqc_errorcode_array[0]
+		#}
 		
-		#TODO: issues with defined() may indicate this should be replaced
-		if (defined(qc_fastqs.pass_or_errorcode)) {
-			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_999_REPORT_TO_DEV"])
+		if(defined(qc_fastqs.pass_or_errorcode)) {
+			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
 			
 			# did the sample pass earlyqc?
-			if(!(coerced_decontam_errorcode == pass)) {          
+			if(!(coerced_earlyqc_errorcode == pass)) {
 				String earlyqc_ERR = coerced_earlyqc_errorcode
 			}
 		}
@@ -436,7 +439,8 @@ workflow myco {
 						Float meanCoverage = meanCoverages[0]
 						
 						if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-						if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } }
+							if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
+						}
 						if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
 					}
 				}
