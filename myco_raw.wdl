@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/record-if-sample-fails-qc/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.7/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -20,8 +20,8 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely       = false
 		
 		File?   diff_mask_these_regions
-		Float   diff_max_pct_low_coverage =    0.20
-		Int     diff_min_site_coverage           =   10
+		Float   diff_max_pct_low_coverage       =    0.20
+		Int     diff_min_site_coverage          =   10
 		Boolean early_qc_cutoffs                = false
 		Float   early_qc_cutoff_q30             =    0.90
 		Boolean early_qc_skip_entirely          = false
@@ -385,15 +385,13 @@ workflow myco {
 			}
 		}
 		
-		# TODO: this defined() check might not be robust if decontaminator fails; consider switching to what the variant caller uses
-		# eg,
+		# TODO: this defined() check seems to be robust for now, but I'm suspicious of it. 
 		#Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
 		#Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]])
 		#if(!(earlyqc_errorcode_array[0] == pass)) {          
 		#		String varcall_ERR = earlyqc_errorcode_array[0]
 		#}
-		
-		if(defined(qc_fastqs.pass_or_errorcode)) {
+		if(defined(qc_fastqs.pass_or_errorcode)) { # this SEEMS to work consistently; if we start getting ERROR_2 then try workaround
 			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
 			
 			# did the sample pass earlyqc?
