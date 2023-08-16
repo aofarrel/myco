@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/error-codes/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/error-codes/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.7/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -387,16 +387,14 @@ workflow myco {
 		}
 		
 		# handle earlyQC (if it ran at all)
+		
 		Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
 		Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
 		if(!(earlyqc_errorcode_array[0] == pass)) {          
 			String earlyqc_ERR = earlyqc_errorcode_array[0]
 		}
 
-		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
-		# have to use the bogus select_first() fallback to define the new strings, because WDL doesn't understand that if you 
-		# are in a block that only executes if X is defined, then X must be defined. (This isn't a Cromwell thing; the lack of
-		# mutual exclusivity in the spec (except in a variable declaration) implies this, and miniwdl also flags this.)
+		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.
 		#
 		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
 		# For example, if(defined(variant_call_after_earlyQC_filtering.errorcode)) returns true even if NO variant callers
@@ -407,6 +405,8 @@ workflow myco {
 		#
 		# I've decided to instead use a variation of how we coerce the VCF outputs into required types - relying entirely on
 		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
+		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
+		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
 		Array[String] errorcode_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
 		Array[String] errorcode_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
 		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
@@ -421,9 +421,9 @@ workflow myco {
 		# handle covstats
 		if (!covstats_qc_skip_entirely) {
 			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
-				if(defined(covstats.percentUnmapped)) { # this seems to always be true, unfortunately!
+				#if(defined(covstats.percentUnmapped)) { # this seems to always be true, unfortunately!
 					if(length(covstats.percentUnmapped) > 0) {
-						# covstats must have run, time to select_all()
+						# there is more than zero values in the output array, so covstats must have run
 						Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
 						Float percentUnmapped = percentsUnmapped[0]
 						Array[Float] meanCoverages = select_all(covstats.coverage)
@@ -434,7 +434,7 @@ workflow myco {
 						}
 						if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
 					}
-				}
+				#}
 			}
 			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
 			if(!(coerced_covstats_error == pass)) {          
