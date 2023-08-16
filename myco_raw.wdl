@@ -386,19 +386,11 @@ workflow myco {
 			}
 		}
 		
-		# TODO: this defined() check seems to be robust for now, but I'm suspicious of it. 
-		#Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
-		#Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]])
-		#if(!(earlyqc_errorcode_array[0] == pass)) {          
-		#		String varcall_ERR = earlyqc_errorcode_array[0]
-		#}
-		if(defined(qc_fastqs.pass_or_errorcode)) { # this SEEMS to work consistently; if we start getting ERROR_2 then try workaround
-			String coerced_earlyqc_errorcode = select_first([qc_fastqs.pass_or_errorcode[0], "WORKFLOW_ERROR_2_REPORT_TO_DEV"])
-			
-			# did the sample pass earlyqc?
-			if(!(coerced_earlyqc_errorcode == pass)) {
-				String earlyqc_ERR = coerced_earlyqc_errorcode
-			}
+		# handle earlyQC (if it ran at all)
+		Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
+		Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
+		if(!(earlyqc_errorcode_array[0] == pass)) {          
+			String earlyqc_ERR = earlyqc_errorcode_array[0]
 		}
 
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.	We also
