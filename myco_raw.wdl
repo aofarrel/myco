@@ -22,10 +22,10 @@ workflow myco {
 		File?   diff_mask_these_regions
 		Float   diff_max_pct_low_coverage       =    0.20
 		Int     diff_min_site_coverage          =   10
-		Boolean early_qc_cutoffs                = false
-		Float   early_qc_cutoff_q30             =    0.90
+		Float   early_qc_minimum_q30            =    0.90
 		Boolean early_qc_skip_entirely          = false
-		Boolean early_qc_trimming               = false
+		Boolean early_qc_skip_qc                = false
+		Boolean early_qc_skip_trimming          = false
 		Int     early_qc_trim_qual_below        =   30
 		Int     quick_tasks_disk_size           =   10 
 		Int     subsample_cutoff                =   -1
@@ -55,12 +55,13 @@ workflow myco {
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_max_pct_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		diff_min_site_coverage: "Positions with coverage below this value will be masked in diff files"
-		early_qc_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_cutoffs is also true."
-		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_cutoffs."
+		early_qc_minimum_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded. Negated by early_qc_skip_qc or early_qc_skip_entirely being false."
+		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_skip_qc."
+		early_qc_skip_qc: "Run earlyQC, but do not throw out samples that fail QC. Independent of early_qc_skip_trimming. Overridden by early_qc_skip_entirely being true."
+		early_qc_skip_trimming: "Run earlyQC (unless early_qc_skip_entirely is true), and remove samples that fail QC (unless early_qc_skip_qc is true), but do not use fastp's cleaned fastqs."
+		early_qc_trim_qual_below: "Trim reads with an average quality score below this value. Independent of early_qc_minimum_q30. Negated by early_qc_skip_trimming or early_qc_skip_entirely being false."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
@@ -95,13 +96,13 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = early_qc_cutoff_q30,
+						q30_cutoff = early_qc_minimum_q30,
 						average_qual = early_qc_trim_qual_below,
-						output_fastps_cleaned_fastqs = early_qc_trimming
+						output_fastps_cleaned_fastqs = !(early_qc_skip_trimming)
 				}
 				
 				# if we are filtering out samples via earlyQC...
-				if(early_qc_cutoffs) {
+				if(!(early_qc_skip_qc)) {
 				
 					# and this sample passes...
 					if(qc_fastqs.pass_or_errorcode == pass) {
@@ -127,7 +128,7 @@ workflow myco {
 				}
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(!early_qc_cutoffs) {
+				if(early_qc_skip_qc) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {

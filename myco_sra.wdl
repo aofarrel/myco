@@ -30,10 +30,10 @@ workflow myco {
 		
 		# QC
 		Boolean fastqc_on_timeout       = false
-		Boolean early_qc_cutoffs        = false
-		Float   early_qc_cutoff_q30     = 0.90
-		Float   early_qc_trimming       = false
-		Float   early_qc_trim_qual_below= 30
+		Boolean early_qc_skip_qc        = false
+		Float   early_qc_minimum_q30     = 0.90
+		Boolean early_qc_skip_trimming    = false
+		Int     early_qc_trim_qual_below = 30
 		Boolean early_qc_skip_entirely  = true
 		
 		# shrink large samples
@@ -73,11 +73,10 @@ workflow myco {
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 		
-		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
-		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
+		early_qc_skip_qc: "If true, run fastp + TBProfiler on decontaminated fastqs"
+		early_qc_minimum_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_skip_qc is false."
+		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_skip_qc."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
-		force_diff: "Make a diff file even if sample fails diff_min_coverage_ratio_per_sample (will not create diff if any other QC fails)"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
 		diff_max_pct_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
@@ -143,13 +142,13 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = early_qc_cutoff_q30,
+						q30_cutoff = early_qc_minimum_q30,
 						average_qual = early_qc_trim_qual_below,
-						output_fastps_cleaned_fastqs = early_qc_trimming
+						output_fastps_cleaned_fastqs = !(early_qc_skip_trimming)
 				}
 				
 				# if we are filtering out samples via earlyQC...
-				if(early_qc_apply_cutoffs) {
+				if(!(early_qc_skip_qc)) {
 					if(qc_fastqs.did_this_sample_pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
@@ -173,7 +172,7 @@ workflow myco {
 				}
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(!early_qc_apply_cutoffs) {
+				if(early_qc_skip_qc) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
