@@ -23,15 +23,6 @@ Regardless of which version of myco you use, please make sure your FASTQs:
 It is recommend that you also keep an eye on the total size of your FASTQs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' FASTQs are over 1 GB in size, but the sum total of these FASTQs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)
 
 myco_cleaned expects that the FASTQs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
-  
-### More info on each version of myco's use case  
-* pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it: **myco_cleaned** 
-  * if these are in Terra data table format, you may want to use **myco_cleaned_1samp** 
- * pairs of FASTQs which have yet to be decontaminated or merged: 
-     * if each sample has its FASTQs in a single array: **myco_raw** 
-     * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: [Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_cleaned** or **myco_cleaned_1samp** 
-     * a list of SRA BioSamples whose FASTQs you'd like to use **myco_sra** 
- * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: [convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then **myco_sra**)   
  
 ## Quality control
 | name | type | myco_sra default | description |  
@@ -39,7 +30,7 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 | covstats_qc_cutoff_coverages | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
 | covstats_qc_cutoff_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
 | covstats_qc_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
-| diff_max_low_cov_pct_per_sample | Float  | 0.05 | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
+| diff_max_pct_low_coverage | Float  | 0.05 (myco_sra), 0.20 (myco_raw) | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
 | diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
 | early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
 | early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
@@ -47,7 +38,7 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 | fastqc_on_timeout | Boolean  | false | (myco_sra only) If true, fastqc one read from a sample when decontamination or variant calling times out |  
 
 Note that all forms of QC will throw out entire samples, with two exceptions: 
-  * `diff_min_coverage_per_site` works on a per-site basis, masking individual sites below that value but not throwing out the entire sample (unless so many sites get masked that `diff_max_low_cov_pct_per_sample` kicks in)
+  * `diff_min_coverage_per_site` works on a per-site basis, masking individual sites below that value but not throwing out the entire sample (unless so many sites get masked that `diff_max_pct_low_coverage` kicks in)
   * `fastqc_on_timeout` will run fastQC if true, but does not parse its output - the samples have already been discarded upstream when they timed out
   
 ## Timeouts  

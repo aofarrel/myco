@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.8/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -20,11 +20,13 @@ workflow myco {
 		Boolean covstats_qc_skip_entirely       = false
 		
 		File?   diff_mask_these_regions
-		Float   diff_max_low_cov_pct_per_sample =    0.20
-		Int     diff_min_cov_per_site           =   10
-		Boolean early_qc_apply_cutoffs          = false
-		Float   early_qc_cutoff_q30             =    0.90
+		Float   diff_max_pct_low_coverage       =    0.20
+		Int     diff_min_site_coverage          =   10
+		Float   early_qc_minimum_q30            =    0.90
 		Boolean early_qc_skip_entirely          = false
+		Boolean early_qc_skip_qc                = false
+		Boolean early_qc_skip_trimming          = false
+		Int     early_qc_trim_qual_below        =   30
 		Int     quick_tasks_disk_size           =   10 
 		Int     subsample_cutoff                =   -1
 		Int     subsample_seed                  = 1965
@@ -47,18 +49,19 @@ workflow myco {
 	}
 
 	parameter_meta {
-		covstats_qc_cutoff_coverages: "If covstats thinks coverage is below this, throw out this sample"
+		covstats_qc_cutoff_coverages: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		covstats_qc_cutoff_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstats_qc_skip_entirely: "Should we skip covstats entirely?"
 		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
-		diff_max_low_cov_pct_per_sample: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
-		diff_min_cov_per_site: "Positions with coverage below this value will be masked in diff files"
-		early_qc_apply_cutoffs: "If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out."
-		early_qc_cutoff_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true."
-		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs."
+		diff_max_pct_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diff_min_site_coverage: "Positions with coverage below this value will be masked in diff files"
+		early_qc_minimum_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded. Negated by early_qc_skip_qc or early_qc_skip_entirely being false."
+		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_skip_qc."
+		early_qc_skip_qc: "Run earlyQC, but do not throw out samples that fail QC. Independent of early_qc_skip_trimming. Overridden by early_qc_skip_entirely being true."
+		early_qc_skip_trimming: "Run earlyQC (unless early_qc_skip_entirely is true), and remove samples that fail QC (unless early_qc_skip_qc is true), but do not use fastp's cleaned fastqs."
+		early_qc_trim_qual_below: "Trim reads with an average quality score below this value. Independent of early_qc_minimum_q30. Negated by early_qc_skip_trimming or early_qc_skip_entirely being false."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		ref_genome_for_tree_building: "Ref genome for building trees -- must have ONLY `>NC_000962.3` on its first line"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
@@ -68,6 +71,8 @@ workflow myco {
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
+											  
+	String pass = "PASS" # used later... much later
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -91,12 +96,16 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = early_qc_cutoff_q30
+						q30_cutoff = early_qc_minimum_q30,
+						average_qual = early_qc_trim_qual_below,
+						use_fastps_cleaned_fastqs = !(early_qc_skip_trimming)
 				}
 				
 				# if we are filtering out samples via earlyQC...
-				if(early_qc_apply_cutoffs) {
-					if(qc_fastqs.did_this_sample_pass) {
+				if(!(early_qc_skip_qc)) {
+				
+					# and this sample passes...
+					if(qc_fastqs.pass_or_errorcode == pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
@@ -119,7 +128,7 @@ workflow myco {
 				}
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(!early_qc_apply_cutoffs) {
+				if(early_qc_skip_qc) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
@@ -165,6 +174,25 @@ workflow myco {
 	}
 
 	# do some wizardry to deal with optionals
+	#
+	# In order to account for different use cases, this workflow has three versions of the variant caller. They are mutually
+	# exclusive, eg, only one can ever be called by a given sample. In fact, there are cases where NONE of them get called.
+	# Additionally, each version of the variant caller technically gives optional output. This is to prevent the entire
+	# pipeline from crashing if a single garbage sample starts the variant calling task but cannot make a VCF.
+	#
+	# Unfortunately, this means I have created multiple optional outputs from optional tasks. Mutually exclusive outputs from
+	# mutually exclusive tasks, yes, but WDL doesn't quite understand mutual exclusivity. WDL and/or Cromwell (it's hard to 
+	# know if the issue is the langauge or its implementation since the spec is not very specific) also gets finicky when we try
+	# to do certain things with optional arrays. So, we want to turn those optionals into not-optionals ASAP. That's what this
+	# block of variable definitions does. WDL does not allow you to overwrite variables, so we need to declare a ton of variables
+	# with unique names. Yes, this could in theory be done more "cleanly" by calling a task, but why spin up a Docker image to do
+	# microseconds worth of work?
+	#
+	# Interestingly, even if the variant caller didn't run, this code block does not cause a crash. Somehow, we can create 
+	# non-optional variables that have no content. This little mystery is mostly good because it means the 
+	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
+	# we cannot use anything here to test if any version of the variant caller actually ran at all!
+	# 
 	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
 	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
 	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
@@ -212,12 +240,13 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diff_min_cov_per_site,
+							min_coverage_per_site = diff_min_site_coverage,
 							tbmf = diff_mask_these_regions,
-							max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
+							max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
 					}
 				}
 			}
+			
 		}
 		
 		if(covstats_qc_skip_entirely) {
@@ -227,9 +256,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diff_min_cov_per_site,
+					min_coverage_per_site = diff_min_site_coverage,
 					tbmf = diff_mask_these_regions,
-					max_ratio_low_coverage_sites_per_sample = diff_max_low_cov_pct_per_sample
+					max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
 			}
 		}
 		
@@ -246,32 +275,51 @@ workflow myco {
 	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
 	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
 
-
 	# pull TBProfiler information, if we ran TBProfiler on bams
+	# For reasons I don't understand, if no variant caller runs (ergo there's no bam and profile_bam also does not run),
+	# the following code block will still execute. coerced_bam_strains etc will be arrays with length 0. So this check
+	# isn't sufficient on its own, but as always, I have a workaround for this!
 	if(defined(profile_bam.strain)) {
+	
+		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
-		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
-
-		call sranwrp_processing.cat_strings as collate_bam_strains {
-			input:
-				strings = coerced_bam_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
+		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
+		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
 		
-		call sranwrp_processing.cat_strings as collate_bam_resistance {
-			input:
-				strings = coerced_bam_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-
-		call sranwrp_processing.cat_strings as collate_bam_depth {
-			input:
-				strings = coerced_bam_depth,
-				out = "depth_reports.txt",
-				disk_size = quick_tasks_disk_size
+		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
+		if(!(length(coerced_bam_strains) == 0)) {
+		
+			# if there is more than one sample, run some tasks to concatenate the outputs
+			if(length(paired_fastq_sets) != 1) {
+		
+				call sranwrp_processing.cat_strings as collate_bam_strains {
+					input:
+						strings = coerced_bam_strains,
+						out = "strain_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_bam_resistance {
+					input:
+						strings = coerced_bam_resistances,
+						out = "resistance_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+		
+				call sranwrp_processing.cat_strings as collate_bam_depth {
+					input:
+						strings = coerced_bam_depths,
+						out = "depth_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+			}
+			
+			# if there is only one sample, there's no need to run tasks
+			if(length(paired_fastq_sets) == 1) {
+				Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
+				String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
+				String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+			}
 		}
   	}
   	
@@ -309,7 +357,105 @@ workflow myco {
 			}
 		}
 	}
+	
+	#########################################
+	# error reporting for Terra data tables #
+	#########################################
+	#
+	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
+	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
+	# for an individual sample as workflow-level output, which gets written to the Terra data table.
+	
+	# is there only one sample?
+	if(length(paired_fastq_sets) == 1) {    
+	
+		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
+		# in the workflow this should be okay for now)
+		if(defined(decontam_each_sample.errorcode)) {
+		
+			# Sidenote: If you have a task taking in decontam_each_sample.errorcode, even after this defined check, it will fail
+			# command instantiation with "Cannot interpolate Array[String?] into a command string with attribute set 
+			# [PlaceholderAttributeSet(None,None,None,Some( ))]".
+		
+			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
+			String coerced_decontam_errorcode = select_first([decontam_each_sample.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			
+			# did the decontamination step return an error?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String decontam_ERR = coerced_decontam_errorcode
+			}
+		}
+		
+		# handle earlyQC (if it ran at all)
+		
+		Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
+		Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
+		if(!(earlyqc_errorcode_array[0] == pass)) {          
+			String earlyqc_ERR = earlyqc_errorcode_array[0]
+		}
 
+		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.
+		#
+		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
+		# For example, if(defined(variant_call_after_earlyQC_filtering.errorcode)) returns true even if NO variant callers
+		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
+		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
+		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
+		# defined() checks. In any case, here's the Cromwell ticket: https://github.com/broadinstitute/cromwell/issues/7201
+		#
+		# I've decided to instead use a variation of how we coerce the VCF outputs into required types - relying entirely on
+		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
+		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
+		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
+		Array[String] errorcode_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
+		Array[String] errorcode_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
+		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
+		
+		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
+		# the final-final-final error code needs to have decontam's error come before the variant caller error.
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC, ["PASS"]])
+		if(!(varcall_errorcode_array[0] == pass)) {          
+				String varcall_ERR = varcall_errorcode_array[0]
+		}
+		
+		# handle covstats
+		if (!covstats_qc_skip_entirely) {
+			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
+				#if(defined(covstats.percentUnmapped)) { # this seems to always be true, unfortunately!
+					if(length(covstats.percentUnmapped) > 0) {
+						# there is more than zero values in the output array, so covstats must have run
+						Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+						Float percentUnmapped = percentsUnmapped[0]
+						Array[Float] meanCoverages = select_all(covstats.coverage)
+						Float meanCoverage = meanCoverages[0]
+						
+						if(!(percentUnmapped > covstats_qc_cutoff_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
+							if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
+						}
+						if(!(meanCoverage > covstats_qc_cutoff_coverages)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+					}
+				#}
+			}
+			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
+			if(!(coerced_covstats_error == pass)) {          
+					String covstats_ERR = coerced_covstats_error
+			}
+		}
+		
+		# handle vcf to diff
+		# will use the same workaround as the variant caller
+		Array[String] vcfdiff_errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_array = flatten([vcfdiff_errorcode_if_covstats, vcfdiff_errorcode_if_no_covstats, ["PASS"]])
+		if(!(vcfdiff_errorcode_array[0] == pass)) {          
+				String vcfdiff_ERR = varcall_errorcode_array[0]
+		}
+		
+		# final-final-final error code
+		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
+
+	}
+		
 	output {
 		# raw files
 		Array[File]  bais = final_bais
@@ -322,11 +468,8 @@ workflow myco {
 		Array[File?]  covstats_reports       = covstats.covstatsOutfile
 		Array[File?]  diff_reports           = real_reports
 		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
-		File?         tbprof_bam_depths      = collate_bam_depth.outfile
 		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
-		File?         tbprof_bam_strains     = collate_bam_strains.outfile
 		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
-		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
 		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
 		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
 		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
@@ -334,6 +477,24 @@ workflow myco {
 		File?         tbprof_fq_strains      = collate_fq_strains.outfile
 		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
+		
+		# these outputs only exist if there are multiple samples
+		File?         tbprof_bam_depths      = collate_bam_depth.outfile
+		File?         tbprof_bam_strains     = collate_bam_strains.outfile
+		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		
+		# these outputs only exist if we ran on a single sample
+		Int?            tbprof_bam_depth      = single_sample_tbprof_bam_depth
+		String?         tbprof_bam_strain     = single_sample_tbprof_bam_strain
+		String?         tbprof_bam_resistance = single_sample_tbprof_bam_resistance
+		
+		# status of sample, only valid iff this ran on only one sample
+		String error_code = select_first([finalcode, pass])
+		String? debug_decontam_ERR = decontam_ERR
+		String? debug_earlyqc_ERR = earlyqc_ERR
+		String? debug_varcall_ERR = varcall_ERR
+		String? debug_covstats_ERR = covstats_ERR
+		String? debug_vcfdiff_ERR = vcfdiff_ERR
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
