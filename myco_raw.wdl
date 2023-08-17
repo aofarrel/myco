@@ -98,7 +98,7 @@ workflow myco {
 						fastq2 = real_decontaminated_fastq_2,
 						q30_cutoff = early_qc_minimum_q30,
 						average_qual = early_qc_trim_qual_below,
-						output_fastps_cleaned_fastqs = !(early_qc_skip_trimming)
+						use_fastps_cleaned_fastqs = !(early_qc_skip_trimming)
 				}
 				
 				# if we are filtering out samples via earlyQC...
