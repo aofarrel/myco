@@ -14,16 +14,16 @@ If a FASTQ is above `subsample_cutoff` MB, it will get downsampled by seqtk. `su
 An entire WDL task of myco (except myco_cleaned) is dedicated just to decontaminating reads. The decontamination workflow starts with `clockwork map_reads` to map to a decontamination reference, and then uses `clockwork rm_contam` to generate decontaminated FASTQs. It is worth noting that how long a sample spends in this decontamination step roughly correlates with how much contamination is in it, but input file size is also a factor. If you're seeing a batch of samples that are roughly the same size (or subject to default downsampling settings) as typical, but take unusually long to decontaminate, that batch of samples might be considered suspect.
 
 ### earlyQC (aka TBfastProfiler)
-EarlyQC merges TBProfiler (in fastq-input-mode) and fastp into one WDL step which will run unless `early_qc_skip_entirely` is true or you are running myco_cleaned. TBProfiler does no site-specific filtering of its own, but if `early_qc_skip_trimming` is false, fastp will further clean your FASTQs as a form of site-specific filtering. 
+EarlyQC merges TBProfiler (in fastq-input-mode) and fastp into one WDL step which will run unless `earlyQC_skip_entirely` is true or you are running myco_cleaned. TBProfiler does no site-specific filtering of its own, but if `earlyQC_skip_trimming` is false, fastp will further clean your FASTQs as a form of site-specific filtering. 
 
 #### removing low-quality read pairs
-`early_qc_trim_qual_below` is piped into fastp's `average_qual`. If one read's average quality score is < `average_qual`, then that read/pair is discarded. You can disable this by setting `early_qc_trim_qual_below` to 0 or `early_qc_skip_trimming` to true.
+`earlyQC_trim_qual_below` is piped into fastp's `average_qual`. If one read's average quality score is < `average_qual`, then that read/pair is discarded. You can disable this by setting `earlyQC_trim_qual_below` to 0 or `earlyQC_skip_trimming` to true.
 
 ### variant calling
 The variant caller used by all forms of myco uses clockwork, which itself leverages minos. minos will generate VCFs using two different methods, then compare the two of them, then output a final ajudicated VCF.
 
 ### VCF to diff
-Lily Karim's VCF to diff script will mask any sites that are below `diff_min_site_coverage` (default: 10) from appearing in the final diff file output. It does not affect the VCF.
+Lily Karim's VCF to diff script will mask any sites that are below `diffQC_low_coverage_cutoff` (default: 10) from appearing in the final diff file output. It does not affect the VCF.
 
 ## Sample filtering
 Generally speaking, these filters apply to myco_sra and myco_raw. The only sample-level filtering myco_cleaned supports are TREE_TOO_MANY_LOW_COVERAGE_SITES, VARIANT_CALLING_KILLED, and VARIANT_CALLING_TIMEOUT.
@@ -46,7 +46,7 @@ Notes:
 Entire samples do not get filtered out here unless the decontamination task errors out, or you have timeouts -- specifically `timeout_decontam_part1` and `timeout_decontam_part2` -- set to a nonzero value. The reason for timeouts filtering out samples is that a sample taking a long time is itself a sign that the sample is heavily contaminated, and a heavily decontaminated sample is more likely to have too many sites removed for variant calling to work properly, which is useful if processing tens of thousands of samples from SRA of varying degrees of quality. It is, however, a lot fuzzier than most other forms of QC in this pipeline, so timeouts are turned off (set to 0) by default for myco_raw. For more information on the circumstances that can cause the decontamination task to error out, please see [status_codes.md](./status_codes.md).
 
 ### earlyQC 
-If more than `early_qc_minimum_q30` (as float where 0.5=50%) of your decontaminated FASTQs's calls are below Q30, and if `early_qc_skip_qc` is false, and if `early_qc_skip_qc` is also false, the sample will be removed with status `EARLYQC_TOO_MANY_BELOW_Q30`. This is independent of fastp's site-specific filtering (eg, `early_qc_skip_trimming`, and `early_qc_trim_qual_below`).
+If more than `earlyQC_minimum_percent_q30` (as float where 0.5=50%) of your decontaminated FASTQs's calls are below Q30, and if `earlyQC_skip_QC` is false, and if `earlyQC_skip_QC` is also false, the sample will be removed with status `EARLYQC_TOO_MANY_BELOW_Q30`. This is independent of fastp's site-specific filtering (eg, `earlyQC_skip_trimming`, and `earlyQC_trim_qual_below`).
 
 ### variant calling
 As with decontamination, entire samples do not get filtered out here unless the variant caller has an error or times out.
@@ -55,7 +55,7 @@ As with decontamination, entire samples do not get filtered out here unless the 
 TODO
 
 ### VCF to diff
-The site-specific filtering of VCF-to-diff informs the sample-level filtering. If too many of a sample's sites are masked for having coverage below `diff_min_site_coverage`, the entire sample will be throw out instead. "Too many" is defined as float `diff_max_pct_low_coverage`, where 0.5=50%. You can effecitvely turn off this filter by setting `diff_max_pct_low_coverage` to 1.01 or higher.
+The site-specific filtering of VCF-to-diff informs the sample-level filtering. If too many of a sample's sites are masked for having coverage below `diffQC_low_coverage_cutoff`, the entire sample will be throw out instead. "Too many" is defined as float `diffQC_max_percent_low_coverage`, where 0.5=50%. You can effecitvely turn off this filter by setting `diffQC_max_percent_low_coverage` to 1.01 or higher.
 
 ### Tree Nine
 myco_cleaned does not support VCF-to-diff's ability to filter out samples based on having too many low coverages sites, so it technically does that filtering in Tree Nine instead. It's the same filter, just done in a different task. To avoid redundancy, myco_raw and myco_sra do not allow the user to attempt to do this filtering in Tree Nine, since for them it's already being done earlier.

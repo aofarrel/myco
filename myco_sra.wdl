@@ -19,22 +19,22 @@ workflow myco {
 		Int quick_tasks_disk_size = 10
 		
 		# TODO: REPLACE WITH BETTER DEFAULTS
-		Float covstats_qc_cutoff_unmapped = 10
-		Float covstats_qc_cutoff_coverages = 2
-		Boolean covstats_qc_skip_entirely = false
+		Float covstatsQC_max_percent_unmapped = 10
+		Float covstatsQC_minimum_coverage = 2
+		Boolean covstatsQC_skip_entirely = false
 		
 		# creation + masking of diff files
-		Int     diff_min_site_coverage         = 10
-		File?   diff_mask_these_regions
-		Float   diff_max_pct_low_coverage = 0.05
+		Int     diffQC_low_coverage_cutoff         = 10
+		File?   diffQC_mask_bedfile
+		Float   diffQC_max_percent_low_coverage = 0.05
 		
 		# QC
 		Boolean fastqc_on_timeout       = false
-		Boolean early_qc_skip_qc        = false
-		Float   early_qc_minimum_q30     = 0.90
-		Boolean early_qc_skip_trimming    = false
-		Int     early_qc_trim_qual_below = 30
-		Boolean early_qc_skip_entirely  = true
+		Boolean earlyQC_skip_QC        = false
+		Float   earlyQC_minimum_percent_q30     = 0.90
+		Boolean earlyQC_skip_trimming    = false
+		Int     earlyQC_trim_qual_below = 30
+		Boolean earlyQC_skip_entirely  = true
 		
 		# shrink large samples
 		Int     subsample_cutoff        =  450
@@ -73,13 +73,13 @@ workflow myco {
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 		
-		early_qc_skip_qc: "If true, run fastp + TBProfiler on decontaminated fastqs"
-		early_qc_minimum_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_skip_qc is false."
-		early_qc_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_skip_qc."
+		earlyQC_skip_QC: "If true, run fastp + TBProfiler on decontaminated fastqs"
+		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff earlyQC_skip_QC is false."
+		earlyQC_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides earlyQC_skip_QC."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
-		diff_mask_these_regions: "Bed file of regions to mask when making diff files"
+		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files"
 		diff_min_coverage_per_site: "Positions with coverage below this value will be masked in diff files"
-		diff_max_pct_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diffQC_max_percent_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		
@@ -137,18 +137,18 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, biosample_accessions])
 
 			# if we are NOT skipping earlyQC
-			if(!early_qc_skip_entirely) {
+			if(!earlyQC_skip_entirely) {
 				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = early_qc_minimum_q30,
-						average_qual = early_qc_trim_qual_below,
-						output_fastps_cleaned_fastqs = !(early_qc_skip_trimming)
+						q30_cutoff = earlyQC_minimum_percent_q30,
+						average_qual = earlyQC_trim_qual_below,
+						output_fastps_cleaned_fastqs = !(earlyQC_skip_trimming)
 				}
 				
 				# if we are filtering out samples via earlyQC...
-				if(!(early_qc_skip_qc)) {
+				if(!(earlyQC_skip_QC)) {
 					if(qc_fastqs.did_this_sample_pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
@@ -172,7 +172,7 @@ workflow myco {
 				}
 				
 				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(early_qc_skip_qc) {
+				if(earlyQC_skip_QC) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
@@ -195,7 +195,7 @@ workflow myco {
 			}
 			
 			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
-			if(early_qc_skip_entirely) {
+			if(earlyQC_skip_entirely) {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
@@ -262,7 +262,7 @@ workflow myco {
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
 	
-		if(!covstats_qc_skip_entirely) {
+		if(!covstatsQC_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
 			call goleft.covstats as covstats {
@@ -271,32 +271,32 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if(covstats.percentUnmapped > covstats_qc_cutoff_unmapped) {
-				if(covstats.coverage > covstats_qc_cutoff_coverages) {
+			if(covstats.percentUnmapped > covstatsQC_max_percent_unmapped) {
+				if(covstats.coverage > covstatsQC_minimum_coverage) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diff_min_site_coverage,
-							tbmf = diff_mask_these_regions,
-							max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
+							min_coverage_per_site = diffQC_low_coverage_cutoff,
+							tbmf = diffQC_mask_bedfile,
+							max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage
 					}
 				}
 			}
 		}
 		
-		if(covstats_qc_skip_entirely) {
+		if(covstatsQC_skip_entirely) {
 		
 			# make diff files
 			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diff_min_site_coverage,
-					tbmf = diff_mask_these_regions,
-					max_ratio_low_coverage_sites_per_sample = diff_max_pct_low_coverage
+					min_coverage_per_site = diffQC_low_coverage_cutoff,
+					tbmf = diffQC_mask_bedfile,
+					max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage
 			}
 		}
 		
