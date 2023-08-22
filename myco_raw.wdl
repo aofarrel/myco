@@ -498,9 +498,9 @@ workflow myco {
 		String? debug_varcall_ERR = varcall_ERR
 		String? debug_covstats_ERR = covstats_ERR
 		String? debug_vcfdiff_ERR = vcfdiff_ERR
-		Array[String?]? debug_vcfdiff_errorcode_if_covstats = vcfdiff_errorcode_if_covstats
-		Array[String?]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
-		Array[String?]? debug_vcfdiff_errorcode_array = vcfdiff_errorcode_array
+		Array[String]? debug_vcfdiff_errorcode_if_covstats = vcfdiff_errorcode_if_covstats
+		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
+		Array[String]? debug_vcfdiff_errorcode_array = vcfdiff_errorcode_array
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
