@@ -452,7 +452,8 @@ workflow myco {
 		}
 		
 		# final-final-final error code
-		String finalcode = select_first([decontam_ERR, earlyqc_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
+		# earlyQC is at the end (but before PASS) to account for early_qc_skip_qc = true
+		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyqc_ERR, pass])
 
 	}
 		
