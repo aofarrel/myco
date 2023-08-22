@@ -14,52 +14,50 @@ workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 		
-		# TODO: REPLACE WITH BETTER DEFAULTS
-		Float   covstatsQC_minimum_coverage    =   10.00
-		Float   covstatsQC_max_percent_unmapped     =    2.00
+		Int     covstatsQC_minimum_coverage    =   10
+		Int     covstatsQC_max_percent_unmapped=    2
 		Boolean covstatsQC_skip_entirely       = false
-		
 		File?   diffQC_mask_bedfile
-		Float   diffQC_max_percent_low_coverage       =    0.20
-		Int     diffQC_low_coverage_cutoff          =   10
-		Float   earlyQC_minimum_percent_q30            =    0.90
+		Int     diffQC_max_percent_low_coverage=    20
+		Int     diffQC_low_coverage_cutoff     =   10
+		Int     earlyQC_minimum_percent_q30    =    90
 		Boolean earlyQC_skip_entirely          = false
 		Boolean earlyQC_skip_QC                = false
 		Boolean earlyQC_skip_trimming          = false
 		Int     earlyQC_trim_qual_below        =   30
-		Int     quick_tasks_disk_size           =   10 
-		Int     subsample_cutoff                =   -1
-		Int     subsample_seed                  = 1965
-		Boolean tbprofiler_on_bam               = false
-		Int     timeout_decontam_part1          =    0
-		Int     timeout_decontam_part2          =    0
-		Int     timeout_variant_caller          =    0
-		Boolean tree_decoration                 = false
+		Int     quick_tasks_disk_size          =   10 
+		Int     subsample_cutoff               =   -1
+		Int     subsample_seed                 = 1965
+		Boolean tbprofiler_on_bam              = false
+		Int     timeout_decontam_part1         =    0
+		Int     timeout_decontam_part2         =    0
+		Int     timeout_variant_caller         =    0
+		Boolean tree_decoration                = false
 		File?   tree_to_decorate
-		Int     variantcalling_addl_disk        =  100
-		Boolean variantcalling_crash_on_error   = false
-		Boolean variantcalling_crash_on_timeout = false
-		Int     variantcalling_cpu              =   16
-		Boolean variantcalling_debug            = false
+		Int     variantcalling_addl_disk       =  100
+		Boolean variantcalling_crash_on_error  = false
+		Boolean variantcalling_crash_on_timeout= false
+		Int     variantcalling_cpu             =   16
+		Boolean variantcalling_debug           = false
 		Int?    variantcalling_mem_height
-		Int     variantcalling_memory           =   32
-		Int     variantcalling_preemptibles     =    1
-		Int     variantcalling_retries          =    1
-		Boolean variantcalling_ssd              = true
+		Int     variantcalling_memory          =   32
+		Int     variantcalling_preemptibles    =    1
+		Int     variantcalling_retries         =    1
+		Boolean variantcalling_ssd             = true
 	}
 
 	parameter_meta {
 		covstatsQC_minimum_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		covstatsQC_max_percent_unmapped: "If covstats thinks this proportion (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		covstatsQC_max_percent_unmapped: "If covstats thinks this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
-		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files"
-		diffQC_max_percent_low_coverage: "Samples who have more than this proportion (as float, 0.5 = 50%) of positions below diff_min_coverage_per_site will be discarded"
+		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
 		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this proportion (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
-		earlyQC_skip_entirely: "Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides earlyQC_skip_QC."
-		earlyQC_skip_QC: "Run earlyQC, but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming. Overridden by earlyQC_skip_entirely being true."
+		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
+		earlyQC_skip_entirely: "Do not run earlyQC (fastp + fastq-TBProfiler) at all - no trimming, no QC, nothing. Does not affect tbprofiler_on_bam."
+		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
 		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Negated by earlyQC_skip_trimming or earlyQC_skip_entirely being false."
+		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
@@ -73,6 +71,10 @@ workflow myco {
 	}
 											  
 	String pass = "PASS" # used later... much later
+	
+	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
+	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100
+	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -96,7 +98,7 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = earlyQC_minimum_percent_q30,
+						q30_cutoff = earlyQC_minimum_percent_q30_float,
 						average_qual = earlyQC_trim_qual_below,
 						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming)
 				}
@@ -242,7 +244,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = diffQC_low_coverage_cutoff,
 							tbmf = diffQC_mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage
+							max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
 					}
 				}
 			}
@@ -258,7 +260,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = diffQC_low_coverage_cutoff,
 					tbmf = diffQC_mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage
+					max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
 			}
 		}
 		
