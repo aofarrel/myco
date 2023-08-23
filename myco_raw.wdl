@@ -19,7 +19,7 @@ workflow myco {
 		Boolean covstatsQC_skip_entirely       = false
 		File?   diffQC_mask_bedfile
 		Int     diffQC_max_percent_low_coverage=    20
-		Int     diffQC_low_coverage_cutoff     =   10
+		Int     diffQC_low_coverage_cutoff     =    10
 		Int     earlyQC_minimum_percent_q30    =    90
 		Boolean earlyQC_skip_entirely          = false
 		Boolean earlyQC_skip_QC                = false
@@ -73,8 +73,8 @@ workflow myco {
 	String pass = "PASS" # used later... much later
 	
 	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
-	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100
-	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100
+	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
+	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
