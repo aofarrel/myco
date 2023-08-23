@@ -450,7 +450,7 @@ workflow myco {
 		Array[String] vcfdiff_errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
 		Array[String] vcfdiff_errorcode_array = flatten([vcfdiff_errorcode_if_covstats, vcfdiff_errorcode_if_no_covstats, ["PASS"]])
 		if(!(vcfdiff_errorcode_array[0] == pass)) {          
-				String vcfdiff_ERR = varcall_errorcode_array[0]
+				String vcfdiff_ERR = vcfdiff_errorcode_array[0]
 		}
 		
 		# final-final-final error code
