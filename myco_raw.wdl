@@ -234,7 +234,7 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if(covstats.percentUnmapped > covstatsQC_max_percent_unmapped) {
+			if(covstats.percentUnmapped < covstatsQC_max_percent_unmapped) {
 				if(covstats.coverage > covstatsQC_minimum_coverage) {
 					
 					# make diff files
@@ -431,10 +431,10 @@ workflow myco {
 						Array[Float] meanCoverages = select_all(covstats.coverage)
 						Float meanCoverage = meanCoverages[0]
 						
-						if(!(percentUnmapped > covstatsQC_max_percent_unmapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-							if(!(meanCoverage > covstatsQC_minimum_coverage)) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
+						if(percentUnmapped > covstatsQC_max_percent_unmapped) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
+							if(meanCoverage < covstatsQC_minimum_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
 						}
-						if(!(meanCoverage > covstatsQC_minimum_coverage)) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+						if(meanCoverage < covstatsQC_minimum_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
 					}
 				#}
 			}
