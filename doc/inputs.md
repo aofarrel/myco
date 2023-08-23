@@ -27,18 +27,18 @@ myco_cleaned expects that the FASTQs you are putting into have already been clea
 ## Quality control
 | name | type | myco_sra default | description |  
 |:---:|:---:|:---:|:---:|  
-| covstats_qc_cutoff_coverages | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
-| covstats_qc_cutoff_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
-| covstats_qc_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
-| diff_max_pct_low_coverage | Float  | 0.05 (myco_sra), 0.20 (myco_raw) | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
+| covstatsQC_minimum_coverage | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
+| covstatsQC_max_percent_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
+| covstatsQC_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
+| diffQC_max_percent_low_coverage | Float  | 0.05 (myco_sra), 0.20 (myco_raw) | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
 | diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
 | early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
 | early_qc_cutoff_q30 | Float  | 0.9 | Decontaminated samples with less than this percentage (as float, 0.5 = 50%) of reads above qual score of 30 will be discarded iff early_qc_apply_cutoffs is also true. |  
-| early_qc_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
+| earlyQC_skip_entirely | Boolean  | false | Do not run early QC (fastp + fastq-TBProfiler) at all. Does not affect whether or not TBProfiler is later run on bams. Overrides early_qc_apply_cutoffs. |  
 | fastqc_on_timeout | Boolean  | false | (myco_sra only) If true, fastqc one read from a sample when decontamination or variant calling times out |  
 
 Note that all forms of QC will throw out entire samples, with two exceptions: 
-  * `diff_min_coverage_per_site` works on a per-site basis, masking individual sites below that value but not throwing out the entire sample (unless so many sites get masked that `diff_max_pct_low_coverage` kicks in)
+  * `diff_min_coverage_per_site` works on a per-site basis, masking individual sites below that value but not throwing out the entire sample (unless so many sites get masked that `diffQC_max_percent_low_coverage` kicks in)
   * `fastqc_on_timeout` will run fastQC if true, but does not parse its output - the samples have already been discarded upstream when they timed out
   
 ## Timeouts  
@@ -75,7 +75,7 @@ Usually, I write WDLs in a way that makes their runtime attributes and rarely-us
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
 | diff_force | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
-| diff_mask_these_regions | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | Bed file of regions to mask when making diff files |  
+| diffQC_mask_bedfile | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | Bed file of regions to mask when making diff files |  
 | quick_tasks_disk_size | Int  | 10 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)isk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization |  
 | subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
 | subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
