@@ -271,7 +271,7 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if(covstats.percentUnmapped > covstatsQC_max_percent_unmapped) {
+			if(covstats.percentUnmapped < covstatsQC_max_percent_unmapped) {
 				if(covstats.coverage > covstatsQC_minimum_coverage) {
 					
 					# make diff files
