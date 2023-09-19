@@ -8,7 +8,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka fastpQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -28,11 +28,11 @@ workflow myco {
 		
 		# QC
 		Boolean fastqc_on_timeout           = false
-		Boolean earlyQC_skip_QC             = false
-		Int     earlyQC_minimum_percent_q30 = 90
-		Boolean earlyQC_skip_trimming       = false
-		Int     earlyQC_trim_qual_below     = 30
-		Boolean earlyQC_skip_entirely       = true
+		Boolean fastpQC_skip_QC             = false
+		Int     fastpQC_minimum_percent_q30 = 90
+		Boolean fastpQC_skip_trimming       = false
+		Int     fastpQC_trim_qual_below     = 30
+		Boolean fastpQC_skip_entirely       = true
 		
 		# shrink large samples
 		Int     subsample_cutoff        =  450
@@ -72,11 +72,11 @@ workflow myco {
 		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
 		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
-		earlyQC_skip_entirely: "Do not run earlyQC (fastp + fastq-TBProfiler) at all - no trimming, no QC, nothing. Does not affect tbprofiler_on_bam."
-		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
-		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
+		fastpQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by fastpQC_skip_QC or fastpQC_skip_entirely being false."
+		fastpQC_skip_entirely: "Do not run fastpQC at all - no trimming, no QC, nothing."
+		fastpQC_skip_QC: "Run fastpQC (unless fastpQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of fastpQC_skip_trimming."
+		fastpQC_skip_trimming: "Run fastpQC (unless fastpQC_skip_entirely is true), and remove samples that fail QC (unless fastpQC_skip_QC is true), but do not use fastp's cleaned fastqs."
+		fastpQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of fastpQC_minimum_percent_q30. Overridden by fastpQC_skip_trimming or fastpQC_skip_entirely being true."
 		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
@@ -91,7 +91,7 @@ workflow myco {
 	
 	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
 	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100
-	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100
+	Float fastpQC_minimum_percent_q30_float = fastpQC_minimum_percent_q30 / 100
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -136,24 +136,24 @@ workflow myco {
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, biosample_accessions])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, biosample_accessions])
 
-			# if we are NOT skipping earlyQC
-			if(!earlyQC_skip_entirely) {
+			# if we are NOT skipping fastpQC
+			if(!fastpQC_skip_entirely) {
 				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = earlyQC_minimum_percent_q30_float,
-						average_qual = earlyQC_trim_qual_below,
-						output_fastps_cleaned_fastqs = !(earlyQC_skip_trimming)
+						q30_cutoff = fastpQC_minimum_percent_q30_float,
+						average_qual = fastpQC_trim_qual_below,
+						output_fastps_cleaned_fastqs = !(fastpQC_skip_trimming)
 				}
 				
-				# if we are filtering out samples via earlyQC...
-				if(!(earlyQC_skip_QC)) {
+				# if we are filtering out samples via fastpQC...
+				if(!(fastpQC_skip_QC)) {
 					if(qc_fastqs.did_this_sample_pass) {
 						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
-						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
+						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_fastpQC_filtering {
 							input:
 								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
 								
@@ -171,12 +171,12 @@ workflow myco {
 					}
 				}
 				
-				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(earlyQC_skip_QC) {
+				# if we are not filtering out samples via the early qc step (but ran fastpQC anyway)...
+				if(fastpQC_skip_QC) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 				    	
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_fastpQC_but_not_filtering_samples {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 							
@@ -195,8 +195,8 @@ workflow myco {
 			}
 			
 			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
-			if(earlyQC_skip_entirely) {
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
+			if(fastpQC_skip_entirely) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_fastpQC {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						
@@ -217,21 +217,21 @@ workflow myco {
 	}
 
 	# do some wizardry to deal with optionals
-	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
-	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
-	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
+	Array[File] minos_vcfs_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.adjudicated_vcf)
+	Array[File] minos_vcfs_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.adjudicated_vcf)
+	Array[File] minos_vcfs_if_no_fastpQC = select_all(variant_call_without_fastpQC.adjudicated_vcf)
 	
-	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bam)
-	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bam)
-	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
+	Array[File] bams_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.bam)
+	Array[File] bams_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.bam)
+	Array[File] bams_if_no_fastpQC = select_all(variant_call_without_fastpQC.bam)
 	
-	Array[File] bais_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bai)
-	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
-	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
+	Array[File] bais_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.bai)
+	Array[File] bais_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.bai)
+	Array[File] bais_if_no_fastpQC = select_all(variant_call_without_fastpQC.bai)
 	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
-	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
-	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_fastpQC_filtered, minos_vcfs_if_fastpQC_but_not_filtering, minos_vcfs_if_no_fastpQC])
+	Array[File] final_bams = flatten([bams_if_fastpQC_filtered, bams_if_fastpQC_but_not_filtering, bams_if_no_fastpQC])
+	Array[File] final_bais = flatten([bais_if_fastpQC_filtered, bais_if_fastpQC_but_not_filtering, bais_if_no_fastpQC])
 	
 	# Now we need to essentially scatter on three arrays: minos_vcfs, bams, and bais. This is trivial in CWL, but
 	# isn't intutive in WDL -- in fact, it's arguably not possible!
@@ -363,7 +363,7 @@ workflow myco {
 
 	if(fastqc_on_timeout) {
 		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
-		Array[File] bad_fastqs_varcallr_ = select_all(flatten([variant_call_without_earlyQC.check_this_fastq, variant_call_after_earlyQC_but_not_filtering_samples.check_this_fastq]))
+		Array[File] bad_fastqs_varcallr_ = select_all(flatten([variant_call_without_fastpQC.check_this_fastq, variant_call_after_fastpQC_but_not_filtering_samples.check_this_fastq]))
 		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
 		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
 			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  

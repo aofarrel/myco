@@ -4,7 +4,7 @@
   "myco.tree_to_decorate": "gs://topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb",
   "myco.diffQC_low_coverage_cutoff": 10,
   "myco.diffQC_mask_bedfile": "gs://topmed_workflow_testing/tb/R00000039_repregions.bed",
-  "myco.earlyQC_skip_entirely": "false",
-  "myco.earlyQC_skip_trimming": "false",
-  "myco.earlyQC_minimum_percent_q30": "0.90"
+  "myco.fastpQC_skip_entirely": "false",
+  "myco.fastpQC_skip_trimming": "false",
+  "myco.fastpQC_minimum_percent_q30": "0.90"
 }
