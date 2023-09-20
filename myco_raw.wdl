@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/CDC-decontam-ref/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
@@ -18,6 +18,7 @@ workflow myco {
 		Int     covstatsQC_minimum_coverage    =   10
 		Int     covstatsQC_max_percent_unmapped=    2
 		Boolean covstatsQC_skip_entirely       = false
+		Boolean decontam_use_CDC_varpipe_ref   = true
 		File?   diffQC_mask_bedfile
 		Int     diffQC_max_percent_low_coverage=    20
 		Int     diffQC_low_coverage_cutoff     =    10
@@ -80,6 +81,7 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
 			input:
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.3-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.3-CRyPTIC",
 				unsorted_sam = true,
 				reads_files = paired_fastqs,
 				subsample_cutoff = subsample_cutoff,
