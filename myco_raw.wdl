@@ -289,7 +289,7 @@ workflow myco {
 		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
 		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
+		Array[Int] coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
 		
 		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
 		if(!(length(coerced_bam_strains) == 0)) {
@@ -321,7 +321,7 @@ workflow myco {
 			
 			# if there is only one sample, there's no need to run tasks
 			if(length(paired_fastq_sets) == 1) {
-				Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
+				Int    single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
 				String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
 				String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 			}
