@@ -286,7 +286,7 @@ workflow myco {
 		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
 		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-		Array[String] coerced_bam_depths=select_all(profile_bam.median_depth)
+		Array[Int] coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
 		
 		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
 		if(!(length(coerced_bam_strains) == 0)) {
