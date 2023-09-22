@@ -81,7 +81,7 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.7-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.7-CRyPTIC",
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.7-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.2-full",
 				unsorted_sam = true,
 				reads_files = paired_fastqs,
 				subsample_cutoff = subsample_cutoff,
