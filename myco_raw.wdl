@@ -6,8 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/fastp-wdl/0.0.1/fastp_tasks.wdl" as fastp # fastpQC
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/new-tbprofiler/neoTBfastProfiler.wdl" as qc_fastqsWF # aka fastpQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/new-tbprofiler/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -22,11 +21,11 @@ workflow myco {
 		File?   diffQC_mask_bedfile
 		Int     diffQC_max_percent_low_coverage=    20
 		Int     diffQC_low_coverage_cutoff     =    10
-		Int     fastpQC_minimum_percent_q30    =    90
-		Boolean fastpQC_skip_entirely          = false
-		Boolean fastpQC_skip_QC                = false
-		Boolean fastpQC_skip_trimming          = false
-		Int     fastpQC_trim_qual_below        =   30
+		Int     earlyQC_minimum_percent_q30    =    90
+		Boolean earlyQC_skip_entirely          = false
+		Boolean earlyQC_skip_QC                = false
+		Boolean earlyQC_skip_trimming          = false
+		Int     earlyQC_trim_qual_below        =   30
 		Int     quick_tasks_disk_size          =   10 
 		Int     subsample_cutoff               =   -1
 		Int     subsample_seed                 = 1965
@@ -56,11 +55,11 @@ workflow myco {
 		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
 		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
-		fastpQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by fastpQC_skip_QC or fastpQC_skip_entirely being false."
-		fastpQC_skip_entirely: "Do not run fastpQC at all - no trimming, no QC, nothing."
-		fastpQC_skip_QC: "Run fastpQC (unless fastpQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of fastpQC_skip_trimming."
-		fastpQC_skip_trimming: "Run fastpQC (unless fastpQC_skip_entirely is true), and remove samples that fail QC (unless fastpQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		fastpQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of fastpQC_minimum_percent_q30. Overridden by fastpQC_skip_trimming or fastpQC_skip_entirely being true."
+		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
+		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
+		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
+		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
+		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
@@ -78,7 +77,7 @@ workflow myco {
 	
 	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
 	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
-	Float fastpQC_minimum_percent_q30_float = fastpQC_minimum_percent_q30 / 100.0
+	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100.0
 	Float tbprofilerQC_max_percent_unmapped_float = tbprofilerQC_max_pct_unmapped / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
@@ -99,22 +98,22 @@ workflow myco {
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
 
-			if(!fastpQC_skip_entirely) {
+			if(!earlyQC_skip_entirely) {
 				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = fastpQC_minimum_percent_q30_float,
-						average_qual = fastpQC_trim_qual_below,
-						use_fastps_cleaned_fastqs = !(fastpQC_skip_trimming),
-						override_qc = fastpQC_skip_QC,
+						q30_cutoff = earlyQC_minimum_percent_q30_float,
+						average_qual = earlyQC_trim_qual_below,
+						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
+						override_qc = earlyQC_skip_QC,
 						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
 				}
-				# if this sample passes fastp, or if fastpQC_skip_QC is true...
+				# if this sample passes fastp, or if earlyQC_skip_QC is true...
 				if(qc_fastqs.pass_or_errorcode == pass) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_fastpQC {
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 							addldisk = variantcalling_addl_disk,
@@ -134,8 +133,8 @@ workflow myco {
 			}
 			
 			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
-			if(fastpQC_skip_entirely) {
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_fastpQC {
+			if(earlyQC_skip_entirely) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						addldisk = variantcalling_addl_disk,
@@ -176,18 +175,18 @@ workflow myco {
 	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
 	# we cannot use anything here to test if any version of the variant caller actually ran at all!
 	# 
-	Array[File] minos_vcfs_if_fastpQC = select_all(variant_call_after_fastpQC.adjudicated_vcf)
-	Array[File] minos_vcfs_if_no_fastpQC = select_all(variant_call_without_fastpQC.adjudicated_vcf)
+	Array[File] minos_vcfs_if_earlyQC = select_all(variant_call_after_earlyQC.adjudicated_vcf)
+	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
 	
-	Array[File] bams_if_fastpQC = select_all(variant_call_after_fastpQC.bam)
-	Array[File] bams_if_no_fastpQC = select_all(variant_call_without_fastpQC.bam)
+	Array[File] bams_if_earlyQC = select_all(variant_call_after_earlyQC.bam)
+	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
 	
-	Array[File] bais_if_fastpQC = select_all(variant_call_after_fastpQC.bai)
-	Array[File] bais_if_no_fastpQC = select_all(variant_call_without_fastpQC.bai)
+	Array[File] bais_if_earlyQC = select_all(variant_call_after_earlyQC.bai)
+	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_fastpQC, minos_vcfs_if_no_fastpQC])
-	Array[File] final_bams = flatten([bams_if_fastpQC, bams_if_no_fastpQC])
-	Array[File] final_bais = flatten([bais_if_fastpQC, bais_if_no_fastpQC])
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC, minos_vcfs_if_no_earlyQC])
+	Array[File] final_bams = flatten([bams_if_earlyQC, bams_if_no_earlyQC])
+	Array[File] final_bais = flatten([bais_if_earlyQC, bais_if_no_earlyQC])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -366,18 +365,18 @@ workflow myco {
 			}
 		}
 		
-		# handle fastpQC (if it ran at all)
+		# handle earlyQC (if it ran at all)
 		
-		Array[String] fastpQC_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
-		Array[String] fastpQC_errorcode_array = flatten([fastpQC_array_coerced, ["PASS"]]) # will fall back to PASS if fastpQC was skipped
-		if(!(fastpQC_errorcode_array[0] == pass)) {          
-			String fastpQC_ERR = fastpQC_errorcode_array[0]
+		Array[String] earlyQC_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
+		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
+		if(!(earlyQC_errorcode_array[0] == pass)) {          
+			String earlyQC_ERR = earlyQC_errorcode_array[0]
 		}
 
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.
 		#
 		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
-		# For example, if(defined(variant_call_after_fastpQC.errorcode)) returns true even if NO variant callers
+		# For example, if(defined(variant_call_after_earlyQC.errorcode)) returns true even if NO variant callers
 		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
 		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
 		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
@@ -387,12 +386,12 @@ workflow myco {
 		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
 		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
 		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
-		Array[String] errorcode_if_fastpQC = select_all(variant_call_after_fastpQC.errorcode)
-		Array[String] errorcode_if_no_fastpQC = select_all(variant_call_without_fastpQC.errorcode)
+		Array[String] errorcode_if_earlyQC = select_all(variant_call_after_earlyQC.errorcode)
+		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
 		
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_fastpQC, errorcode_if_no_fastpQC, ["PASS"]])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, errorcode_if_no_earlyQC, ["PASS"]])
 		if(!(varcall_errorcode_array[0] == pass)) {          
 				String varcall_ERR = varcall_errorcode_array[0]
 		}
@@ -431,8 +430,8 @@ workflow myco {
 		}
 		
 		# final-final-final error code
-		# fastpQC is at the end (but before PASS) to account for fastpQC_skip_QC = true
-		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, fastpQC_ERR, pass])
+		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
+		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
 
 	}
 		
@@ -470,7 +469,7 @@ workflow myco {
 		# status of sample, only valid iff this ran on only one sample
 		String error_code = select_first([finalcode, pass])
 		String? debug_decontam_ERR = decontam_ERR
-		String? debug_fastpQC_ERR = fastpQC_ERR
+		String? debug_earlyQC_ERR = earlyQC_ERR
 		String? debug_varcall_ERR = varcall_ERR
 		String? debug_covstats_ERR = covstats_ERR
 		String? debug_vcfdiff_ERR = vcfdiff_ERR
