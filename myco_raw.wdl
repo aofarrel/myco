@@ -7,7 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/fastp-wdl/0.0.1/fastp_tasks.wdl" as fastp # fastpQC
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.8/TBfastProfiler.wdl" as qc_fastqsWF # aka fastpQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/new-tbprofiler/neoTBfastProfiler.wdl" as qc_fastqsWF # aka fastpQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -31,6 +31,7 @@ workflow myco {
 		Int     subsample_cutoff               =   -1
 		Int     subsample_seed                 = 1965
 		Boolean tbprofiler_on_bam              = false
+		Float   tbprofilerQC_max_pct_unmapped  =    2
 		Int     timeout_decontam_part1         =    0
 		Int     timeout_decontam_part2         =    0
 		Int     timeout_variant_caller         =    0
@@ -65,6 +66,7 @@ workflow myco {
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
+		tbprofilerQC_max_pct_unmapped: "If tbprofiler thinks this percent (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
@@ -77,6 +79,7 @@ workflow myco {
 	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
 	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
 	Float fastpQC_minimum_percent_q30_float = fastpQC_minimum_percent_q30 / 100.0
+	Float tbprofilerQC_max_percent_unmapped_float = tbprofilerQC_max_pct_unmapped / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -103,40 +106,15 @@ workflow myco {
 						fastq2 = real_decontaminated_fastq_2,
 						q30_cutoff = fastpQC_minimum_percent_q30_float,
 						average_qual = fastpQC_trim_qual_below,
-						use_fastps_cleaned_fastqs = !(fastpQC_skip_trimming)
+						use_fastps_cleaned_fastqs = !(fastpQC_skip_trimming),
+						override_qc = fastpQC_skip_QC,
+						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
 				}
-				
-				# if we are filtering out samples via fastpQC...
-				if(!(fastpQC_skip_QC)) {
-				
-					# and this sample passes...
-					if(qc_fastqs.pass_or_errorcode == pass) {
-						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_fastpQC_filtering {
-							input:
-								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
-								addldisk = variantcalling_addl_disk,
-								cpu = variantcalling_cpu,
-								crash_on_error = variantcalling_crash_on_error,
-								crash_on_timeout = variantcalling_crash_on_timeout,
-								debug = variantcalling_debug,
-								mem_height = variantcalling_mem_height,
-								memory = variantcalling_memory,
-								preempt = variantcalling_preemptibles,
-								retries = variantcalling_retries,
-								ssd = variantcalling_ssd,
-								tarball_bams_and_bais = false,
-								timeout = timeout_variant_caller
-						}
-					}
-				}
-				
-				# if we are not filtering out samples via the early qc step (but ran fastpQC anyway)...
-				if(fastpQC_skip_QC) {
+				# if this sample passes fastp, or if fastpQC_skip_QC is true...
+				if(qc_fastqs.pass_or_errorcode == pass) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_fastpQC_but_not_filtering_samples {
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_fastpQC {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 							addldisk = variantcalling_addl_disk,
@@ -198,21 +176,18 @@ workflow myco {
 	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
 	# we cannot use anything here to test if any version of the variant caller actually ran at all!
 	# 
-	Array[File] minos_vcfs_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.adjudicated_vcf)
-	Array[File] minos_vcfs_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.adjudicated_vcf)
+	Array[File] minos_vcfs_if_fastpQC = select_all(variant_call_after_fastpQC.adjudicated_vcf)
 	Array[File] minos_vcfs_if_no_fastpQC = select_all(variant_call_without_fastpQC.adjudicated_vcf)
 	
-	Array[File] bams_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.bam)
-	Array[File] bams_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.bam)
+	Array[File] bams_if_fastpQC = select_all(variant_call_after_fastpQC.bam)
 	Array[File] bams_if_no_fastpQC = select_all(variant_call_without_fastpQC.bam)
 	
-	Array[File] bais_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.bai)
-	Array[File] bais_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.bai)
+	Array[File] bais_if_fastpQC = select_all(variant_call_after_fastpQC.bai)
 	Array[File] bais_if_no_fastpQC = select_all(variant_call_without_fastpQC.bai)
 	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_fastpQC_filtered, minos_vcfs_if_fastpQC_but_not_filtering, minos_vcfs_if_no_fastpQC])
-	Array[File] final_bams = flatten([bams_if_fastpQC_filtered, bams_if_fastpQC_but_not_filtering, bams_if_no_fastpQC])
-	Array[File] final_bais = flatten([bais_if_fastpQC_filtered, bais_if_fastpQC_but_not_filtering, bais_if_no_fastpQC])
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_fastpQC, minos_vcfs_if_no_fastpQC])
+	Array[File] final_bams = flatten([bams_if_fastpQC, bams_if_no_fastpQC])
+	Array[File] final_bais = flatten([bais_if_fastpQC, bais_if_no_fastpQC])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -329,9 +304,9 @@ workflow myco {
   	}
   	
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	if(defined(qc_fastqs.samp_strain)) {
-		Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
-		Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
+  	if(defined(qc_fastqs.strain)) {
+		Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
+		Array[String] coerced_fq_resistance=select_all(qc_fastqs.resistance)
 
 		call sranwrp_processing.cat_strings as collate_fq_strains {
 			input:
@@ -402,7 +377,7 @@ workflow myco {
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.
 		#
 		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
-		# For example, if(defined(variant_call_after_fastpQC_filtering.errorcode)) returns true even if NO variant callers
+		# For example, if(defined(variant_call_after_fastpQC.errorcode)) returns true even if NO variant callers
 		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
 		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
 		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
@@ -412,13 +387,12 @@ workflow myco {
 		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
 		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
 		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
-		Array[String] errorcode_if_fastpQC_filtered = select_all(variant_call_after_fastpQC_filtering.errorcode)
-		Array[String] errorcode_if_fastpQC_but_not_filtering = select_all(variant_call_after_fastpQC_but_not_filtering_samples.errorcode)
+		Array[String] errorcode_if_fastpQC = select_all(variant_call_after_fastpQC.errorcode)
 		Array[String] errorcode_if_no_fastpQC = select_all(variant_call_without_fastpQC.errorcode)
 		
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_fastpQC_filtered, errorcode_if_fastpQC_but_not_filtering, errorcode_if_no_fastpQC, ["PASS"]])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_fastpQC, errorcode_if_no_fastpQC, ["PASS"]])
 		if(!(varcall_errorcode_array[0] == pass)) {          
 				String varcall_ERR = varcall_errorcode_array[0]
 		}
@@ -481,7 +455,6 @@ workflow myco {
 		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
 		Array[File?]  tbprof_fq_lims         = qc_fastqs.tbprofiler_lims_report_csv
 		File?         tbprof_fq_strains      = collate_fq_strains.outfile
-		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
 		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if there are multiple samples
