@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.10.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
@@ -17,6 +17,7 @@ workflow myco {
 		Int     covstatsQC_minimum_coverage    =   10
 		Int     covstatsQC_max_percent_unmapped=    2
 		Boolean covstatsQC_skip_entirely       = false
+		Boolean decontam_use_CDC_varpipe_ref   = true
 		File?   diffQC_mask_bedfile
 		Int     diffQC_max_percent_low_coverage=    20
 		Int     diffQC_low_coverage_cutoff     =    10
@@ -79,6 +80,7 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
 			input:
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.7-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.2-full",
 				unsorted_sam = true,
 				reads_files = paired_fastqs,
 				subsample_cutoff = subsample_cutoff,
@@ -318,7 +320,7 @@ workflow myco {
 			
 			# if there is only one sample, there's no need to run tasks
 			if(length(paired_fastq_sets) == 1) {
-				Int    single_sample_tbprof_bam_depth      = read_int(coerced_bam_depths[0])
+				Int    single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
 				String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
 				String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 			}
