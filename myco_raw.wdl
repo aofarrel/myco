@@ -483,5 +483,13 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+		
+		# useful run information
+		Int seconds_to_untar = decontam_each_sample.seconds_to_untar
+		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads
+		Int seconds_to_sort = decontam_each_sample.seconds_to_sort
+		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam
+		Int seconds_total = decontam_each_sample.seconds_total
+		String docker_used = decontam_each_sample.docker_used
 	}
 }
