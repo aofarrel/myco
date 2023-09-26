@@ -263,7 +263,7 @@ workflow myco {
 		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
 		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-		Array[Int] coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
+		Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
 		
 		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
 		if(!(length(coerced_bam_strains) == 0)) {
@@ -305,20 +305,43 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	if(defined(qc_fastqs.strain)) {
 		Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
-		Array[String] coerced_fq_resistance=select_all(qc_fastqs.resistance)
-
-		call sranwrp_processing.cat_strings as collate_fq_strains {
-			input:
-				strings = coerced_fq_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
+		Array[String] coerced_fq_resistances=select_all(qc_fastqs.resistance)
+		Array[Int]    coerced_fq_depths=select_all(qc_fastqs.median_coverage)
 		
-		call sranwrp_processing.cat_strings as collate_fq_resistance {
-			input:
-				strings = coerced_fq_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
+		# workaround for "task.output exists but task didn't run" bug
+		if(!(length(coerced_fq_strains) == 0)) {
+		
+			# if there is more than one sample, run some tasks to concatenate the outputs
+			if(length(paired_fastq_sets) != 1) {
+
+				call sranwrp_processing.cat_strings as collate_fq_strains {
+					input:
+						strings = coerced_fq_strains,
+						out = "strain_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_fq_resistance {
+					input:
+						strings = coerced_fq_resistances,
+						out = "resistance_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_fq_depth {
+					input:
+						strings = coerced_fq_depths,
+						out = "depth_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+			}
+		
+			# if there is only one sample, there's no need to run tasks
+			if(length(paired_fastq_sets) == 1) {
+				Int    single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
+				String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
+				String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+			}
 		}
   	}
 
@@ -436,46 +459,42 @@ workflow myco {
 	}
 		
 	output {
+		# status of sample -- only valid iff this ran on only one sample
+		String status_code = select_first([finalcode, pass])
+		
 		# raw files
-		Array[File]  bais = final_bais
+		Array[File]  bais  = final_bais
 		Array[File]  bams  = final_bams
 		Array[File?] diffs = real_diffs
 		Array[File?] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?]  covstats_reports       = covstats.covstatsOutfile
-		Array[File?]  diff_reports           = real_reports
-		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
-		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
-		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
-		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
-		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
-		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
-		Array[File?]  tbprof_fq_lims         = qc_fastqs.tbprofiler_lims_report_csv
-		File?         tbprof_fq_strains      = collate_fq_strains.outfile
-		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
+		Array[File?] covstats_reports          = covstats.covstatsOutfile
+		Array[File?] diff_reports              = real_reports
+		Array[File?] fastp_reports             = qc_fastqs.fastp_txt
+		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbprof_fq_jsons           = qc_fastqs.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = qc_fastqs.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = qc_fastqs.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = qc_fastqs.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
-		File?         tbprof_bam_depths      = collate_bam_depth.outfile
-		File?         tbprof_bam_strains     = collate_bam_strains.outfile
-		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
+		File?        tbprof_bam_all_strains     = collate_bam_strains.outfile
+		File?        tbprof_bam_all_resistances = collate_bam_resistance.outfile
+		File?        tbprof_fq_all_depths       = collate_fq_depth.outfile
+		File?        tbprof_fq_all_strains      = collate_fq_strains.outfile
+		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if we ran on a single sample
-		Int?            tbprof_bam_depth      = single_sample_tbprof_bam_depth
-		String?         tbprof_bam_strain     = single_sample_tbprof_bam_strain
-		String?         tbprof_bam_resistance = single_sample_tbprof_bam_resistance
-		
-		# status of sample, only valid iff this ran on only one sample
-		String error_code = select_first([finalcode, pass])
-		String? debug_decontam_ERR = decontam_ERR
-		String? debug_earlyQC_ERR = earlyQC_ERR
-		String? debug_varcall_ERR = varcall_ERR
-		String? debug_covstats_ERR = covstats_ERR
-		String? debug_vcfdiff_ERR = vcfdiff_ERR
-		Array[String]? debug_vcfdiff_errorcode_if_covstats = vcfdiff_errorcode_if_covstats
-		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
-		Array[String]? debug_vcfdiff_errorcode_array = vcfdiff_errorcode_array
+		Int?         tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
+		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
+		Int?         tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
+		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
@@ -484,12 +503,20 @@ workflow myco {
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
-		# useful run information (again, only iff this ran on one sample)
-		Int seconds_to_untar = decontam_each_sample.seconds_to_untar[0]
+		# useful debugging/run information (only valid iff this ran on only one sample)
+		String? debug_decontam_ERR  = decontam_ERR
+		String? debug_earlyQC_ERR   = earlyQC_ERR
+		String? debug_varcall_ERR   = varcall_ERR
+		String? debug_covstats_ERR  = covstats_ERR
+		String? debug_vcfdiff_ERR   = vcfdiff_ERR
+		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
+		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
+		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
+		Int seconds_to_untar     = decontam_each_sample.seconds_to_untar[0]
 		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads[0]
-		Int seconds_to_sort = decontam_each_sample.seconds_to_sort[0]
+		Int seconds_to_sort      = decontam_each_sample.seconds_to_sort[0]
 		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
-		Int seconds_total = decontam_each_sample.seconds_total[0]
-		String docker_used = decontam_each_sample.docker_used[0]
+		Int seconds_total        = decontam_each_sample.seconds_total[0]
+		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
