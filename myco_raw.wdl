@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
@@ -484,12 +484,12 @@ workflow myco {
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
-		# useful run information
-		Int seconds_to_untar = decontam_each_sample.seconds_to_untar
-		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads
-		Int seconds_to_sort = decontam_each_sample.seconds_to_sort
-		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam
-		Int seconds_total = decontam_each_sample.seconds_total
-		String docker_used = decontam_each_sample.docker_used
+		# useful run information (again, only iff this ran on one sample)
+		Int seconds_to_untar = decontam_each_sample.seconds_to_untar[0]
+		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads[0]
+		Int seconds_to_sort = decontam_each_sample.seconds_to_sort[0]
+		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
+		Int seconds_total = decontam_each_sample.seconds_total[0]
+		String docker_used = decontam_each_sample.docker_used[0]
 	}
 }
