@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.8/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/new-tbprofiler/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -30,6 +30,7 @@ workflow myco {
 		Int     subsample_cutoff               =   -1
 		Int     subsample_seed                 = 1965
 		Boolean tbprofiler_on_bam              = false
+		Float   tbprofilerQC_max_pct_unmapped  =    2
 		Int     timeout_decontam_part1         =    0
 		Int     timeout_decontam_part2         =    0
 		Int     timeout_variant_caller         =    0
@@ -55,7 +56,7 @@ workflow myco {
 		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
 		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
 		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
-		earlyQC_skip_entirely: "Do not run earlyQC (fastp + fastq-TBProfiler) at all - no trimming, no QC, nothing. Does not affect tbprofiler_on_bam."
+		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
 		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
 		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
 		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
@@ -64,6 +65,7 @@ workflow myco {
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
+		tbprofilerQC_max_pct_unmapped: "If tbprofiler thinks this percent (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
@@ -76,6 +78,7 @@ workflow myco {
 	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
 	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
 	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100.0
+	Float tbprofilerQC_max_percent_unmapped_float = tbprofilerQC_max_pct_unmapped / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -102,40 +105,15 @@ workflow myco {
 						fastq2 = real_decontaminated_fastq_2,
 						q30_cutoff = earlyQC_minimum_percent_q30_float,
 						average_qual = earlyQC_trim_qual_below,
-						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming)
+						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
+						override_qc = earlyQC_skip_QC,
+						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
 				}
-				
-				# if we are filtering out samples via earlyQC...
-				if(!(earlyQC_skip_QC)) {
-				
-					# and this sample passes...
-					if(qc_fastqs.pass_or_errorcode == pass) {
-						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
-							input:
-								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
-								addldisk = variantcalling_addl_disk,
-								cpu = variantcalling_cpu,
-								crash_on_error = variantcalling_crash_on_error,
-								crash_on_timeout = variantcalling_crash_on_timeout,
-								debug = variantcalling_debug,
-								mem_height = variantcalling_mem_height,
-								memory = variantcalling_memory,
-								preempt = variantcalling_preemptibles,
-								retries = variantcalling_retries,
-								ssd = variantcalling_ssd,
-								tarball_bams_and_bais = false,
-								timeout = timeout_variant_caller
-						}
-					}
-				}
-				
-				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(earlyQC_skip_QC) {
+				# if this sample passes fastp, or if earlyQC_skip_QC is true...
+				if(qc_fastqs.pass_or_errorcode == pass) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
+					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 							addldisk = variantcalling_addl_disk,
@@ -197,21 +175,18 @@ workflow myco {
 	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
 	# we cannot use anything here to test if any version of the variant caller actually ran at all!
 	# 
-	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
-	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
+	Array[File] minos_vcfs_if_earlyQC = select_all(variant_call_after_earlyQC.adjudicated_vcf)
 	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
 	
-	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bam)
-	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bam)
+	Array[File] bams_if_earlyQC = select_all(variant_call_after_earlyQC.bam)
 	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
 	
-	Array[File] bais_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bai)
-	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
+	Array[File] bais_if_earlyQC = select_all(variant_call_after_earlyQC.bai)
 	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
 	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
-	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
-	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
+	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC, minos_vcfs_if_no_earlyQC])
+	Array[File] final_bams = flatten([bams_if_earlyQC, bams_if_no_earlyQC])
+	Array[File] final_bais = flatten([bais_if_earlyQC, bais_if_no_earlyQC])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -288,7 +263,7 @@ workflow myco {
 		# coerce optional types into required types
 		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
 		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-		Array[Int] coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
+		Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
 		
 		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
 		if(!(length(coerced_bam_strains) == 0)) {
@@ -328,22 +303,45 @@ workflow myco {
   	}
   	
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	if(defined(qc_fastqs.samp_strain)) {
-		Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
-		Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
-
-		call sranwrp_processing.cat_strings as collate_fq_strains {
-			input:
-				strings = coerced_fq_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
+  	if(defined(qc_fastqs.strain)) {
+		Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
+		Array[String] coerced_fq_resistances=select_all(qc_fastqs.resistance)
+		Array[Int]    coerced_fq_depths=select_all(qc_fastqs.median_coverage)
 		
-		call sranwrp_processing.cat_strings as collate_fq_resistance {
-			input:
-				strings = coerced_fq_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
+		# workaround for "task.output exists but task didn't run" bug
+		if(!(length(coerced_fq_strains) == 0)) {
+		
+			# if there is more than one sample, run some tasks to concatenate the outputs
+			if(length(paired_fastq_sets) != 1) {
+
+				call sranwrp_processing.cat_strings as collate_fq_strains {
+					input:
+						strings = coerced_fq_strains,
+						out = "strain_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_fq_resistance {
+					input:
+						strings = coerced_fq_resistances,
+						out = "resistance_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+				
+				call sranwrp_processing.cat_strings as collate_fq_depth {
+					input:
+						strings = coerced_fq_depths,
+						out = "depth_reports.txt",
+						disk_size = quick_tasks_disk_size
+				}
+			}
+		
+			# if there is only one sample, there's no need to run tasks
+			if(length(paired_fastq_sets) == 1) {
+				Int    single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
+				String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
+				String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+			}
 		}
   	}
 
@@ -392,16 +390,16 @@ workflow myco {
 		
 		# handle earlyQC (if it ran at all)
 		
-		Array[String] earlyqc_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
-		Array[String] earlyqc_errorcode_array = flatten([earlyqc_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
-		if(!(earlyqc_errorcode_array[0] == pass)) {          
-			String earlyqc_ERR = earlyqc_errorcode_array[0]
+		Array[String] earlyQC_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
+		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
+		if(!(earlyQC_errorcode_array[0] == pass)) {          
+			String earlyQC_ERR = earlyQC_errorcode_array[0]
 		}
 
 		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.
 		#
 		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
-		# For example, if(defined(variant_call_after_earlyQC_filtering.errorcode)) returns true even if NO variant callers
+		# For example, if(defined(variant_call_after_earlyQC.errorcode)) returns true even if NO variant callers
 		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
 		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
 		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
@@ -411,13 +409,12 @@ workflow myco {
 		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
 		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
 		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
-		Array[String] errorcode_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.errorcode)
-		Array[String] errorcode_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.errorcode)
+		Array[String] errorcode_if_earlyQC = select_all(variant_call_after_earlyQC.errorcode)
 		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
 		
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC_filtered, errorcode_if_earlyQC_but_not_filtering, errorcode_if_no_earlyQC, ["PASS"]])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, errorcode_if_no_earlyQC, ["PASS"]])
 		if(!(varcall_errorcode_array[0] == pass)) {          
 				String varcall_ERR = varcall_errorcode_array[0]
 		}
@@ -457,52 +454,47 @@ workflow myco {
 		
 		# final-final-final error code
 		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
-		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyqc_ERR, pass])
+		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
 
 	}
 		
 	output {
+		# status of sample -- only valid iff this ran on only one sample
+		String status_code = select_first([finalcode, pass])
+		
 		# raw files
-		Array[File]  bais = final_bais
+		Array[File]  bais  = final_bais
 		Array[File]  bams  = final_bams
 		Array[File?] diffs = real_diffs
 		Array[File?] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?]  covstats_reports       = covstats.covstatsOutfile
-		Array[File?]  diff_reports           = real_reports
-		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
-		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
-		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
-		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
-		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
-		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
-		Array[File?]  tbprof_fq_lims         = qc_fastqs.tbprofiler_lims_report_csv
-		File?         tbprof_fq_strains      = collate_fq_strains.outfile
-		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
-		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
+		Array[File?] covstats_reports          = covstats.covstatsOutfile
+		Array[File?] diff_reports              = real_reports
+		Array[File?] fastp_reports             = qc_fastqs.fastp_txt
+		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbprof_fq_jsons           = qc_fastqs.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = qc_fastqs.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = qc_fastqs.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = qc_fastqs.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
-		File?         tbprof_bam_depths      = collate_bam_depth.outfile
-		File?         tbprof_bam_strains     = collate_bam_strains.outfile
-		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
+		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
+		File?        tbprof_bam_all_strains     = collate_bam_strains.outfile
+		File?        tbprof_bam_all_resistances = collate_bam_resistance.outfile
+		File?        tbprof_fq_all_depths       = collate_fq_depth.outfile
+		File?        tbprof_fq_all_strains      = collate_fq_strains.outfile
+		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if we ran on a single sample
-		Int?            tbprof_bam_depth      = single_sample_tbprof_bam_depth
-		String?         tbprof_bam_strain     = single_sample_tbprof_bam_strain
-		String?         tbprof_bam_resistance = single_sample_tbprof_bam_resistance
-		
-		# status of sample, only valid iff this ran on only one sample
-		String error_code = select_first([finalcode, pass])
-		String? debug_decontam_ERR = decontam_ERR
-		String? debug_earlyqc_ERR = earlyqc_ERR
-		String? debug_varcall_ERR = varcall_ERR
-		String? debug_covstats_ERR = covstats_ERR
-		String? debug_vcfdiff_ERR = vcfdiff_ERR
-		Array[String]? debug_vcfdiff_errorcode_if_covstats = vcfdiff_errorcode_if_covstats
-		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
-		Array[String]? debug_vcfdiff_errorcode_array = vcfdiff_errorcode_array
+		Int?         tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
+		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
+		Int?         tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
+		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
@@ -510,5 +502,21 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+		
+		# useful debugging/run information (only valid iff this ran on only one sample)
+		String? debug_decontam_ERR  = decontam_ERR
+		String? debug_earlyQC_ERR   = earlyQC_ERR
+		String? debug_varcall_ERR   = varcall_ERR
+		String? debug_covstats_ERR  = covstats_ERR
+		String? debug_vcfdiff_ERR   = vcfdiff_ERR
+		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
+		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
+		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
+		Int seconds_to_untar     = decontam_each_sample.seconds_to_untar[0]
+		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads[0]
+		Int seconds_to_sort      = decontam_each_sample.seconds_to_sort[0]
+		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
+		Int seconds_total        = decontam_each_sample.seconds_total[0]
+		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
