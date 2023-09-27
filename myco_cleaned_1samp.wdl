@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/myco/4.2.0/myco_cleaned.wdl" as WF
+import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco_cleaned.wdl" as WF
 
 # This is just a one-sample wrapper for myco_cleaned. It is intended for Terra data tables with a format like this:
 #
@@ -18,7 +18,7 @@ workflow myco_cleaned_one_sample {
     input {
         File decontaminated_fastq_1
         File decontaminated_fastq_2
-        File typical_tb_masked_regions
+        File? typical_tb_masked_regions
     }
 
     call WF.myco {

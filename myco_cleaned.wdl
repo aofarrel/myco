@@ -1,5 +1,5 @@
 version 1.0
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
@@ -67,8 +67,8 @@ workflow myco {
 		}
 	}
 
-	Array[File] minos_vcfs=select_all(variant_call_each_sample.vcf_final_call_set)
-	Array[File] bams_to_ref=select_all(variant_call_each_sample.mapped_to_ref)
+	Array[File] minos_vcfs=select_all(variant_call_each_sample.adjudicated_vcf)
+	Array[File] bams_to_ref=select_all(variant_call_each_sample.bam)
 
 
 	scatter(vcfs_and_bams in zip(bams_to_ref, minos_vcfs)) {
