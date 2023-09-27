@@ -3,7 +3,7 @@ myco is group of pipelines built for phylogenic analysis of the _Mycobacterium t
 
 ## Which workflow should I use?
 Each version of myco largely only differs in how you are passing in FASTQ files. **In all cases, your FASTQs must be paired-end Illumina reads.**
-* [myco_cleaned](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_cleaned) (and its Terra-data-table-friendly wrapper myco_cleaned_1samp) expects decontaminated and merged FASTQs
+* [myco_simple](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects decontaminated and merged FASTQs
 * [myco_raw](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated and may or may not be merged
 * [myco_sra](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
 
@@ -13,10 +13,10 @@ For more information please see [./docs/inputs.md](./doc/inputs.md).
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
 * Full list of inputs: [inputs.md](./doc/inputs.md)
 * Per-workflow readmes:
-  * [myco_cleaned_1sample](.doc/myco_cleaned_1sample.md)
-  * [myco_cleaned](./doc/myco_cleaned.md)
   * [myco_raw](./doc/myco_raw.md)
+  * [myco_simple](./doc/myco_simple.md)
   * [myco_sra](./doc/myco_sra.md)
+  * [wrapper_example](.doc/wrapper_example.md)
 
 myco imports almost all of its code from other repos. Please see those specific repos for support with different parts of the myco pipeline:
 * Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)

@@ -11,8 +11,8 @@ echo "grabbing inputs from myco_sra..."
 java -jar /Applications/womtool-85.jar inputs myco_sra.wdl > raw.txt
 echo "grabbing inputs from myco_raw..."
 java -jar /Applications/womtool-85.jar inputs myco_raw.wdl >> raw.txt
-echo "grabbing inputs from myco_cleaned..."
-java -jar /Applications/womtool-85.jar inputs myco_cleaned.wdl >> raw.txt
+echo "grabbing inputs from myco_simple..."
+java -jar /Applications/womtool-85.jar inputs myco_simple.wdl >> raw.txt
 echo "processing..."
 sort raw.txt > sorted.txt
 uniq sorted.txt > unique.txt
@@ -27,13 +27,13 @@ fastq_intro =  ("Each version of myco has a slightly different way of inputting 
 				"A basic explanation for each workflow is in the table below. You can "
 				"find more detailed explanations in each workflow's workflow-level readme.")
 fastq_summary = ("* pairs of FASTQs which have been decontaminated and merged such that each "
-				"sample has precisely two FASTQs associated with it: **myco_cleaned** \n"
-				"  * if these are in Terra data table format, you may want to use **myco_cleaned_1samp** \n"
+				"sample has precisely two FASTQs associated with it: **myco_simple** \n"
+				"  * if these are in Terra data table format, you may want to use **myco_simple_1samp** \n"
 				" * pairs of FASTQs which have yet to be decontaminated or merged: \n"
 				" * if each sample has its FASTQs in a single array: **myco_raw** \n"
 				" * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: "
 				"[Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), "
-				"then **myco_cleaned** or **myco_cleaned_1samp** \n"
+				"then **myco_simple** or **myco_simple_1samp** \n"
 				" * a list of SRA BioSamples whose FASTQs you'd like to use: **myco_sra** \n"
 				" * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: "
 				"[convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), "
@@ -52,7 +52,7 @@ dont_input_garbage = ("Regardless of which version of myco you use, please make 
 					"none of these run accessions' FASTQs are over 1 GB in size, but the sum total of "
 					"these FASTQs could quickly fill up your disk space. (You probably should not be using "
 					"SAMEA968096 anyway because it is in sample group, which can cause other issues.)\n\n"
-					"myco_cleaned expects that the FASTQs you are putting into have already been cleaned and "
+					"myco_simple expects that the FASTQs you are putting into have already been cleaned and "
 					"merged. It's recommend you do this by running "
 					"[Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).")
 timeout_intro =    ("When working with data of unknown quality such as SRA data, it can be helpful to quickly remove "
@@ -62,7 +62,7 @@ timeout_intro =    ("When working with data of unknown quality such as SRA data,
 					"of the decontamination step -- the more contamination a sample has, the more that step has to do. "
 					"This heuristic was defined on the default runtime attributes and using Terra as a backend, so "
 					"straying from those defaults is likely to make the default timeout values less useful. This "
-					"*includes* changing from SDDs to HDDs! \n\n myco_raw and myco_cleaned default to not using this "
+					"*includes* changing from SDDs to HDDs! \n\n myco_raw and myco_simple default to not using this "
 					"heuristic at all.")
 filename_vars = [
 			"out", 
@@ -226,8 +226,8 @@ with open("myco_sra.wdl", "r") as myco:
 		else:
 			continue
 in_parameter_meta = False
-print("Extracting workflow-level variables from myco_cleaned...")
-with open("myco_cleaned.wdl", "r") as myco:
+print("Extracting workflow-level variables from myco_simple...")
+with open("myco_simple.wdl", "r") as myco:
 	for line in myco:
 		if line.startswith("\tparameter_meta"):
 			in_parameter_meta = True
@@ -258,15 +258,15 @@ for input_variable in workflow_level:
 		del input_variable["default"]
 		fastq_inputs.append(input_variable)
 	elif value == "paired_decontaminated_fastq_sets":
-		input_variable["workflow"] = "myco_cleaned"
+		input_variable["workflow"] = "myco_simple"
 		del input_variable["default"]
 		fastq_inputs.append(input_variable)
 	#elif value == "decontaminated_fastq_1":
-	#	input_variable["workflow"] = "myco_cleaned_1samp"
+	#	input_variable["workflow"] = "myco_simple_1samp"
 	#	del input_variable["default"]
 	#	fastq_inputs.append(input_variable)
 	#elif value == "decontaminated_fastq_2":
-	#	input_variable["workflow"] = "myco_cleaned_1samp"
+	#	input_variable["workflow"] = "myco_simple_1samp"
 	#	del input_variable["default"]
 	#	fastq_inputs.append(input_variable)
 	else:
@@ -294,13 +294,13 @@ for input_variable in workflow_level:
 	
 	# the other ones, which have zero for the defaults
 	elif input_variable["name"] == "timeout_decontam_part1" and input_variable["default"] == "0":
-		input_variable["workflow"] = "myco_raw, myco_cleaned"
+		input_variable["workflow"] = "myco_raw, myco_simple"
 		timeout_inputs.append(input_variable)
 	elif input_variable["name"] == "timeout_decontam_part2" and input_variable["default"] == "0":
-		input_variable["workflow"] = "myco_raw, myco_cleaned"
+		input_variable["workflow"] = "myco_raw, myco_simple"
 		timeout_inputs.append(input_variable)
 	elif input_variable["name"] == "timeout_variant_caller" and input_variable["default"] == "0":
-		input_variable["workflow"] = "myco_raw, myco_cleaned"
+		input_variable["workflow"] = "myco_raw, myco_simple"
 		timeout_inputs.append(input_variable)
 	
 	else:

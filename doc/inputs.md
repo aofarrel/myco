@@ -11,7 +11,7 @@ Each version of myco has a slightly different way of inputting FASTQs. A basic e
 | name | type | workflow | description |  
 |:---:|:---:|:---:|:---:|  
 | biosample_accessions | File | myco_sra | File of BioSample accessions to pull, one accession per line |  
-| paired_decontaminated_fastq_sets | Array | myco_cleaned | Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one forward read and one reverse read. |  
+| paired_decontaminated_fastq_sets | Array | myco_simple| Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one forward read and one reverse read. |  
 | paired_fastq_sets | Array | myco_raw | Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs |  
   
 Regardless of which version of myco you use, please make sure your FASTQs:
@@ -22,7 +22,7 @@ Regardless of which version of myco you use, please make sure your FASTQs:
 <sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.
 It is recommend that you also keep an eye on the total size of your FASTQs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' FASTQs are over 1 GB in size, but the sum total of these FASTQs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)
 
-myco_cleaned expects that the FASTQs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
+myco_simple expects that the FASTQs you are putting into have already been cleaned and decontaminated, but this isn't a hard requirement. What is a hard requirement is that you have precisely one forward read and one reverse read per sample -- if you have multi-lane samples across various fastqs, they will need to be merged first.
  
 ## Quality control
 | name | type | myco_sra default | description |  
@@ -50,7 +50,7 @@ When working with data of unknown quality, it can be helpful to quickly remove s
 | timeout_decontam_part2 | Int  | 15<sup>†</sup>  | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) |  
 | timeout_variant_caller | Int  | 120<sup>†</sup> | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) | 
 
-<sup>†</sup> myco_raw and myco_cleaned default to not using this heuristic at all, so their defaults are 0.
+<sup>†</sup> myco_raw and myco_simple default to not using this heuristic at all, so their defaults are 0.
 
 
 ## Variant caller inputs

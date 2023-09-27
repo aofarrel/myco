@@ -36,7 +36,7 @@ with open("../myco_raw.md", "w") as myco_raw:
 with open("../myco_sra.md", "w") as myco_sra:
     pass
 
-with open("../myco_cleaned.md", "w") as myco_cleaned:
+with open("../myco_simple.md", "w") as myco_simple:
     pass
 
 CODE

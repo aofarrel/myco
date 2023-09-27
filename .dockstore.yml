@@ -15,17 +15,15 @@ workflows:
       - /inputs/myco_sra_local.json
     authors:
       - orcid: 0000-0003-4896-1858
-  - name: myco_cleaned
+  - name: myco_simple
     subclass: WDL
-    primaryDescriptorPath: /myco_cleaned.wdl
-    readMePath: /doc/myco_cleaned.md
+    primaryDescriptorPath: /myco_simple.wdl
+    readMePath: /doc/myco_simple.md
     authors:
       - orcid: 0000-0003-4896-1858
-  - name: myco_cleaned_one_sample
+  - name: myco_wrapper_example
     subclass: WDL
-    primaryDescriptorPath: /myco_cleaned_1samp.wdl
-    readMePath: /doc/myco_cleaned_1samp.md
-    testParameterFiles:
-      - /inputs/myco_sra_terra.json    
+    primaryDescriptorPath: /wrapper_example.wdl
+    readMePath: /doc/wrapper_example.md
     authors:
       - orcid: 0000-0003-4896-1858

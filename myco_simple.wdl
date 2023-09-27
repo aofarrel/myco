@@ -4,6 +4,11 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.1.8/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
 
+# This is a stripped-down version of myco which only runs the variant caller, vcf-to-diff, and (optionally) Tree Nine and/or fastQC.
+# There is NO decontamination, fastp, TB-Profiler, covstats, or QC beyond "does the variant caller crash/time out or not."
+# Need to decontaminate your fastqs, but don't want to run myco_raw? Try Decontam_And_Combine_One_Samples_Fastqs, which can be found
+# on Dockstore: https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs
+
 
 workflow myco {
 	input {

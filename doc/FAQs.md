@@ -1,14 +1,14 @@
 # FAQs
 
 ## What's the use case of each version of myco?
-Short answer: If you are are an LHJ or anyone else who has non-SRA TB samples lying around, use myco_raw. If your samples are on SRA, use myco_sra. If your samples should undergo as little processing (eg: cleaning, decontamination) as possible and you're okay with having less features, use myco_cleaned.
+Short answer: If you are are an LHJ or anyone else who has non-SRA TB samples lying around, use myco_raw. If your samples are on SRA, use myco_sra. If your samples should undergo as little processing (eg: cleaning, decontamination) as possible and you're okay with having less features, use myco_simple.
 
 Longer answer:
-* pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it: **myco_cleaned** 
-  * if these are in Terra data table format, you may want to use **myco_cleaned_1samp** 
+* pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it: **myco_simple** 
+  * if these are in Terra data table format, you may want to use the **wrapper_example** 
  * pairs of FASTQs which have yet to be decontaminated or merged: 
      * if each sample has its FASTQs in a single array: **myco_raw** 
-     * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: [Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_cleaned** or **myco_cleaned_1samp** 
+     * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: [Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_simple** 
      * a list of SRA BioSamples whose FASTQs you'd like to use **myco_sra** 
      * a list of SRA run accessions (ERR, SRR, DRR) whose FASTQs you'd like to use: [convert them to BioSamples](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info), then **myco_sra**)   
 

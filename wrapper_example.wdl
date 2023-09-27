@@ -1,8 +1,8 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco_cleaned.wdl" as WF
+import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco_simple.wdl" as WF
 
-# This is just a one-sample wrapper for myco_cleaned. It is intended for Terra data tables with a format like this:
+# This is just a one-sample wrapper for myco_simple. It is intended for Terra data tables with a format like this:
 #
 #  | entity:sample_id | FASTQ_forward             | FASTQ_reverse             | decontaminated_fastq_1 | decontaminated_fastq_2 |
 #  |------------------|---------------------------|---------------------------|------------------------|------------------------|
@@ -10,11 +10,10 @@ import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco
 #  | sampleB          | raw_B1_r1.fq, rawB2_r1.fq | raw_B1_r2.fq, rawB2_r2.fq | decontam_B_r1.fq       | decontam_B_r2.fq       |
 #  | sampleC          | raw_C_r1.fq               | raw_C_r2.fq               | decontam_C_r1.fq       | decontam_C_r2.fq       |
 #
-# You can get the last two columns of this table from the first three columns by running Decontam_And_Combine_One_Samples_Fastqs
-# which is on Dockstore: https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs
+# However, you don't need to use this wrapper at all. You could still use the above Terra data table with myco_simple 
+# 
 
-
-workflow myco_cleaned_one_sample {
+workflow myco_simple_one_sample {
     input {
         File decontaminated_fastq_1
         File decontaminated_fastq_2
