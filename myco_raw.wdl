@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.9/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/warnings/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -106,7 +106,7 @@ workflow myco {
 						q30_cutoff = earlyQC_minimum_percent_q30_float,
 						average_qual = earlyQC_trim_qual_below,
 						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
-						override_qc = earlyQC_skip_QC,
+						soft_all_qc = earlyQC_skip_QC,
 						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
 				}
 				# if this sample passes fastp, or if earlyQC_skip_QC is true...
@@ -504,6 +504,7 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
+		Array[Array[String]?] pass_or_warnings = qc_fastqs.pass_or_warnings
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
 		String? debug_varcall_ERR   = varcall_ERR
