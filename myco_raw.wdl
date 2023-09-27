@@ -110,7 +110,7 @@ workflow myco {
 						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
 				}
 				# if this sample passes fastp, or if earlyQC_skip_QC is true...
-				if(qc_fastqs.pass_or_errorcode == pass) {
+				if(qc_fastqs.status_code == pass) {
 					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
 			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
@@ -250,9 +250,11 @@ workflow myco {
 		}
 	}
 	
-	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])
-	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
-	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
+	# miniwdl check flags for "SelectArray, array of non-optional items passed to select_first" here, but I'm reasonably sure
+	# this is required to avoid empty arrays.
+	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff]) #!SelectArray
+	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]) #!SelectArray
+	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file]) #!SelectArray
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	# For reasons I don't understand, if no variant caller runs (ergo there's no bam and profile_bam also does not run),
@@ -390,7 +392,7 @@ workflow myco {
 		
 		# handle earlyQC (if it ran at all)
 		
-		Array[String] earlyQC_array_coerced = select_all(qc_fastqs.pass_or_errorcode)
+		Array[String] earlyQC_array_coerced = select_all(qc_fastqs.status_code)
 		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
 		if(!(earlyQC_errorcode_array[0] == pass)) {          
 			String earlyQC_ERR = earlyQC_errorcode_array[0]
@@ -504,7 +506,7 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		Array[Array[String]?] pass_or_warnings = qc_fastqs.pass_or_warnings
+		Array[String]? pass_or_warnings = qc_fastqs.warning_codes[0]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
 		String? debug_varcall_ERR   = varcall_ERR
