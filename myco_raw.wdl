@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/new-tbprofiler/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.9/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 
@@ -157,7 +157,7 @@ workflow myco {
 
 	# do some wizardry to deal with optionals
 	#
-	# In order to account for different use cases, this workflow has three versions of the variant caller. They are mutually
+	# In order to account for different use cases, this workflow has two versions of the variant caller. They are mutually
 	# exclusive, eg, only one can ever be called by a given sample. In fact, there are cases where NONE of them get called.
 	# Additionally, each version of the variant caller technically gives optional output. This is to prevent the entire
 	# pipeline from crashing if a single garbage sample starts the variant calling task but cannot make a VCF.
@@ -396,7 +396,7 @@ workflow myco {
 			String earlyQC_ERR = earlyQC_errorcode_array[0]
 		}
 
-		# Unfortunately, to check if the variant caller ran, we have to check all three versions of the variant caller.
+		# Unfortunately, to check if the variant caller ran, we have to check both versions of the variant caller.
 		#
 		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
 		# For example, if(defined(variant_call_after_earlyQC.errorcode)) returns true even if NO variant callers
