@@ -1,9 +1,11 @@
 # myco_simple
-myco_simple is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis, and at least one of these is true:
+myco_simple is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis, individually gzipped, and at least one of these is true:
 * your fastqs are already decontaminated and cleaned
 * you do not care about decontaminating/cleaning your fastqs
 * you want to run a very basic version of myco as a test
 * you want to compare the final output of a different version of myco versus what you would get without decontamination/fastp cleaning
+
+By "individually gzipped" we mean SAMN02599053_SRR1173122_1.fq.gz and SAMN02599053_SRR1173122_2.fq.gz, not SAMN02599053_SRR1173122.gz which contains two fastqs. Unlike other versions of myco, which are flexible with gzipped or not gzipped fastqs, the inputs to myco_simple **strictly** must be individually gzipped due to limitations of the variant caller.
 
 ## Notable inputs
 All non-fastq inputs are documented here: [inputs.md](./inputs.md)

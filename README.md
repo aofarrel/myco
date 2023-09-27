@@ -3,7 +3,7 @@ myco is group of pipelines built for phylogenic analysis of the _Mycobacterium t
 
 ## Which workflow should I use?
 Each version of myco largely only differs in how you are passing in FASTQ files. **In all cases, your FASTQs must be paired-end Illumina reads.**
-* [myco_simple](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects decontaminated and merged FASTQs
+* [myco_simple](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects decontaminated, gzipped FASTQs 
 * [myco_raw](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated and may or may not be merged
 * [myco_sra](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
 

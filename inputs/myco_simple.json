@@ -1,0 +1,3 @@
+{
+  "myco.paired_decontaminated_fastq_sets": [["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA3512769_ERR987753_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA3512769_ERR987753_2.fastq.gz"]]
+}
