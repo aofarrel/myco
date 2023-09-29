@@ -250,11 +250,11 @@ workflow myco {
 		}
 	}
 	
-	# miniwdl check flags for "SelectArray, array of non-optional items passed to select_first" here, but I'm reasonably sure
-	# this is required to avoid empty arrays.
-	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff]) #!SelectArray
-	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]) #!SelectArray
-	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file]) #!SelectArray
+	# we cannot use select_first() here because of the of the scattered task output bug (https://github.com/broadinstitute/cromwell/issues/7201)
+	# but since both arrays will be defined no matter what, we can cheat a little bit and use select_all() and flatten()!
+	Array[File?] real_diffs = flatten(select_all([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff]))
+	Array[File?] real_reports = flatten(select_all([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]))
+	Array[File?] real_masks = flatten(select_all([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file]))
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	# For reasons I don't understand, if no variant caller runs (ergo there's no bam and profile_bam also does not run),
