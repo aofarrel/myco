@@ -9,7 +9,6 @@ import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/warnings/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
-
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
@@ -250,102 +249,101 @@ workflow myco {
 		}
 	}
 	
-	# we cannot use select_first() here because of the of the scattered task output bug (https://github.com/broadinstitute/cromwell/issues/7201)
-	# but since both arrays will be defined no matter what, we can cheat a little bit and use select_all() and flatten()!
-	Array[File?] real_diffs = flatten(select_all([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff]))
+	# some attempts to reconcile SOTHWO...
+	# real_diffs is now Array[File] and uses two select_all, like final_bais, which does not crash everything
+	# real_reports uses two select_all (valid for changing to Array[File] though)
+	# real_reports unchanged (not valid for changing to Array[File])
+	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File?] real_reports = flatten(select_all([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]))
-	Array[File?] real_masks = flatten(select_all([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file]))
+	Array[File?] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
-	# For reasons I don't understand, if no variant caller runs (ergo there's no bam and profile_bam also does not run),
-	# the following code block will still execute. coerced_bam_strains etc will be arrays with length 0. So this check
-	# isn't sufficient on its own, but as always, I have a workaround for this!
-	if(defined(profile_bam.strain)) {
+	# As per SOTHWO, if no variant caller runs (ergo there's no bam and profile_bam also does not run), defined() is
+	# useless to us but coerced_bam_strains etc will be arrays with length 0.
 	
-		# coerce optional types into required types
-		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-		Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-		Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
-		
-		# workaround for "profile_bam.strain exists but profile_bam didn't run" bug
-		if(!(length(coerced_bam_strains) == 0)) {
-		
-			# if there is more than one sample, run some tasks to concatenate the outputs
-			if(length(paired_fastq_sets) != 1) {
-		
-				call sranwrp_processing.cat_strings as collate_bam_strains {
-					input:
-						strings = coerced_bam_strains,
-						out = "strain_reports.txt",
-						disk_size = quick_tasks_disk_size
-				}
-				
-				call sranwrp_processing.cat_strings as collate_bam_resistance {
-					input:
-						strings = coerced_bam_resistances,
-						out = "resistance_reports.txt",
-						disk_size = quick_tasks_disk_size
-				}
-		
-				call sranwrp_processing.cat_strings as collate_bam_depth {
-					input:
-						strings = coerced_bam_depths,
-						out = "depth_reports.txt",
-						disk_size = quick_tasks_disk_size
-				}
+	# coerce optional types into required types (doesn't crash if these are null)
+	Array[String] coerced_bam_strains=select_all(profile_bam.strain)
+	Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
+	Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
+	
+	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
+	if(!(length(coerced_bam_strains) == 0)) {
+	
+		# if there is more than one sample, run some tasks to concatenate the outputs
+		if(length(paired_fastq_sets) != 1) {
+	
+			call sranwrp_processing.cat_strings as collate_bam_strains {
+				input:
+					strings = coerced_bam_strains,
+					out = "strain_reports.txt",
+					disk_size = quick_tasks_disk_size
 			}
 			
-			# if there is only one sample, there's no need to run tasks
-			if(length(paired_fastq_sets) == 1) {
-				Int    single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
-				String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
-				String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+			call sranwrp_processing.cat_strings as collate_bam_resistance {
+				input:
+					strings = coerced_bam_resistances,
+					out = "resistance_reports.txt",
+					disk_size = quick_tasks_disk_size
+			}
+	
+			call sranwrp_processing.cat_strings as collate_bam_depth {
+				input:
+					strings = coerced_bam_depths,
+					out = "depth_reports.txt",
+					disk_size = quick_tasks_disk_size
 			}
 		}
-  	}
+		
+		# if there is only one sample, there's no need to run tasks
+		if(length(paired_fastq_sets) == 1) {
+			Int    single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
+			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
+			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+		}
+	}
   	
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	if(defined(qc_fastqs.strain)) {
-		Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
-		Array[String] coerced_fq_resistances=select_all(qc_fastqs.resistance)
-		Array[Int]    coerced_fq_depths=select_all(qc_fastqs.median_coverage)
-		
-		# workaround for "task.output exists but task didn't run" bug
-		if(!(length(coerced_fq_strains) == 0)) {
-		
-			# if there is more than one sample, run some tasks to concatenate the outputs
-			if(length(paired_fastq_sets) != 1) {
+  	
+  	# coerce optional types into required types (doesn't crash if these are null)
+	Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
+	Array[String] coerced_fq_resistances=select_all(qc_fastqs.resistance)
+	Array[Int]    coerced_fq_depths=select_all(qc_fastqs.median_coverage)
+	
+	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
+	if(!(length(coerced_fq_strains) == 0)) {
+	
+		# if there is more than one sample, run some tasks to concatenate the outputs
+		if(length(paired_fastq_sets) != 1) {
 
-				call sranwrp_processing.cat_strings as collate_fq_strains {
-					input:
-						strings = coerced_fq_strains,
-						out = "strain_reports.txt",
-						disk_size = quick_tasks_disk_size
-				}
-				
-				call sranwrp_processing.cat_strings as collate_fq_resistance {
-					input:
-						strings = coerced_fq_resistances,
-						out = "resistance_reports.txt",
-						disk_size = quick_tasks_disk_size
-				}
-				
-				call sranwrp_processing.cat_strings as collate_fq_depth {
-					input:
-						strings = coerced_fq_depths,
-						out = "depth_reports.txt",
-						disk_size = quick_tasks_disk_size
-				}
+			call sranwrp_processing.cat_strings as collate_fq_strains {
+				input:
+					strings = coerced_fq_strains,
+					out = "strain_reports.txt",
+					disk_size = quick_tasks_disk_size
 			}
-		
-			# if there is only one sample, there's no need to run tasks
-			if(length(paired_fastq_sets) == 1) {
-				Int    single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
-				String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
-				String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+			
+			call sranwrp_processing.cat_strings as collate_fq_resistance {
+				input:
+					strings = coerced_fq_resistances,
+					out = "resistance_reports.txt",
+					disk_size = quick_tasks_disk_size
+			}
+			
+			call sranwrp_processing.cat_strings as collate_fq_depth {
+				input:
+					strings = coerced_fq_depths,
+					out = "depth_reports.txt",
+					disk_size = quick_tasks_disk_size
 			}
 		}
-  	}
+	
+		# if there is only one sample, there's no need to run tasks
+		if(length(paired_fastq_sets) == 1) {
+			Int    single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
+			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
+			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+		}
+	}
 
 	if(tree_decoration) {
 		if(length(real_diffs)>0) {
@@ -523,3 +521,33 @@ workflow myco {
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
+
+# ** The "Scattered Optional Tasks Have Weird Outputs" (SOTHWO) Issue **
+# As of October 2023, Cromwell handles the output of scattered optional tasks oddly. Let's say task X and Y are mutually
+# exclusive tasks which each output a single File named outfile.
+#
+# scatter {
+#  if (input_variable = true) { call x }
+#  if (input_variable = false) { call y }
+# }
+#
+# If input_variable is true and this is a three way scatter, it APPEARS that...
+#  * x.outfile has type Array[File?] and has three Files in it
+#  * y.outfile has type Array[File?] and has at least one null (not None!) in it
+#  * defined(x.outfile) is true
+#  * defined(y.outfile) is true (!)
+#  * length(x.outfile) is 3
+#  * length(y.outfile) is 0
+#  * select_all(x.outfile) creates an Array[File] with three Files
+#    * You can scatter on the resulting array
+#    * You can output the resulting array as a workflow-level output
+#  * select_all(y.outfile) creates an Array[File] with at least one null in it (!)
+#    * Attempting to scatter on the resulting array will simply do nothing but will not crash
+#    * Attempting to output the resulting array as a workflow-level output will crash Cromwell... maybe?!
+#      * final_bais in myco_raw doesn't crash cromwell in spite of being flatten(select_all(x), select_all(y))
+#      * diffs in myco_raw does crash Cromwell in spite of being flatten(select_all(x, y))
+#
+# Implications:
+#  * nulls and Nones exist in Cromwell-WDL in spite of spec implying otherwise
+#  * nulls get "dropped" by length() but not select_all()
+
