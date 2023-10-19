@@ -251,11 +251,24 @@ workflow myco {
 	
 	# some attempts to reconcile SOTHWO...
 	# real_diffs is now Array[File] and uses two select_all, like final_bais, which does not crash everything
-	# real_reports uses two select_all (valid for changing to Array[File] though)
+	# real_masks uses two select_all (not valid for changing to Array[File] though)
 	# real_reports unchanged (not valid for changing to Array[File])
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File?] real_reports = flatten(select_all([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]))
 	Array[File?] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
+	
+	
+	
+	Array[File] diffs_required_double = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
+	#Array[File] diffs_required_single = flatten((select_all([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])))
+	Array[File?] diffs_optional_double = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
+	Array[File?] diffs_optional_single = flatten((select_all([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])))
+	Array[File?] reports_optional_single = flatten(select_all([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]))
+	Array[File?] reports_optional_double = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
+	Array[File?] masks_optional_single = flatten(select_all([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file]))
+	Array[File?] masks_optional_double = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
+	
+	
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	# As per SOTHWO, if no variant caller runs (ergo there's no bam and profile_bam also does not run), defined() is
@@ -519,6 +532,15 @@ workflow myco {
 		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
 		Int seconds_total        = decontam_each_sample.seconds_total[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
+		
+		Array[File] STH_diffs_req_double = diffs_required_double
+		#Array[File] STH_diffs_req_single = diffs_required_single
+		Array[File?] STH_diffs_opt_double = diffs_optional_double
+		Array[File?] STH_diffs_opt_single = diffs_optional_single
+		Array[File?] STH_reports_opt_single = reports_optional_single
+		Array[File?] STH_reports_opt_double = reports_optional_double
+		Array[File?] STH_masks_opt_single = masks_optional_single
+		Array[File?] STH_masks_opt_double = masks_optional_double
 	}
 }
 
