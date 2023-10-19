@@ -460,8 +460,8 @@ workflow myco {
 		# raw files
 		Array[File]  bais  = final_bais
 		Array[File]  bams  = final_bams
-		Array[File?] diffs = real_diffs
-		Array[File?] masks = real_masks   # bedgraph
+		Array[File] diffs = real_diffs
+		Array[File] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
