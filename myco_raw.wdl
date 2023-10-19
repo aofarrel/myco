@@ -248,33 +248,15 @@ workflow myco {
 			}
 		}
 	}
-	
-	# some attempts to reconcile SOTHWO...
-	# real_diffs is now Array[File] and uses two select_all, like final_bais, which does not crash everything
-	# real_masks uses two select_all (not valid for changing to Array[File] though)
-	# real_reports unchanged (not valid for changing to Array[File])
+
+	# even though diffs and reports are technically optional outputs, this does work, and will avoid nulls in the final output
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
-	Array[File?] real_reports = flatten(select_all([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]))
-	Array[File?] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
-	
-	
-	
-	Array[File] diffs_required_double = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
-	#Array[File] diffs_required_single = flatten((select_all([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])))
-	Array[File?] diffs_optional_double = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
-	Array[File?] diffs_optional_single = flatten((select_all([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])))
-	Array[File?] reports_optional_single = flatten(select_all([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report]))
-	Array[File?] reports_optional_double = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
-	Array[File?] masks_optional_single = flatten(select_all([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file]))
-	Array[File?] masks_optional_double = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
-	
-	
+	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
+	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
-	# As per SOTHWO, if no variant caller runs (ergo there's no bam and profile_bam also does not run), defined() is
-	# useless to us but coerced_bam_strains etc will be arrays with length 0.
 	
-	# coerce optional types into required types (doesn't crash if these are null)
+	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
 	Array[String] coerced_bam_strains=select_all(profile_bam.strain)
 	Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
 	Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
@@ -532,28 +514,18 @@ workflow myco {
 		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
 		Int seconds_total        = decontam_each_sample.seconds_total[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
-		
-		Array[File] STH_diffs_req_double = diffs_required_double
-		#Array[File] STH_diffs_req_single = diffs_required_single
-		Array[File?] STH_diffs_opt_double = diffs_optional_double
-		Array[File?] STH_diffs_opt_single = diffs_optional_single
-		Array[File?] STH_reports_opt_single = reports_optional_single
-		Array[File?] STH_reports_opt_double = reports_optional_double
-		Array[File?] STH_masks_opt_single = masks_optional_single
-		Array[File?] STH_masks_opt_double = masks_optional_double
 	}
 }
 
 # ** The "Scattered Optional Tasks Have Weird Outputs" (SOTHWO) Issue **
-# As of October 2023, Cromwell handles the output of scattered optional tasks oddly. Let's say task X and Y are mutually
-# exclusive tasks which each output a single File named outfile.
+# Let's say task X and Y are mutually exclusive tasks which each output a single File named outfile.
 #
 # scatter {
 #  if (input_variable = true) { call x }
 #  if (input_variable = false) { call y }
 # }
 #
-# If input_variable is true and this is a three way scatter, it APPEARS that...
+# If input_variable is true and this is a three way scatter, it APPEARS that, from outside the scatter...
 #  * x.outfile has type Array[File?] and has three Files in it
 #  * y.outfile has type Array[File?] and has at least one null (not None!) in it
 #  * defined(x.outfile) is true
@@ -562,14 +534,22 @@ workflow myco {
 #  * length(y.outfile) is 0
 #  * select_all(x.outfile) creates an Array[File] with three Files
 #    * You can scatter on the resulting array
-#    * You can output the resulting array as a workflow-level output
-#  * select_all(y.outfile) creates an Array[File] with at least one null in it (!)
-#    * Attempting to scatter on the resulting array will simply do nothing but will not crash
-#    * Attempting to output the resulting array as a workflow-level output will crash Cromwell... maybe?!
-#      * final_bais in myco_raw doesn't crash cromwell in spite of being flatten(select_all(x), select_all(y))
-#      * diffs in myco_raw does crash Cromwell in spite of being flatten(select_all(x, y))
+#    * You can output the resulting array as a workflow-level output to a Terra data table
+#  * select_all(y.outfile) creates... ???????
+#    * Attempting to scatter on the resulting array will simply do nothing
+#    * Idk what will happen on Terra if you have an Array[File] that is ONLY null
+#  * flatten(select_all(x.outfile, y.outfile)) will result in an Array[File] that DOES have at least one null
+#  * flatten(select_all(x.outfile), select_all(y.outfile)) will result in an Array[File] that DOES NOT have any nulls
+#    * select_all() will also coerce x.outfile and/or y.outfile from File? to File if necessary
+#  * select_first(select_all(x.outfile), select_all(y.outfile)) will result in an Array[File] that DOES NOT have any nulls
 #
 # Implications:
 #  * nulls and Nones exist in Cromwell-WDL in spite of spec implying otherwise
-#  * nulls get "dropped" by length() but not select_all()
-
+#  * the mere act of scattering a task defines one array for each of its outputs, and if that task never
+#    runs, the arrays remain defined and full of null(s)
+#  * length() does not count null values
+#  * select_all() is not "recursive" so flatten(select_all(x.outfile, y.outfile)) can have null(s)
+#  * Array[File] can have nulls, so it may not be much different from Array[File?] in practice
+#
+# So, the correct way to gather mutually exclusive scattered optional task outputs is...
+# Array[File] foo = flatten(select_all(x.outfile), select_all(y.outfile))
