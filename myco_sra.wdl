@@ -309,16 +309,21 @@ workflow myco {
 		}
 	}
 	
+	# TODO: compare select_first() used here to nested flatten(select_all(), select_all()) used in myco_raw -- are there nulls in output?
 	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])
 	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
 	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
+	
+	# these will not crash even if profile_bam/qc_fastqs did not run (see SOTHWO explaination in myco_raw.wdl)
+	Array[String] coerced_bam_strains=select_all(profile_bam.strain)
+	Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
+	Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
+	Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
+	Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
-	if(defined(profile_bam.strain)) {
-		Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-		Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
-		Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
-
+	if(!(length(coerced_bam_strains) == 0)) {
+	
 		call sranwrp_processing.cat_strings as collate_bam_strains {
 			input:
 				strings = coerced_bam_strains,
@@ -342,9 +347,7 @@ workflow myco {
   	}
   	
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	if(defined(qc_fastqs.samp_strain)) {
-		Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
-		Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
+  	if(!(length(coerced_fq_strains) == 0)) {
 
 		call sranwrp_processing.cat_strings as collate_fq_strains {
 			input:
