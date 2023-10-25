@@ -2,7 +2,7 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/count-reads/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/count-reads/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/write-csv-or-tsv-task/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
@@ -228,7 +228,6 @@ workflow myco {
 					}
 				}
 			}
-			
 		}
 		
 		if(covstatsQC_skip_entirely) {
@@ -456,7 +455,26 @@ workflow myco {
 		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
 	}
 	
-	Array[String] warnings = flatten([select_all(qc_fastqs.warning_codes), select_all(warning_decontam)])
+	Array[String] warnings = flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])
+	
+	call sranwrp_processing.write_csv as qc_summary {
+		input:
+			# TODO: warnings has commas, maybe don't include that? or see if TSV will work for CDPH
+			headings = [
+				"status",
+				"reads_is_contam", 
+				"reads_reference",
+				"reads_unmapped", 
+				"median_coverage", 
+				"mean_coverage" ],
+			stuff_to_write = [[
+				select_first([finalcode, "NA"]),
+				select_first([decontam_each_sample.reads_is_contam[0], "NA"]), 
+				select_first([decontam_each_sample.reads_reference[0], "NA"]), 
+				select_first([decontam_each_sample.reads_unmapped[0], "NA"]),
+				select_first([qc_fastqs.median_coverage[0], single_sample_tbprof_fq_depth, "NA"]),
+				select_first([meanCoverage, "NA"]) ]]
+	}
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
@@ -504,6 +522,7 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
+		File qc_csv = qc_summary.finalOut
 		Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
