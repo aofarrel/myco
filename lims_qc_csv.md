@@ -1,13 +1,33 @@
 draft draft draft
 
-1. sample: sample ID 
-2. eQC_dupe_rate: duplication rate (fastp)
-3. eQC_pct_pass: percent of reads that pass fastp's filters
-4. eQC_pct_q30
-5. dQC_pct_low_cov: percent of variants that are low coverage (vcf-to-diff) (CHECK!)
-6. pQC_med_cov: median coverage of the sameple (tbprofiler)
-7. cQC_mean_cov: mean coverage of the sample (covstats)
-8. input_size: size of the raw fastq inputs
-9. decon_size: size of the decontaminated fastqs before earlyQC
-10. status: the status/"error code" for this sample
-11. warnings: non-fatal warnings for this sample
+sample
+    Sample ID
+status
+    The status of this sample
+warnings
+    Non-fatal warnings for this sample
+    
+reads_is_contam
+    Reads considered contaminated (and removed) by the decontaminator
+reads_reference
+    Reads considered mapping to reference by the decontaminator
+reads_unmapped
+    Reads considered unmapped by the decontaminator
+
+FASTP
+in_dupe_rate
+out_dupe_rate
+in_pct_q30
+out_pct_q30
+out_pct_pass_fastp
+    Percent of reads that pass fastp's filters
+
+median_coverage
+    Median coverage as determined by TBProfiler
+mean_coverage
+    Mean coverage as determined by covstats
+
+coverage_cutoff
+    Coverage below this is considered "low coverage" wrt in_pct_low_cov
+in_pct_low_cov
+    Percent of sites (CHECK!!) determined with coverage below coverage_cutoff; these sites get masked when creating diff files

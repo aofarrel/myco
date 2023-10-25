@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/decon-size-change/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/count-reads/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/count-reads/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
@@ -96,6 +96,10 @@ workflow myco {
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
+    		
+    		if((decontam_each_sample.reads_kept < 5000)) {
+		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
+		    }
 
 			if(!earlyQC_skip_entirely) {
 				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
@@ -364,8 +368,8 @@ workflow myco {
 	# for an individual sample as workflow-level output, which gets written to the Terra data table.
 	
 	# is there only one sample?
-	if(length(paired_fastq_sets) == 1) {    
-	
+	if(length(paired_fastq_sets) == 1) {
+
 		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
 		# in the workflow this should be okay for now)
 		if(defined(decontam_each_sample.errorcode)) {
@@ -450,8 +454,9 @@ workflow myco {
 		# final-final-final error code
 		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
 		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
-
 	}
+	
+	Array[String] warnings = flatten([select_all(qc_fastqs.warning_codes), select_all(warning_decontam)])
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
@@ -499,7 +504,7 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		Array[String]? pass_or_warnings = qc_fastqs.warning_codes[0]
+		Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
 		String? debug_varcall_ERR   = varcall_ERR
@@ -508,11 +513,8 @@ workflow myco {
 		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
 		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
 		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_untar     = decontam_each_sample.seconds_to_untar[0]
-		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads[0]
-		Int seconds_to_sort      = decontam_each_sample.seconds_to_sort[0]
-		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
-		Int seconds_total        = decontam_each_sample.seconds_total[0]
+		Int seconds_to_map_reads = decontam_each_sample.timer_map_reads[0]
+		Int seconds_to_rm_contam = decontam_each_sample.timer_rm_contam[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
