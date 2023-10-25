@@ -455,7 +455,8 @@ workflow myco {
 		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
 	}
 	
-	Array[String] warnings = flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])
+	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
+	Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
 	
 	call sranwrp_processing.write_csv as qc_summary {
 		input:
