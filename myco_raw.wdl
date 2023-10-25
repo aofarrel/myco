@@ -458,24 +458,27 @@ workflow myco {
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
 	Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
 	
-	call sranwrp_processing.write_csv as qc_summary {
-		input:
-			# TODO: warnings has commas, maybe don't include that? or see if TSV will work for CDPH
-			headings = [
-				"status",
-				"reads_is_contam", 
-				"reads_reference",
-				"reads_unmapped", 
-				"median_coverage", 
-				"mean_coverage" ],
-			stuff_to_write = [[
-				select_first([finalcode, "NA"]),
-				select_first([decontam_each_sample.reads_is_contam[0], "NA"]), 
-				select_first([decontam_each_sample.reads_reference[0], "NA"]), 
-				select_first([decontam_each_sample.reads_unmapped[0], "NA"]),
-				select_first([qc_fastqs.median_coverage[0], single_sample_tbprof_fq_depth, "NA"]),
-				select_first([meanCoverage, "NA"]) ]]
+	Map[String, String] headings_to_stuff = { 
+		"status": select_first([finalcode, "NA"]), 
+		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]) 
 	}
+	# call sranwrp_processing.write_csv as qc_summary {
+	# 	input:
+	# 		# TODO: warnings has commas, maybe don't include that? or see if TSV will work for CDPH
+	# 		headings = [
+	# 			"reads_reference", # decontamination
+	# 			"reads_unmapped",  # decontamination
+	# 			"pct_above_q30",   # fastp
+	# 			"median_coverage", # thiagen!TBProfiler
+	# 			#"genome_pct_coverage", # thiagen!TBProfiler
+	# 			"mean_coverage" ],
+	# 		stuff_to_write = [[
+	# 			select_first([decontam_each_sample.reads_reference[0], "NA"]), 
+	# 			select_first([decontam_each_sample.reads_unmapped[0], "NA"]),
+	# 			select_first([qc_fastqs.median_coverage[0], "NA"]),
+	# 			#select_first([qc_fastqs.genome_pct_coverage[0], "NA"]),
+	# 			select_first([meanCoverage, "NA"]) ]]
+	# }
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
@@ -523,7 +526,8 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		File qc_csv = qc_summary.finalOut
+		#File qc_csv = qc_summary.finalOut
+		Map[String, String] qc_stuff = headings_to_stuff
 		Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
