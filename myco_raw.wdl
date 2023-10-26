@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/write-csv-or-tsv-task
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.10/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/main/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
@@ -74,7 +74,7 @@ workflow myco {
 											  
 	String pass = "PASS" # used later... much later
 	
-	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
+	# convert percent integers to floats (excludes covstatsQC_max_percent_unmapped, earlyQC_minimum_percent_q30)
 	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
 	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100.0
 	Float tbprofilerQC_max_percent_unmapped_float = tbprofilerQC_max_pct_unmapped / 100.0
@@ -456,29 +456,20 @@ workflow myco {
 	}
 	
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
-	Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
+	# TODO: this is still breaking in Cromwell!
+	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '[["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
+	#Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
 	
 	Map[String, String] headings_to_stuff = { 
 		"status": select_first([finalcode, "NA"]), 
-		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]) 
+		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
+		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
+		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
+		"pct_above_q30": select_first([qc_fastqs.pct_above_q30, "NA"]),                    # fastp
+		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([qc_fastqs.genome_pct_coverage[0], "NA"]),     # thiagen!TBProfiler
+		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
 	}
-	# call sranwrp_processing.write_csv as qc_summary {
-	# 	input:
-	# 		# TODO: warnings has commas, maybe don't include that? or see if TSV will work for CDPH
-	# 		headings = [
-	# 			"reads_reference", # decontamination
-	# 			"reads_unmapped",  # decontamination
-	# 			"pct_above_q30",   # fastp
-	# 			"median_coverage", # thiagen!TBProfiler
-	# 			#"genome_pct_coverage", # thiagen!TBProfiler
-	# 			"mean_coverage" ],
-	# 		stuff_to_write = [[
-	# 			select_first([decontam_each_sample.reads_reference[0], "NA"]), 
-	# 			select_first([decontam_each_sample.reads_unmapped[0], "NA"]),
-	# 			select_first([qc_fastqs.median_coverage[0], "NA"]),
-	# 			#select_first([qc_fastqs.genome_pct_coverage[0], "NA"]),
-	# 			select_first([meanCoverage, "NA"]) ]]
-	# }
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
@@ -528,7 +519,7 @@ workflow myco {
 		# useful debugging/run information (only valid iff this ran on only one sample)
 		#File qc_csv = qc_summary.finalOut
 		Map[String, String] qc_stuff = headings_to_stuff
-		Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
+		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
 		String? debug_varcall_ERR   = varcall_ERR
