@@ -465,10 +465,15 @@ workflow myco {
 		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
 		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
 		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
-		"pct_above_q30": select_first([qc_fastqs.pct_above_q30, "NA"]),                    # fastp
+		"pct_above_q30": select_first([qc_fastqs.pct_above_q30[0], "NA"]),                 # fastp
 		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
 		"genome_pct_coverage": select_first([qc_fastqs.genome_pct_coverage[0], "NA"]),     # thiagen!TBProfiler
 		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
+	}
+	
+	call sranwrp_processing.map_to_tsv as qc_summary {
+		input:
+			the_map = headings_to_stuff
 	}
 		
 	output {
@@ -517,8 +522,7 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		#File qc_csv = qc_summary.finalOut
-		Map[String, String] qc_stuff = headings_to_stuff
+		File qc_csv = qc_summary.tsv
 		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
