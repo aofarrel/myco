@@ -467,7 +467,7 @@ workflow myco {
 		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
 		"pct_above_q30": select_first([qc_fastqs.pct_above_q30[0], "NA"]),                 # fastp
 		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
-		"genome_pct_coverage": select_first([qc_fastqs.genome_pct_coverage[0], "NA"]),     # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),      # thiagen!TBProfiler
 		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
 	}
 	
