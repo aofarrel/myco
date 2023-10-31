@@ -29,7 +29,7 @@ workflow myco {
 		Int     subsample_cutoff               =   -1
 		Int     subsample_seed                 = 1965
 		Boolean tbprofiler_on_bam              = false
-		Float   tbprofilerQC_max_pct_unmapped  =    2
+		Int     tbprofilerQC_min_pct_mapped    =   98
 		Int     timeout_decontam_part1         =    0
 		Int     timeout_decontam_part2         =    0
 		Int     timeout_variant_caller         =    0
@@ -64,7 +64,7 @@ workflow myco {
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
-		tbprofilerQC_max_pct_unmapped: "If tbprofiler thinks this percent (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		tbprofilerQC_min_pct_mapped: "If tbprofiler thinks less than this percent (as int, 50 = 50%) of data does map to H37Rv, throw out this sample"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
@@ -74,10 +74,8 @@ workflow myco {
 											  
 	String pass = "PASS" # used later... much later
 	
-	# convert percent integers to floats (excludes covstatsQC_max_percent_unmapped, earlyQC_minimum_percent_q30)
+	# convert percent integers to floats (excludes covstatsQC_max_percent_unmapped, earlyQC_minimum_percent_q30, tbprofilerQC_min_pct_mapped_float
 	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
-	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100.0
-	Float tbprofilerQC_max_percent_unmapped_float = tbprofilerQC_max_pct_unmapped / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -106,11 +104,11 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = earlyQC_minimum_percent_q30_float,
+						minimum_q30_rate = earlyQC_minimum_percent_q30,
 						average_qual = earlyQC_trim_qual_below,
 						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
 						soft_all_qc = earlyQC_skip_QC,
-						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
+						minimum_pct_mapped = tbprofilerQC_min_pct_mapped
 				}
 				# if this sample passes fastp, or if earlyQC_skip_QC is true...
 				if(qc_fastqs.status_code == pass) {
