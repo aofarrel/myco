@@ -13,14 +13,14 @@ workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 		
-		Int     covstatsQC_minimum_coverage    =   10
-		Int     covstatsQC_max_percent_unmapped=    2
+		Int     covstatsQC_min_coverage        =   10
+		Int     covstatsQC_min_pct_unmapped    =    2
 		Boolean covstatsQC_skip_entirely       = false
 		Boolean decontam_use_CDC_varpipe_ref   = true
 		File?   diffQC_mask_bedfile
-		Int     diffQC_max_percent_low_coverage=    20
-		Int     diffQC_low_coverage_cutoff     =    10
-		Int     earlyQC_minimum_percent_q30    =    90
+		Int     diffQC_max_pct_low_coverage    =    20
+		Int     diffQC_this_is_low_coverage    =    10
+		Int     earlyQC_min_q30_rate           =    90
 		Boolean earlyQC_skip_entirely          = false
 		Boolean earlyQC_skip_QC                = false
 		Boolean earlyQC_skip_trimming          = false
@@ -48,17 +48,17 @@ workflow myco {
 	}
 
 	parameter_meta {
-		covstatsQC_minimum_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		covstatsQC_max_percent_unmapped: "If covstats thinks this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		covstatsQC_min_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
+		covstatsQC_min_pct_unmapped: "If covstats thinks less than this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
-		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
+		diffQC_max_pct_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_this_is_low_coverage will be discarded"
+		diffQC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
+		earlyQC_min_q30_rate: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
 		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
 		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
 		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
+		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
@@ -74,8 +74,9 @@ workflow myco {
 											  
 	String pass = "PASS" # used later... much later
 	
-	# convert percent integers to floats (excludes covstatsQC_max_percent_unmapped, earlyQC_minimum_percent_q30, tbprofilerQC_min_pct_mapped_float
-	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
+	# flip some QC stuff around
+	Float diffQC_max_pct_low_coverage_float = diffQC_max_pct_low_coverage / 100.0
+	Int covstatsQC_max_percent_unmapped = 100 - covstatsQC_min_pct_unmapped
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -104,7 +105,7 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						minimum_q30_rate = earlyQC_minimum_percent_q30,
+						minimum_q30_rate = earlyQC_min_q30_rate,
 						average_qual = earlyQC_trim_qual_below,
 						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
 						soft_all_qc = earlyQC_skip_QC,
@@ -213,16 +214,16 @@ workflow myco {
 			}
 			
 			if(covstats.percentUnmapped < covstatsQC_max_percent_unmapped) {
-				if(covstats.coverage > covstatsQC_minimum_coverage) {
+				if(covstats.coverage > covstatsQC_min_coverage) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diffQC_low_coverage_cutoff,
+							min_coverage_per_site = diffQC_this_is_low_coverage,
 							tbmf = diffQC_mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
+							max_ratio_low_coverage_sites_per_sample = diffQC_max_pct_low_coverage_float
 					}
 				}
 			}
@@ -235,9 +236,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diffQC_low_coverage_cutoff,
+					min_coverage_per_site = diffQC_this_is_low_coverage,
 					tbmf = diffQC_mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
+					max_ratio_low_coverage_sites_per_sample = diffQC_max_pct_low_coverage_float
 			}
 		}
 		
@@ -427,9 +428,9 @@ workflow myco {
 						Float meanCoverage = meanCoverages[0]
 						
 						if(percentUnmapped > covstatsQC_max_percent_unmapped) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-							if(meanCoverage < covstatsQC_minimum_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
+							if(meanCoverage < covstatsQC_min_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
 						}
-						if(meanCoverage < covstatsQC_minimum_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+						if(meanCoverage < covstatsQC_min_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
 					}
 				#}
 			}
