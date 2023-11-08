@@ -459,7 +459,7 @@ workflow myco {
 	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '[["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
 	#Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
 	
-	Map[String, String] headings_to_stuff = { 
+	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
 		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
 		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
@@ -472,7 +472,8 @@ workflow myco {
 	
 	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
 		input:
-			the_map = headings_to_stuff
+			the_map = metrics_to_values,
+			column_names = if length(paired_fastq_sets) == 1 then [basename(paired_fastq_sets[0][0])] else ["sample"]
 	}
 		
 	output {
