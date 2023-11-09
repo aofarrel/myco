@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.3/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.3/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.17/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.11/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.11/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
@@ -520,6 +520,7 @@ workflow myco {
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+		File?        distance_matrix  = trees.distance_matrix
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
 		File qc_csv = qc_summary.tsv_or_csv
