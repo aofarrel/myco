@@ -1,4 +1,4 @@
-# Style Guide (draft and not actually implemented yet)
+# Style Guide (draft)
 
 ## Percentages/Ratios
 User facing inputs and outputs that are a percentage are written as an integer or float between 0 and 100. Something that is 90% will be written as 90 or as 90.0, not 0.90
