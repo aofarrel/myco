@@ -1,26 +1,26 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.3/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.11.3/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.17/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.10/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.11/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 		
-		Int     covstatsQC_minimum_coverage    =   10
-		Int     covstatsQC_max_percent_unmapped=    2
+		Int     covstatsQC_min_coverage        =   10
+		Int     covstatsQC_min_pct_unmapped    =    2
 		Boolean covstatsQC_skip_entirely       = false
 		Boolean decontam_use_CDC_varpipe_ref   = true
 		File?   diffQC_mask_bedfile
-		Int     diffQC_max_percent_low_coverage=    20
-		Int     diffQC_low_coverage_cutoff     =    10
-		Int     earlyQC_minimum_percent_q30    =    90
+		Int     diffQC_max_pct_low_coverage    =    20
+		Int     diffQC_this_is_low_coverage    =    10
+		Int     earlyQC_min_q30_rate           =    90
 		Boolean earlyQC_skip_entirely          = false
 		Boolean earlyQC_skip_QC                = false
 		Boolean earlyQC_skip_trimming          = false
@@ -29,7 +29,7 @@ workflow myco {
 		Int     subsample_cutoff               =   -1
 		Int     subsample_seed                 = 1965
 		Boolean tbprofiler_on_bam              = false
-		Float   tbprofilerQC_max_pct_unmapped  =    2
+		Int     tbprofilerQC_min_pct_mapped    =   98
 		Int     timeout_decontam_part1         =    0
 		Int     timeout_decontam_part2         =    0
 		Int     timeout_variant_caller         =    0
@@ -48,23 +48,23 @@ workflow myco {
 	}
 
 	parameter_meta {
-		covstatsQC_minimum_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		covstatsQC_max_percent_unmapped: "If covstats thinks this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		covstatsQC_min_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
+		covstatsQC_min_pct_unmapped: "If covstats thinks less than this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
-		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
+		diffQC_max_pct_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_this_is_low_coverage will be discarded"
+		diffQC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
+		earlyQC_min_q30_rate: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
 		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
 		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
 		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
+		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
-		tbprofilerQC_max_pct_unmapped: "If tbprofiler thinks this percent (as float, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		tbprofilerQC_min_pct_mapped: "If tbprofiler thinks less than this percent (as int, 50 = 50%) of data does map to H37Rv, throw out this sample"
 		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
 		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
@@ -74,10 +74,9 @@ workflow myco {
 											  
 	String pass = "PASS" # used later... much later
 	
-	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
-	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100.0
-	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100.0
-	Float tbprofilerQC_max_percent_unmapped_float = tbprofilerQC_max_pct_unmapped / 100.0
+	# flip some QC stuff around
+	Float diffQC_max_pct_low_coverage_float = diffQC_max_pct_low_coverage / 100.0
+	Int covstatsQC_max_percent_unmapped = 100 - covstatsQC_min_pct_unmapped
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
@@ -96,17 +95,21 @@ workflow myco {
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
+    		
+    		if((decontam_each_sample.reads_kept < 5000)) {
+		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
+		    }
 
 			if(!earlyQC_skip_entirely) {
 				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = earlyQC_minimum_percent_q30_float,
+						minimum_q30_rate = earlyQC_min_q30_rate,
 						average_qual = earlyQC_trim_qual_below,
 						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
 						soft_all_qc = earlyQC_skip_QC,
-						pct_mapped_cutoff = tbprofilerQC_max_percent_unmapped_float
+						minimum_pct_mapped = tbprofilerQC_min_pct_mapped
 				}
 				# if this sample passes fastp, or if earlyQC_skip_QC is true...
 				if(qc_fastqs.status_code == pass) {
@@ -211,20 +214,19 @@ workflow myco {
 			}
 			
 			if(covstats.percentUnmapped < covstatsQC_max_percent_unmapped) {
-				if(covstats.coverage > covstatsQC_minimum_coverage) {
+				if(covstats.coverage > covstatsQC_min_coverage) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diffQC_low_coverage_cutoff,
+							min_coverage_per_site = diffQC_this_is_low_coverage,
 							tbmf = diffQC_mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
+							max_ratio_low_coverage_sites_per_sample = diffQC_max_pct_low_coverage_float
 					}
 				}
 			}
-			
 		}
 		
 		if(covstatsQC_skip_entirely) {
@@ -234,9 +236,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diffQC_low_coverage_cutoff,
+					min_coverage_per_site = diffQC_this_is_low_coverage,
 					tbmf = diffQC_mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
+					max_ratio_low_coverage_sites_per_sample = diffQC_max_pct_low_coverage_float
 			}
 		}
 		
@@ -364,8 +366,8 @@ workflow myco {
 	# for an individual sample as workflow-level output, which gets written to the Terra data table.
 	
 	# is there only one sample?
-	if(length(paired_fastq_sets) == 1) {    
-	
+	if(length(paired_fastq_sets) == 1) {
+
 		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
 		# in the workflow this should be okay for now)
 		if(defined(decontam_each_sample.errorcode)) {
@@ -426,9 +428,9 @@ workflow myco {
 						Float meanCoverage = meanCoverages[0]
 						
 						if(percentUnmapped > covstatsQC_max_percent_unmapped) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-							if(meanCoverage < covstatsQC_minimum_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
+							if(meanCoverage < covstatsQC_min_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
 						}
-						if(meanCoverage < covstatsQC_minimum_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+						if(meanCoverage < covstatsQC_min_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
 					}
 				#}
 			}
@@ -450,7 +452,28 @@ workflow myco {
 		# final-final-final error code
 		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
 		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
-
+	}
+	
+	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
+	# TODO: this is still breaking in Cromwell!
+	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '[["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
+	#Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
+	
+	Map[String, String] metrics_to_values = { 
+		"status": select_first([finalcode, "NA"]), 
+		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
+		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
+		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
+		"pct_above_q30": select_first([qc_fastqs.pct_above_q30[0], "NA"]),                 # fastp
+		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),      # thiagen!TBProfiler
+		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
+	}
+	
+	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
+		input:
+			the_map = metrics_to_values,
+			column_names = if length(paired_fastq_sets) == 1 then [basename(paired_fastq_sets[0][0])] else ["sample"]
 	}
 		
 	output {
@@ -499,7 +522,8 @@ workflow myco {
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		Array[String]? pass_or_warnings = qc_fastqs.warning_codes[0]
+		File qc_csv = qc_summary.tsv_or_csv
+		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? debug_decontam_ERR  = decontam_ERR
 		String? debug_earlyQC_ERR   = earlyQC_ERR
 		String? debug_varcall_ERR   = varcall_ERR
@@ -508,11 +532,8 @@ workflow myco {
 		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
 		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
 		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_untar     = decontam_each_sample.seconds_to_untar[0]
-		Int seconds_to_map_reads = decontam_each_sample.seconds_to_map_reads[0]
-		Int seconds_to_sort      = decontam_each_sample.seconds_to_sort[0]
-		Int seconds_to_rm_contam = decontam_each_sample.seconds_to_rm_contam[0]
-		Int seconds_total        = decontam_each_sample.seconds_total[0]
+		Int seconds_to_map_reads = decontam_each_sample.timer_map_reads[0]
+		Int seconds_to_rm_contam = decontam_each_sample.timer_rm_contam[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
