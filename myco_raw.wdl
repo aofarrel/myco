@@ -473,7 +473,8 @@ workflow myco {
 	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
 		input:
 			the_map = metrics_to_values,
-			column_names = if length(paired_fastq_sets) == 1 then [basename(paired_fastq_sets[0][0])] else ["sample"]
+			column_names = if length(paired_fastq_sets) == 1 then [basename(paired_fastq_sets[0][0])] else ["sample"],
+			outfile = if length(paired_fastq_sets) == 1 then basename(paired_fastq_sets[0][0])+"_qc" else "combined_qc_report.txt"
 	}
 		
 	output {
