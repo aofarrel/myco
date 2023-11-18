@@ -1,5 +1,14 @@
 # test data
 
+		# The test FASTQs should include only SRA data, specifically:
+		#  * Some of the "multistrain" dataset
+		#  * An extremely low coverage sample
+		#  * A "perfect" sample
+		#  * Two samples that are borderline for getting filtered out for low coverage (one just above, one just below)
+		#  * Two samples that are borderline for getting filtered out for non-coverage reasons (as above, so below)
+		#  * A real contaminated sample
+		#  * A sample contaminated in silico
+SAMEA838047
 
 ## contamination
 ### contaminated in silico
