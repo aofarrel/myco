@@ -1,4 +1,4 @@
-# test data
+# test data (WIP)
 
 		# The test FASTQs should include only SRA data, specifically:
 		#  * Some of the "multistrain" dataset
