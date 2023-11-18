@@ -1,0 +1,1 @@
+{"myco.docker_used":"${this.decontam}","myco.bais":"${this.TRUTH_bai}","myco.diff_reports":"${this.TRUTH_report}","myco.vcfs":"${this.TRUTH_vcf}","myco.qc_csv":"${this.TRUTH_qc}","myco.status_code":"${this.TRUTH_code}","myco.diffs":"${this.TRUTH_diff}"}
