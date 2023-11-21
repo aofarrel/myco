@@ -81,7 +81,7 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.7-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.2-full",
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.9-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.9-full",
 				unsorted_sam = true,
 				reads_files = paired_fastqs,
 				subsample_cutoff = subsample_cutoff,
@@ -96,8 +96,8 @@ workflow myco {
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
     		
-    		if((decontam_each_sample.reads_kept < 5000)) {
-		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
+    		if((decontam_each_sample.reads_clck_kept < 5000)) {
+		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_clck_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
 		    }
 
 			if(!earlyQC_skip_entirely) {
@@ -534,8 +534,8 @@ workflow myco {
 		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
 		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
 		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_map_reads = decontam_each_sample.timer_map_reads[0]
-		Int seconds_to_rm_contam = decontam_each_sample.timer_rm_contam[0]
+		Int seconds_to_map_reads = decontam_each_sample.timer_5_mapFQ[0]
+		Int seconds_to_rm_contam = decontam_each_sample.timer_7_dcnFQ[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
