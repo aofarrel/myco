@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.17/tasks/process
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.11/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.12/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/main/thiagen_tbprofiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
@@ -101,20 +101,17 @@ workflow myco {
 		    }
 
 			if(!earlyQC_skip_entirely) {
-				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
+				call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						minimum_q30_rate = earlyQC_min_q30_rate,
-						average_qual = earlyQC_trim_qual_below,
-						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
 						soft_all_qc = earlyQC_skip_QC,
 						minimum_pct_mapped = tbprofilerQC_min_pct_mapped
 				}
 				# if this sample passes fastp, or if earlyQC_skip_QC is true...
 				if(qc_fastqs.status_code == pass) {
-					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
+					File possibly_fastp_cleaned_fastq1=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_1])
+			    	File possibly_fastp_cleaned_fastq2=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_2])
 					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
 						input:
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
@@ -464,7 +461,7 @@ workflow myco {
 		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
 		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
 		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
-		"pct_above_q30": select_first([qc_fastqs.pct_above_q30[0], "NA"]),                 # fastp
+		"pct_above_q30": select_first([decontam_each_sample.dcntmd_pct_above_q30[0], "NA"]),                 # fastp
 		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
 		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),      # thiagen!TBProfiler
 		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
@@ -491,7 +488,6 @@ workflow myco {
 		# metadata
 		Array[File?] covstats_reports          = covstats.covstatsOutfile
 		Array[File?] diff_reports              = real_reports
-		Array[File?] fastp_reports             = qc_fastqs.fastp_txt
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
 		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
 		Array[File?] tbprof_fq_jsons           = qc_fastqs.tbprofiler_json
