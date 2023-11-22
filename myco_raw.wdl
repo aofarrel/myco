@@ -75,6 +75,7 @@ workflow myco {
 				fastp_clean_avg_qual = clean_average_q_score,
 				fastp_clean_before_decontam = clean_before_decontam,
 				fastp_clean_after_decontam = clean_after_decontam,
+				pre_decontam_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
 				subsample_cutoff = if guardrail_mode then 30000 else -1,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0
