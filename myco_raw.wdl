@@ -106,7 +106,8 @@ workflow myco {
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
 						soft_all_qc = earlyQC_skip_QC,
-						minimum_pct_mapped = tbprofilerQC_min_pct_mapped
+						minimum_pct_mapped = tbprofilerQC_min_pct_mapped,
+						sample = decontam_each_sample.sample
 				}
 				# if this sample passes fastp, or if earlyQC_skip_QC is true...
 				if(qc_fastqs.status_code == pass) {
