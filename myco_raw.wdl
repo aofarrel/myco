@@ -21,7 +21,6 @@ workflow myco {
 		Int     diffQC_max_pct_low_coverage    =    20
 		Int     diffQC_this_is_low_coverage    =    10
 		Int     earlyQC_min_q30_rate           =    90
-		Boolean earlyQC_skip_entirely          = false
 		Boolean clean_before_decontam          = true
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
@@ -49,9 +48,8 @@ workflow myco {
 		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		diffQC_max_pct_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_this_is_low_coverage will be discarded"
 		diffQC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_min_q30_rate: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
-		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
-		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
+		earlyQC_min_q30_rate: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by clean_before_decontam and clean_after_decontam BOTH being false."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
@@ -90,44 +88,23 @@ workflow myco {
     		if((decontam_each_sample.reads_clck_kept < 5000)) {
 		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_clck_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
 		    }
-
-			if(!earlyQC_skip_entirely) {
-				call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
-					input:
-						fastq1 = real_decontaminated_fastq_1,
-						fastq2 = real_decontaminated_fastq_2,
-						soft_pct_mapped = soft_pct_mapped,
-						soft_coverage = if guardrail_mode then false else true,
-						minimum_coverage = if guardrail_mode then 3 else 0,
-						minimum_pct_mapped = tbprofilerQC_min_pct_mapped,
-						sample = decontam_each_sample.sample
-				}
-				# if this sample passes fastp, or if earlyQC_skip_QC is true...
-				if(qc_fastqs.status_code == pass) {
-					File possibly_fastp_cleaned_fastq1=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_2])
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
-						input:
-							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
-							addldisk = variantcalling_addl_disk,
-							cpu = variantcalling_cpu,
-							debug = variantcalling_debug,
-							mem_height = variantcalling_mem_height,
-							memory = variantcalling_memory,
-							preempt = variantcalling_preemptibles,
-							retries = variantcalling_retries,
-							ssd = variantcalling_ssd,
-							tarball_bams_and_bais = false,
-							timeout = if guardrail_mode then 600 else 0
-					}
-				}
+			call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
+				input:
+					fastq1 = real_decontaminated_fastq_1,
+					fastq2 = real_decontaminated_fastq_2,
+					soft_pct_mapped = soft_pct_mapped,
+					soft_coverage = if guardrail_mode then false else true,
+					minimum_coverage = if guardrail_mode then 3 else 0,
+					minimum_pct_mapped = tbprofilerQC_min_pct_mapped,
+					sample = decontam_each_sample.sample
 			}
-			
-			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
-			if(earlyQC_skip_entirely) {
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
+			# if this sample passes...
+			if(qc_fastqs.status_code == pass) {
+				File possibly_fastp_cleaned_fastq1=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_1])
+		    	File possibly_fastp_cleaned_fastq2=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_2])
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
 					input:
-						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
+						reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 						addldisk = variantcalling_addl_disk,
 						cpu = variantcalling_cpu,
 						debug = variantcalling_debug,
@@ -141,41 +118,11 @@ workflow myco {
 				}
 			}
 		}
-
 	}
-
-	# do some wizardry to deal with optionals
-	#
-	# In order to account for different use cases, this workflow has two versions of the variant caller. They are mutually
-	# exclusive, eg, only one can ever be called by a given sample. In fact, there are cases where NONE of them get called.
-	# Additionally, each version of the variant caller technically gives optional output. This is to prevent the entire
-	# pipeline from crashing if a single garbage sample starts the variant calling task but cannot make a VCF.
-	#
-	# Unfortunately, this means I have created multiple optional outputs from optional tasks. Mutually exclusive outputs from
-	# mutually exclusive tasks, yes, but WDL doesn't quite understand mutual exclusivity. WDL and/or Cromwell (it's hard to 
-	# know if the issue is the langauge or its implementation since the spec is not very specific) also gets finicky when we try
-	# to do certain things with optional arrays. So, we want to turn those optionals into not-optionals ASAP. That's what this
-	# block of variable definitions does. WDL does not allow you to overwrite variables, so we need to declare a ton of variables
-	# with unique names. Yes, this could in theory be done more "cleanly" by calling a task, but why spin up a Docker image to do
-	# microseconds worth of work?
-	#
-	# Interestingly, even if the variant caller didn't run, this code block does not cause a crash. Somehow, we can create 
-	# non-optional variables that have no content. This little mystery is mostly good because it means the 
-	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
-	# we cannot use anything here to test if any version of the variant caller actually ran at all!
-	# 
-	Array[File] minos_vcfs_if_earlyQC = select_all(variant_call_after_earlyQC.adjudicated_vcf)
-	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
 	
-	Array[File] bams_if_earlyQC = select_all(variant_call_after_earlyQC.bam)
-	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
-	
-	Array[File] bais_if_earlyQC = select_all(variant_call_after_earlyQC.bai)
-	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
-	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC, minos_vcfs_if_no_earlyQC])
-	Array[File] final_bams = flatten([bams_if_earlyQC, bams_if_no_earlyQC])
-	Array[File] final_bais = flatten([bais_if_earlyQC, bais_if_no_earlyQC])
+	Array[File] minos_vcfs = flatten([select_all(variant_call_after_earlyQC.adjudicated_vcf)])
+	Array[File] final_bams = flatten([select_all(variant_call_after_earlyQC.bam)])
+	Array[File] final_bais = flatten([select_all(variant_call_after_earlyQC.bai)])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -380,25 +327,13 @@ workflow myco {
 			String earlyQC_ERR = earlyQC_errorcode_array[0]
 		}
 
-		# Unfortunately, to check if the variant caller ran, we have to check both versions of the variant caller.
-		#
-		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
-		# For example, if(defined(variant_call_after_earlyQC.errorcode)) returns true even if NO variant callers
-		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
-		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
-		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
-		# defined() checks. In any case, here's the Cromwell ticket: https://github.com/broadinstitute/cromwell/issues/7201
-		#
-		# I've decided to instead use a variation of how we coerce the VCF outputs into required types - relying entirely on
-		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
 		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
 		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
 		Array[String] errorcode_if_earlyQC = select_all(variant_call_after_earlyQC.errorcode)
-		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
 		
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, errorcode_if_no_earlyQC, ["PASS"]])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, ["PASS"]])
 		if(!(varcall_errorcode_array[0] == pass)) {          
 				String varcall_ERR = varcall_errorcode_array[0]
 		}
