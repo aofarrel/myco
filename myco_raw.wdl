@@ -22,22 +22,17 @@ workflow myco {
 		Int     diffQC_this_is_low_coverage    =    10
 		Int     earlyQC_min_q30_rate           =    90
 		Boolean earlyQC_skip_entirely          = false
-		Boolean earlyQC_skip_QC                = false
-		Boolean earlyQC_skip_trimming          = false
-		Int     earlyQC_trim_qual_below        =   30
+		Boolean clean_before_decontam          = true
+		Boolean clean_after_decontam           = false
+		Int     clean_average_q_score          = 29
+		Boolean guardrail_mode                 = false
+		Boolean soft_pct_mapped                = false
 		Int     quick_tasks_disk_size          =   10 
-		Int     subsample_cutoff               =   -1
-		Int     subsample_seed                 = 1965
 		Boolean tbprofiler_on_bam              = false
 		Int     tbprofilerQC_min_pct_mapped    =   98
-		Int     timeout_decontam_part1         =    0
-		Int     timeout_decontam_part2         =    0
-		Int     timeout_variant_caller         =    0
 		Boolean tree_decoration                = false
 		File?   tree_to_decorate
 		Int     variantcalling_addl_disk       =  100
-		Boolean variantcalling_crash_on_error  = false
-		Boolean variantcalling_crash_on_timeout= false
 		Int     variantcalling_cpu             =   16
 		Boolean variantcalling_debug           = false
 		Int?    variantcalling_mem_height
@@ -56,18 +51,11 @@ workflow myco {
 		diffQC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		earlyQC_min_q30_rate: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
 		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
-		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
-		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
+		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
-		subsample_seed: "Seed used for subsampling with seqtk"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
 		tbprofilerQC_min_pct_mapped: "If tbprofiler thinks less than this percent (as int, 50 = 50%) of data does map to H37Rv, throw out this sample"
-		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
-		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
-		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
@@ -84,10 +72,12 @@ workflow myco {
 				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.9-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.9-full",
 				unsorted_sam = true,
 				reads_files = paired_fastqs,
-				subsample_cutoff = subsample_cutoff,
-				subsample_seed = subsample_seed,
-				timeout_map_reads = timeout_decontam_part1,
-				timeout_decontam = timeout_decontam_part2
+				fastp_clean_avg_qual = clean_average_q_score,
+				fastp_clean_before_decontam = clean_before_decontam,
+				fastp_clean_after_decontam = clean_after_decontam,
+				subsample_cutoff = if guardrail_mode then 30000 else -1,
+				timeout_map_reads = if guardrail_mode then 300 else 0,
+				timeout_decontam = if guardrail_mode then 600 else 0
 		}
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
@@ -105,7 +95,9 @@ workflow myco {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						soft_all_qc = earlyQC_skip_QC,
+						soft_pct_mapped = soft_pct_mapped,
+						soft_coverage = if guardrail_mode then false else true,
+						minimum_coverage = if guardrail_mode then 3 else 0,
 						minimum_pct_mapped = tbprofilerQC_min_pct_mapped,
 						sample = decontam_each_sample.sample
 				}
@@ -118,8 +110,6 @@ workflow myco {
 							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
 							addldisk = variantcalling_addl_disk,
 							cpu = variantcalling_cpu,
-							crash_on_error = variantcalling_crash_on_error,
-							crash_on_timeout = variantcalling_crash_on_timeout,
 							debug = variantcalling_debug,
 							mem_height = variantcalling_mem_height,
 							memory = variantcalling_memory,
@@ -127,7 +117,7 @@ workflow myco {
 							retries = variantcalling_retries,
 							ssd = variantcalling_ssd,
 							tarball_bams_and_bais = false,
-							timeout = timeout_variant_caller
+							timeout = if guardrail_mode then 600 else 0
 					}
 				}
 			}
@@ -139,8 +129,6 @@ workflow myco {
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						addldisk = variantcalling_addl_disk,
 						cpu = variantcalling_cpu,
-						crash_on_error = variantcalling_crash_on_error,
-						crash_on_timeout = variantcalling_crash_on_timeout,
 						debug = variantcalling_debug,
 						mem_height = variantcalling_mem_height,
 						memory = variantcalling_memory,
@@ -148,7 +136,7 @@ workflow myco {
 						retries = variantcalling_retries,
 						ssd = variantcalling_ssd,
 						tarball_bams_and_bais = false,
-						timeout = timeout_variant_caller
+						timeout = if guardrail_mode then 600 else 0
 				}
 			}
 		}
