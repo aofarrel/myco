@@ -85,9 +85,6 @@ workflow myco {
     		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
     		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
     		
-    		if((decontam_each_sample.reads_clck_kept < 5000)) {
-		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_clck_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
-		    }
 			call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
