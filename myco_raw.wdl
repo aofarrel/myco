@@ -20,7 +20,7 @@ workflow myco {
 		File?   diffQC_mask_bedfile
 		Int     diffQC_max_pct_low_coverage    =    20
 		Int     diffQC_this_is_low_coverage    =    10
-		Int     earlyQC_min_q30_rate           =    90
+		Int     QC_min_q30                     =    90
 		Boolean clean_before_decontam          = true
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
@@ -73,7 +73,8 @@ workflow myco {
 				fastp_clean_avg_qual = clean_average_q_score,
 				fastp_clean_before_decontam = clean_before_decontam,
 				fastp_clean_after_decontam = clean_after_decontam,
-				pre_decontam_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
+				QC_min_q30 = QC_min_q30 / 100.0,
+				preliminary_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
 				subsample_cutoff = if guardrail_mode then 30000 else -1,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0
