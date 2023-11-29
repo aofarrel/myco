@@ -31,14 +31,6 @@ workflow myco {
 		Int     tbprofilerQC_min_pct_mapped    =   98
 		Boolean tree_decoration                = false
 		File?   tree_to_decorate
-		Int     variantcalling_addl_disk       =  100
-		Int     variantcalling_cpu             =   16
-		Boolean variantcalling_debug           = false
-		Int?    variantcalling_mem_height
-		Int     variantcalling_memory          =   32
-		Int     variantcalling_preemptibles    =    1
-		Int     variantcalling_retries         =    1
-		Boolean variantcalling_ssd             = true
 	}
 
 	parameter_meta {
@@ -100,17 +92,9 @@ workflow myco {
 			if(qc_fastqs.status_code == pass) {
 				File possibly_fastp_cleaned_fastq1=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_1])
 		    	File possibly_fastp_cleaned_fastq2=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_2])
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
 						reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
-						addldisk = variantcalling_addl_disk,
-						cpu = variantcalling_cpu,
-						debug = variantcalling_debug,
-						mem_height = variantcalling_mem_height,
-						memory = variantcalling_memory,
-						preempt = variantcalling_preemptibles,
-						retries = variantcalling_retries,
-						ssd = variantcalling_ssd,
 						tarball_bams_and_bais = false,
 						timeout = if guardrail_mode then 600 else 0
 				}
@@ -118,9 +102,9 @@ workflow myco {
 		}
 	}
 	
-	Array[File] minos_vcfs = flatten([select_all(variant_call_after_earlyQC.adjudicated_vcf)])
-	Array[File] final_bams = flatten([select_all(variant_call_after_earlyQC.bam)])
-	Array[File] final_bais = flatten([select_all(variant_call_after_earlyQC.bai)])
+	Array[File] minos_vcfs = flatten([select_all(variant_calling.adjudicated_vcf)])
+	Array[File] final_bams = flatten([select_all(variant_calling.bam)])
+	Array[File] final_bais = flatten([select_all(variant_calling.bai)])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -327,7 +311,7 @@ workflow myco {
 
 		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
 		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
-		Array[String] errorcode_if_earlyQC = select_all(variant_call_after_earlyQC.errorcode)
+		Array[String] errorcode_if_earlyQC = select_all(variant_calling.errorcode)
 		
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
