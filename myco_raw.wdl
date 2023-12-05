@@ -75,8 +75,10 @@ workflow myco {
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
-    		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
-    		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
+			# Setting the second element to something that isn't valid may help catch otherwise silent errors should the
+			# behavior of Cromwell changes in the future with regard to defined().
+			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[3]])
+			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[3]])
     		
 			call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
 				input:
@@ -90,11 +92,9 @@ workflow myco {
 			}
 			# if this sample passes...
 			if(qc_fastqs.status_code == pass) {
-				File possibly_fastp_cleaned_fastq1=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_1])
-		    	File possibly_fastp_cleaned_fastq2=select_first([decontam_each_sample.decontaminated_fastq_1, real_decontaminated_fastq_2])
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
-						reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
+						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						tarball_bams_and_bais = false,
 						timeout = if guardrail_mode then 600 else 0
 				}
@@ -365,13 +365,13 @@ workflow myco {
 	
 	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
-		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
-		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
-		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
-		"pct_above_q30": select_first([decontam_each_sample.dcntmd_pct_above_q30[0], "NA"]),                 # fastp
-		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
-		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),      # thiagen!TBProfiler
-		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
+		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),    # decontamination
+		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),    # decontamination
+		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),      # decontamination
+		"pct_above_q30": select_first([decontam_each_sample.dcntmd_pct_above_q30[0], "NA"]), # fastp
+		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),               # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),        # thiagen!TBProfiler
+		"mean_coverage": select_first([meanCoverage, "NA"])                                  # covstats
 	}
 	
 	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
