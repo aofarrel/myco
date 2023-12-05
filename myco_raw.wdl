@@ -13,8 +13,11 @@ workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 		
+		String? output_sample_name
+		Boolean guardrail_mode                 = false
+		
 		Int     covstatsQC_min_coverage        =   10
-		Int     covstatsQC_min_pct_unmapped    =    2
+		Int     covstatsQC_min_pct_mapped      =   98
 		Boolean covstatsQC_skip_entirely       = false
 		Boolean decontam_use_CDC_varpipe_ref   = true
 		File?   diffQC_mask_bedfile
@@ -24,7 +27,7 @@ workflow myco {
 		Boolean clean_before_decontam          = true
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
-		Boolean guardrail_mode                 = false
+		
 		Boolean soft_pct_mapped                = false
 		Int     quick_tasks_disk_size          =   10 
 		Boolean tbprofiler_on_bam              = false
@@ -54,13 +57,14 @@ workflow myco {
 	
 	# flip some QC stuff around
 	Float diffQC_max_pct_low_coverage_float = diffQC_max_pct_low_coverage / 100.0
-	Int covstatsQC_max_percent_unmapped = 100 - covstatsQC_min_pct_unmapped
+	Int covstatsQC_max_percent_unmapped = 100 - covstatsQC_min_pct_mapped
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
 				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.9-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.9-full",
 				unsorted_sam = true,
+				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = clean_average_q_score,
 				fastp_clean_before_decontam = clean_before_decontam,
