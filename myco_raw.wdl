@@ -75,10 +75,12 @@ workflow myco {
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
-			# Setting the second element to something that isn't valid may help catch otherwise silent errors should the
-			# behavior of Cromwell changes in the future with regard to defined().
-			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[3]])
-			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[3]])
+			# Originally I wanted to set the second element to something that isn't valid in hopes that may help catch 
+			# otherwise silent errors should the behavior of Cromwell changes in the future with regard to defined()...
+			# But it seems all members of a select_first() array are evaulated and checked for "is this valid" even if
+			# the first (0 index) member of the select_first() array is defined (eg, is selected).
+			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
+			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
     		
 			call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
 				input:
