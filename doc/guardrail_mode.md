@@ -6,7 +6,7 @@ Guardrail mode is **not** a replacement for QC. It is arguably a type of QC filt
 
 ## Filters
 When guardrail mode is active, if any of these are true about a sample, the sample will be removed.
-* TBProfiler thinks the median coverage is less than 3x
+* TBProfiler thinks the median coverage is less than 3x or that more than 10% of the data can't map to H37Rv
 * Mapping reads to the decontamination reference takes more than 300 minutes
 * Decontaminating takes more than 600 minutes
 * Variant calling takes more 600 minutes
