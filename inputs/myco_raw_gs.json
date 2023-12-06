@@ -1,0 +1,3 @@
+{
+  "myco.paired_fastq_sets": [["gs://ucsc-pathogen-genomics-public/tb/fq/SAMN25995139_SRR19428597_1.fastq", "gs://ucsc-pathogen-genomics-public/tb/fq/SAMN25995139_SRR19428597_2.fastq"]]
+}
