@@ -23,7 +23,7 @@ workflow myco {
 		Boolean decontam_use_CDC_varpipe_ref   = true
 		File?   mask_bedfile
 		Int     QC_max_pct_low_coverage_sites  =    20
-		Int     QC_min_pct_mapped              =    98
+		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
 		Boolean QC_soft_pct_mapped             = false
@@ -46,9 +46,9 @@ workflow myco {
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		QC_min_pct_mapped: "If covstats thinks less than this percent of your sample (after decontam and cleaning) maps to H37Rv, throw out this sample."
+		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
-		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_min_pct_mapped) will throw a non-fatal warning."
+		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
@@ -95,7 +95,7 @@ workflow myco {
 					soft_pct_mapped = QC_soft_pct_mapped,
 					soft_coverage = if guardrail_mode then false else true,
 					minimum_coverage = if guardrail_mode then 3 else 0,
-					minimum_pct_mapped = if guardrail_mode then 10 else 100,
+					minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
 					sample = decontam_each_sample.sample
 			}
 			# if this sample passes...
@@ -137,7 +137,7 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if((covstats.percentUnmapped < QC_min_pct_mapped) || QC_soft_pct_mapped) {
+			if((covstats.percentUnmapped > QC_max_pct_unmapped) || QC_soft_pct_mapped) {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
@@ -339,10 +339,10 @@ workflow myco {
 					Array[Float] meanCoverages = select_all(covstats.coverage)
 					Float        meanCoverage = meanCoverages[0]
 					
-					if((percentUnmapped < QC_min_pct_mapped) || !(QC_soft_pct_mapped)) { 
-						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MIN_"+QC_min_pct_mapped +")"
+					if((percentUnmapped > QC_max_pct_unmapped) || !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")"
 						if(meanCoverage < QC_min_mean_coverage) {
-							String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE"
+							String double_bad = "COVSTATS_BOTH_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")_AND_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
 						} 
 					}
 					if(meanCoverage < QC_min_mean_coverage) {
