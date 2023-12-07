@@ -386,7 +386,7 @@ workflow myco {
 		"mean_coverage": select_first([meanCoverage, "NA"])                             # covstats
 	}
 	String sample_name_inputs_basename = sub(sub(sub(basename(paired_fastq_sets[0][0]), ".fastq", ""), ".gz", ""), ".fq", "")
-	String sample_name_maybe_varcalled = if length(final_bams) > 0 then sub(basename(final_bams[0]), ".bam", "") else sample_name_inputs_basename
+	String sample_name_maybe_varcalled = if length(final_bams) > 0 then sub(basename(final_bams[0]), "_to_H37Rv.bam", "") else sample_name_inputs_basename
 	String sample_name_maybe_manually_set = if defined(output_sample_name) then select_first([output_sample_name, "fallback"]) else sample_name_maybe_varcalled
 	
 	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
