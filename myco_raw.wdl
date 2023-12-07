@@ -137,7 +137,7 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if((covstats.percentUnmapped < QC_min_pct_mapped)||QC_soft_pct_mapped) {
+			if((covstats.percentUnmapped < QC_min_pct_mapped) || QC_soft_pct_mapped) {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
@@ -330,21 +330,25 @@ workflow myco {
 		
 		# handle covstats
 		if (!covstatsQC_skip_entirely) {
-			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
-				#if(defined(covstats.percentUnmapped)) { # this seems to always be true, unfortunately!
-					if(length(covstats.percentUnmapped) > 0) {
-						# there is more than zero values in the output array, so covstats must have run
-						Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
-						Float percentUnmapped = percentsUnmapped[0]
-						Array[Float] meanCoverages = select_all(covstats.coverage)
-						Float meanCoverage = meanCoverages[0]
-						
-						if((percentUnmapped > QC_min_pct_mapped) || !(QC_soft_pct_mapped)) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-							if(meanCoverage < QC_min_mean_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
-						}
-						if(meanCoverage < QC_min_mean_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+			if (varcall_errorcode_array[0] == "PASS") {
+				if(length(covstats.percentUnmapped) > 0) {
+					# cannot use defined(covstats.percentUnmapped) as it is always true, so we instead
+					# check if there are more than zero values in the output array for covstats
+					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+					Float        percentUnmapped = percentsUnmapped[0]
+					Array[Float] meanCoverages = select_all(covstats.coverage)
+					Float        meanCoverage = meanCoverages[0]
+					
+					if((percentUnmapped < QC_min_pct_mapped) || !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MIN_"+QC_min_pct_mapped +")"
+						if(meanCoverage < QC_min_mean_coverage) {
+							String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE"
+						} 
 					}
-				#}
+					if(meanCoverage < QC_min_mean_coverage) {
+						String too_low_coverage = "COVSTATS_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
+					}
+				}
 			}
 			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
 			if(!(coerced_covstats_error == pass)) {          
@@ -368,7 +372,9 @@ workflow myco {
 	
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
 	# TODO: this is still breaking in Cromwell!
-	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '[["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
+	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], 
+	# [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '
+	# [["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
 	#Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
 	
 	Map[String, String] metrics_to_values = { 
