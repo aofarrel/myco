@@ -268,10 +268,8 @@ workflow myco {
 
 	if(tree_decoration) {
 		if(length(real_diffs)>0) {
-			# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
-			# into an Array[File] with the classic "select_first() with a bogus fallback" hack
-			Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
-			Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
+			Array[File] coerced_diffs = select_all(real_diffs)
+			Array[File] coerced_reports = select_all(real_reports)
 			call build_treesWF.Tree_Nine as trees {
 				input:
 					diffs = coerced_diffs,
@@ -379,20 +377,23 @@ workflow myco {
 	
 	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
-		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),    # decontamination
-		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),    # decontamination
-		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),      # decontamination
-		"pct_above_q30": select_first([decontam_each_sample.dcntmd_pct_above_q30[0], "NA"]), # fastp
-		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),               # thiagen!TBProfiler
-		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),        # thiagen!TBProfiler
-		"mean_coverage": select_first([meanCoverage, "NA"])                                  # covstats
+		"reads_is_contam": decontam_each_sample.reads_is_contam[0],                     # decontamination
+		"reads_reference": decontam_each_sample.reads_reference[0],                     # decontamination
+		"reads_unmapped": decontam_each_sample.reads_unmapped[0],                       # decontamination
+		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                  # fastp
+		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),          # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),   # thiagen!TBProfiler
+		"mean_coverage": select_first([meanCoverage, "NA"])                             # covstats
 	}
+	String sample_name_inputs_basename = sub(sub(sub(basename(paired_fastq_sets[0][0]), ".fastq", ""), ".gz", ""), ".fq", "")
+	String sample_name_maybe_varcalled = if length(final_bams) > 0 then sub(basename(final_bams[0]), ".bam", "") else sample_name_inputs_basename
+	String sample_name_maybe_manually_set = if defined(output_sample_name) then select_first([output_sample_name, "fallback"]) else sample_name_maybe_varcalled
 	
 	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
 		input:
 			the_map = metrics_to_values,
-			column_names = if length(paired_fastq_sets) == 1 then [basename(paired_fastq_sets[0][0])] else ["sample"],
-			outfile = if length(paired_fastq_sets) == 1 then basename(paired_fastq_sets[0][0])+"_qc" else "combined_qc_report.txt"
+			column_names = if length(paired_fastq_sets) == 1 then [sample_name_maybe_manually_set] else ["sample"],
+			outfile = if length(paired_fastq_sets) == 1 then sample_name_maybe_manually_set+"_qc" else "combined_qc_report.txt"
 	}
 		
 	output {
