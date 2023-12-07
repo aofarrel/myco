@@ -137,7 +137,7 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if((covstats.percentUnmapped > QC_max_pct_unmapped) || QC_soft_pct_mapped) {
+			if((covstats.percentUnmapped < QC_max_pct_unmapped) || QC_soft_pct_mapped) {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
@@ -337,7 +337,7 @@ workflow myco {
 					Array[Float] meanCoverages = select_all(covstats.coverage)
 					Float        meanCoverage = meanCoverages[0]
 					
-					if((percentUnmapped > QC_max_pct_unmapped) || !(QC_soft_pct_mapped)) { 
+					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
 						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")"
 						if(meanCoverage < QC_min_mean_coverage) {
 							String double_bad = "COVSTATS_BOTH_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")_AND_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
