@@ -375,13 +375,17 @@ workflow myco {
 	# [["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
 	#Array[String] warnings = flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], [select_all(warning_decontam)]]))
 	
-	Float pct_unmapped_decontam = if !clean_after_decontam then (decontam_each_sample.reads_unmapped[0] / decontam_each_sample.reads_clck_kept[0]) * 100 else -1.0
+	Float this_unmapped = decontam_each_sample.reads_unmapped[0]
+	Float this_kept = decontam_each_sample.reads_clck_kept[0]
+	Float porp_unmapped = this_unmapped/this_kept
+	Float pct_unmapped_decontam = if !clean_after_decontam then (porp_unmapped * 100) else -1.0
 	
 	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
 		"n_reads_contam": decontam_each_sample.reads_is_contam[0],                       # decontamination
-		"n_reads_reference": decontam_each_sample.reads_reference[0],                    # decontamination
-		"n_reads_unmapped": decontam_each_sample.reads_unmapped[0],                      # decontamination
+		"n_reads_decon_reference": decontam_each_sample.reads_reference[0],                    # decontamination
+		"n_reads_decon_unmapped": decontam_each_sample.reads_unmapped[0],                      # decontamination
+		"n_reads_decon_kept": decontam_each_sample.reads_clck_kept[0],                        # decontamination  
 		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
 		"pct_mapped_tbprof": select_first([tbprofilerFQ.pct_reads_mapped[0], "NA"]),     # thiagen!TBProfiler
 		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
@@ -404,6 +408,13 @@ workflow myco {
 	output {
 		# status of sample -- only valid iff this ran on only one sample
 		String status_code = select_first([finalcode, pass])
+		
+		# debug
+		Float pct_unmapped_decontamm = pct_unmapped_decontam
+		Float n_reads_decon_kept = this_kept
+		Float n_reads_decon_unmapped = this_unmapped
+		Float? pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
+		Float? pct_unmapped_covstats = percentUnmapped
 		
 		# raw files
 		Array[File]  bais  = final_bais
