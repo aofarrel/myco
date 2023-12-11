@@ -1,12 +1,12 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.17/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.11/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.3/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/main/thiagen_tbprofiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.4/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
@@ -88,7 +88,7 @@ workflow myco {
 			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
     		
-			call qc_fastqsWF.ThiagenTBProfiler as qc_fastqs {
+			call tbprofilerFQ_WF.ThiagenTBProfiler as tbprofilerFQ {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
@@ -99,7 +99,7 @@ workflow myco {
 					sample = decontam_each_sample.sample
 			}
 			# if this sample passes...
-			if(qc_fastqs.status_code == pass) {
+			if(tbprofilerFQ.status_code == pass) {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
@@ -226,9 +226,9 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	
   	# coerce optional types into required types (doesn't crash if these are null)
-	Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
-	Array[String] coerced_fq_resistances=select_all(qc_fastqs.resistance)
-	Array[Int]    coerced_fq_depths=select_all(qc_fastqs.median_coverage)
+	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.strain)
+	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.resistance)
+	Array[Int]    coerced_fq_depths=select_all(tbprofilerFQ.median_coverage)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -309,7 +309,7 @@ workflow myco {
 		
 		# handle earlyQC (if it ran at all)
 		
-		Array[String] earlyQC_array_coerced = select_all(qc_fastqs.status_code)
+		Array[String] earlyQC_array_coerced = select_all(tbprofilerFQ.status_code)
 		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
 		if(!(earlyQC_errorcode_array[0] == pass)) {          
 			String earlyQC_ERR = earlyQC_errorcode_array[0]
@@ -370,20 +370,25 @@ workflow myco {
 	
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
 	# TODO: this is still breaking in Cromwell!
-	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], 
+	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], 
 	# [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '
 	# [["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
-	#Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
+	#Array[String] warnings = flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], [select_all(warning_decontam)]]))
+	
+	Float pct_unmapped_decontam = if !clean_after_decontam then (decontam_each_sample.reads_unmapped[0] / decontam_each_sample.reads_clck_kept[0]) * 100 else -1.0
 	
 	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
-		"reads_is_contam": decontam_each_sample.reads_is_contam[0],                     # decontamination
-		"reads_reference": decontam_each_sample.reads_reference[0],                     # decontamination
-		"reads_unmapped": decontam_each_sample.reads_unmapped[0],                       # decontamination
-		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                  # fastp
-		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),          # thiagen!TBProfiler
-		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),   # thiagen!TBProfiler
-		"mean_coverage": select_first([meanCoverage, "NA"])                             # covstats
+		"n_reads_contam": decontam_each_sample.reads_is_contam[0],                       # decontamination
+		"n_reads_reference": decontam_each_sample.reads_reference[0],                    # decontamination
+		"n_reads_unmapped": decontam_each_sample.reads_unmapped[0],                      # decontamination
+		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
+		"pct_mapped_tbprof": select_first([tbprofilerFQ.pct_reads_mapped[0], "NA"]),     # thiagen!TBProfiler
+		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
+		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                   # fastp
+		"median_coverage": select_first([tbprofilerFQ.median_coverage[0], "NA"]),        # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([tbprofilerFQ.pct_genome_covered[0], "NA"]), # thiagen!TBProfiler
+		"mean_coverage": select_first([meanCoverage, "NA"])                              # covstats
 	}
 	String sample_name_inputs_basename = sub(sub(sub(basename(paired_fastq_sets[0][0]), ".fastq", ""), ".gz", ""), ".fq", "")
 	String sample_name_maybe_varcalled = if length(final_bams) > 0 then sub(basename(final_bams[0]), "_to_H37Rv.bam", "") else sample_name_inputs_basename
@@ -412,10 +417,10 @@ workflow myco {
 		Array[File?] diff_reports              = real_reports
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
 		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = qc_fastqs.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = qc_fastqs.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = qc_fastqs.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = qc_fastqs.tbprofiler_lims_report_csv
+		Array[File?] tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
