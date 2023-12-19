@@ -1,73 +1,57 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.17/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.11/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.12/neoTBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.1/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.3/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.4/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
 		
-		Int     covstatsQC_min_coverage        =   10
-		Int     covstatsQC_min_pct_unmapped    =    2
+		String? output_sample_name
+		Boolean guardrail_mode                 = true
+		
+		Boolean clean_after_decontam           = false
+		Int     clean_average_q_score          = 29
+		Boolean clean_before_decontam          = true
 		Boolean covstatsQC_skip_entirely       = false
 		Boolean decontam_use_CDC_varpipe_ref   = true
-		File?   diffQC_mask_bedfile
-		Int     diffQC_max_pct_low_coverage    =    20
-		Int     diffQC_this_is_low_coverage    =    10
-		Int     earlyQC_min_q30_rate           =    90
-		Boolean earlyQC_skip_entirely          = false
-		Boolean earlyQC_skip_QC                = false
-		Boolean earlyQC_skip_trimming          = false
-		Int     earlyQC_trim_qual_below        =   30
-		Int     quick_tasks_disk_size          =   10 
-		Int     subsample_cutoff               =   -1
-		Int     subsample_seed                 = 1965
+		File?   mask_bedfile
+		Int     QC_max_pct_low_coverage_sites  =    20
+		Int     QC_max_pct_unmapped            =     2
+		Int     QC_min_mean_coverage           =    10
+		Int     QC_min_q30                     =    90
+		Boolean QC_soft_pct_mapped             = false
+		Int     QC_this_is_low_coverage        =    10
+		Int     quick_tasks_disk_size          =    10 
 		Boolean tbprofiler_on_bam              = false
-		Int     tbprofilerQC_min_pct_mapped    =   98
-		Int     timeout_decontam_part1         =    0
-		Int     timeout_decontam_part2         =    0
-		Int     timeout_variant_caller         =    0
 		Boolean tree_decoration                = false
 		File?   tree_to_decorate
-		Int     variantcalling_addl_disk       =  100
-		Boolean variantcalling_crash_on_error  = false
-		Boolean variantcalling_crash_on_timeout= false
-		Int     variantcalling_cpu             =   16
-		Boolean variantcalling_debug           = false
-		Int?    variantcalling_mem_height
-		Int     variantcalling_memory          =   32
-		Int     variantcalling_preemptibles    =    1
-		Int     variantcalling_retries         =    1
-		Boolean variantcalling_ssd             = true
 	}
 
 	parameter_meta {
-		covstatsQC_min_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		covstatsQC_min_pct_unmapped: "If covstats thinks less than this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		clean_after_decontam: "Clean fqs with fastp AFTER decontaminating. Redundant if clean_before_decontam is true."
+		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30. Overridden by clean_before_decontam and clean_after_decontam BOTH being false."
+		clean_before_decontam: "Clean fqs with fastp BEFORE decontamination."
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
-		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-		diffQC_max_pct_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_this_is_low_coverage will be discarded"
-		diffQC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_min_q30_rate: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
-		earlyQC_skip_entirely: "Do not run earlyQC at all - no trimming, no QC, nothing."
-		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
-		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_min_q30_rate. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
-		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
+		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
+		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		output_sample_name: "Override all sample names with this string instead."
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
-		subsample_seed: "Seed used for subsampling with seqtk"
+		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
+		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
+		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
+		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
+		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
-		tbprofilerQC_min_pct_mapped: "If tbprofiler thinks less than this percent (as int, 50 = 50%) of data does map to H37Rv, throw out this sample"
-		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
-		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
-		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
@@ -75,120 +59,60 @@ workflow myco {
 	String pass = "PASS" # used later... much later
 	
 	# flip some QC stuff around
-	Float diffQC_max_pct_low_coverage_float = diffQC_max_pct_low_coverage / 100.0
-	Int covstatsQC_max_percent_unmapped = 100 - covstatsQC_min_pct_unmapped
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
-		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
+		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.9-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.9-full",
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.11-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.11-CRyPTIC",
 				unsorted_sam = true,
+				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
-				subsample_cutoff = subsample_cutoff,
-				subsample_seed = subsample_seed,
-				timeout_map_reads = timeout_decontam_part1,
-				timeout_decontam = timeout_decontam_part2
+				fastp_clean_avg_qual = clean_average_q_score,
+				fastp_clean_before_decontam = clean_before_decontam,
+				fastp_clean_after_decontam = clean_after_decontam,
+				QC_min_q30 = QC_min_q30 / 100.0,
+				preliminary_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
+				subsample_cutoff = if guardrail_mode then 30000 else -1,
+				timeout_map_reads = if guardrail_mode then 300 else 0,
+				timeout_decontam = if guardrail_mode then 600 else 0
 		}
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
-    		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
-    		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
+			# Originally I wanted to set the second element to something that isn't valid in hopes that may help catch 
+			# otherwise silent errors should the behavior of Cromwell changes in the future with regard to defined()...
+			# But it seems all members of a select_first() array are evaulated and checked for "is this valid" even if
+			# the first (0 index) member of the select_first() array is defined (eg, is selected).
+			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
+			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
     		
-    		if((decontam_each_sample.reads_kept < 5000)) {
-		        String warning_decontam = "DECONTAMINATION_ONLY" + decontam_each_sample.reads_kept + "_READS_REMAINING_(MIN_" + 5000 + ")" #!StringCoercion
-		    }
-
-			if(!earlyQC_skip_entirely) {
-				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
-					input:
-						fastq1 = real_decontaminated_fastq_1,
-						fastq2 = real_decontaminated_fastq_2,
-						minimum_q30_rate = earlyQC_min_q30_rate,
-						average_qual = earlyQC_trim_qual_below,
-						use_fastps_cleaned_fastqs = !(earlyQC_skip_trimming),
-						soft_all_qc = earlyQC_skip_QC,
-						minimum_pct_mapped = tbprofilerQC_min_pct_mapped
-				}
-				# if this sample passes fastp, or if earlyQC_skip_QC is true...
-				if(qc_fastqs.status_code == pass) {
-					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC {
-						input:
-							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
-							addldisk = variantcalling_addl_disk,
-							cpu = variantcalling_cpu,
-							crash_on_error = variantcalling_crash_on_error,
-							crash_on_timeout = variantcalling_crash_on_timeout,
-							debug = variantcalling_debug,
-							mem_height = variantcalling_mem_height,
-							memory = variantcalling_memory,
-							preempt = variantcalling_preemptibles,
-							retries = variantcalling_retries,
-							ssd = variantcalling_ssd,
-							tarball_bams_and_bais = false,
-							timeout = timeout_variant_caller
-					}
-				}
+			call tbprofilerFQ_WF.ThiagenTBProfiler as tbprofilerFQ {
+				input:
+					fastq1 = real_decontaminated_fastq_1,
+					fastq2 = real_decontaminated_fastq_2,
+					soft_pct_mapped = QC_soft_pct_mapped,
+					soft_coverage = if guardrail_mode then false else true,
+					minimum_coverage = if guardrail_mode then 3 else 0,
+					minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
+					sample = decontam_each_sample.sample
 			}
-			
-			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
-			if(earlyQC_skip_entirely) {
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
+			# if this sample passes...
+			if(tbprofilerFQ.status_code == pass) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
-						addldisk = variantcalling_addl_disk,
-						cpu = variantcalling_cpu,
-						crash_on_error = variantcalling_crash_on_error,
-						crash_on_timeout = variantcalling_crash_on_timeout,
-						debug = variantcalling_debug,
-						mem_height = variantcalling_mem_height,
-						memory = variantcalling_memory,
-						preempt = variantcalling_preemptibles,
-						retries = variantcalling_retries,
-						ssd = variantcalling_ssd,
 						tarball_bams_and_bais = false,
-						timeout = timeout_variant_caller
+						timeout = if guardrail_mode then 600 else 0
 				}
 			}
 		}
-
 	}
-
-	# do some wizardry to deal with optionals
-	#
-	# In order to account for different use cases, this workflow has two versions of the variant caller. They are mutually
-	# exclusive, eg, only one can ever be called by a given sample. In fact, there are cases where NONE of them get called.
-	# Additionally, each version of the variant caller technically gives optional output. This is to prevent the entire
-	# pipeline from crashing if a single garbage sample starts the variant calling task but cannot make a VCF.
-	#
-	# Unfortunately, this means I have created multiple optional outputs from optional tasks. Mutually exclusive outputs from
-	# mutually exclusive tasks, yes, but WDL doesn't quite understand mutual exclusivity. WDL and/or Cromwell (it's hard to 
-	# know if the issue is the langauge or its implementation since the spec is not very specific) also gets finicky when we try
-	# to do certain things with optional arrays. So, we want to turn those optionals into not-optionals ASAP. That's what this
-	# block of variable definitions does. WDL does not allow you to overwrite variables, so we need to declare a ton of variables
-	# with unique names. Yes, this could in theory be done more "cleanly" by calling a task, but why spin up a Docker image to do
-	# microseconds worth of work?
-	#
-	# Interestingly, even if the variant caller didn't run, this code block does not cause a crash. Somehow, we can create 
-	# non-optional variables that have no content. This little mystery is mostly good because it means the 
-	# all-samples-get-dropped-before-variant-calling-because-they-suck does not break this section... but it also means
-	# we cannot use anything here to test if any version of the variant caller actually ran at all!
-	# 
-	Array[File] minos_vcfs_if_earlyQC = select_all(variant_call_after_earlyQC.adjudicated_vcf)
-	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
 	
-	Array[File] bams_if_earlyQC = select_all(variant_call_after_earlyQC.bam)
-	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
-	
-	Array[File] bais_if_earlyQC = select_all(variant_call_after_earlyQC.bai)
-	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
-	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC, minos_vcfs_if_no_earlyQC])
-	Array[File] final_bams = flatten([bams_if_earlyQC, bams_if_no_earlyQC])
-	Array[File] final_bais = flatten([bais_if_earlyQC, bais_if_no_earlyQC])
+	Array[File] minos_vcfs = flatten([select_all(variant_calling.adjudicated_vcf)])
+	Array[File] final_bams = flatten([select_all(variant_calling.bam)])
+	Array[File] final_bais = flatten([select_all(variant_calling.bai)])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
@@ -213,17 +137,17 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if(covstats.percentUnmapped < covstatsQC_max_percent_unmapped) {
-				if(covstats.coverage > covstatsQC_min_coverage) {
+			if((covstats.percentUnmapped < QC_max_pct_unmapped) || QC_soft_pct_mapped) {
+				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diffQC_this_is_low_coverage,
-							tbmf = diffQC_mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = diffQC_max_pct_low_coverage_float
+							min_coverage_per_site = QC_this_is_low_coverage,
+							tbmf = mask_bedfile,
+							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 					}
 				}
 			}
@@ -236,9 +160,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diffQC_this_is_low_coverage,
-					tbmf = diffQC_mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = diffQC_max_pct_low_coverage_float
+					min_coverage_per_site = QC_this_is_low_coverage,
+					tbmf = mask_bedfile,
+					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 			}
 		}
 		
@@ -302,9 +226,9 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	
   	# coerce optional types into required types (doesn't crash if these are null)
-	Array[String] coerced_fq_strains=select_all(qc_fastqs.strain)
-	Array[String] coerced_fq_resistances=select_all(qc_fastqs.resistance)
-	Array[Int]    coerced_fq_depths=select_all(qc_fastqs.median_coverage)
+	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.strain)
+	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.resistance)
+	Array[Int]    coerced_fq_depths=select_all(tbprofilerFQ.median_coverage)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -344,10 +268,8 @@ workflow myco {
 
 	if(tree_decoration) {
 		if(length(real_diffs)>0) {
-			# diff files must exist if tree_decoration is true, so we can force the Array[File?]?
-			# into an Array[File] with the classic "select_first() with a bogus fallback" hack
-			Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
-			Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
+			Array[File] coerced_diffs = select_all(real_diffs)
+			Array[File] coerced_reports = select_all(real_reports)
 			call build_treesWF.Tree_Nine as trees {
 				input:
 					diffs = coerced_diffs,
@@ -387,52 +309,44 @@ workflow myco {
 		
 		# handle earlyQC (if it ran at all)
 		
-		Array[String] earlyQC_array_coerced = select_all(qc_fastqs.status_code)
+		Array[String] earlyQC_array_coerced = select_all(tbprofilerFQ.status_code)
 		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
 		if(!(earlyQC_errorcode_array[0] == pass)) {          
 			String earlyQC_ERR = earlyQC_errorcode_array[0]
 		}
 
-		# Unfortunately, to check if the variant caller ran, we have to check both versions of the variant caller.
-		#
-		# But there seems to be a bug in Cromwell that causes it to incorrectly define variables even when a task hasn't run.
-		# For example, if(defined(variant_call_after_earlyQC.errorcode)) returns true even if NO variant callers
-		# ran at all. And if you put a select_first() in that if block, it will fall back to the next variable, indicating
-		# that select_first() knows it's undefined but defined() does not. I have not replicated this behavior with an optional
-		# non-scattered task, so I think this is specific to scattered tasks, or I am a fool and something is wrong with my 
-		# defined() checks. In any case, here's the Cromwell ticket: https://github.com/broadinstitute/cromwell/issues/7201
-		#
-		# I've decided to instead use a variation of how we coerce the VCF outputs into required types - relying entirely on
-		# select_first() and select_all() instead of the seemingly buggy defined(). It's less clean, but it seems to be necessary.
 		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
 		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
-		Array[String] errorcode_if_earlyQC = select_all(variant_call_after_earlyQC.errorcode)
-		Array[String] errorcode_if_no_earlyQC = select_all(variant_call_without_earlyQC.errorcode)
+		Array[String] errorcode_if_earlyQC = select_all(variant_calling.errorcode)
 		
 		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
 		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, errorcode_if_no_earlyQC, ["PASS"]])
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, ["PASS"]])
 		if(!(varcall_errorcode_array[0] == pass)) {          
 				String varcall_ERR = varcall_errorcode_array[0]
 		}
 		
 		# handle covstats
 		if (!covstatsQC_skip_entirely) {
-			if (varcall_errorcode_array[0] == "PASS") { # cannot use varcall_ERR, as it is considered optional
-				#if(defined(covstats.percentUnmapped)) { # this seems to always be true, unfortunately!
-					if(length(covstats.percentUnmapped) > 0) {
-						# there is more than zero values in the output array, so covstats must have run
-						Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
-						Float percentUnmapped = percentsUnmapped[0]
-						Array[Float] meanCoverages = select_all(covstats.coverage)
-						Float meanCoverage = meanCoverages[0]
-						
-						if(percentUnmapped > covstatsQC_max_percent_unmapped) { String too_many_unmapped = "COVSTATS_LOW_PCT_MAPPED_TO_REF" 
-							if(meanCoverage < covstatsQC_min_coverage) { String double_bad = "COVSTATS_BAD_MAP_AND_COVERAGE" } 
-						}
-						if(meanCoverage < covstatsQC_min_coverage) { String too_low_coverage = "COVSTATS_LOW_MEAN_COVERAGE" }
+			if (varcall_errorcode_array[0] == "PASS") {
+				if(length(covstats.percentUnmapped) > 0) {
+					# cannot use defined(covstats.percentUnmapped) as it is always true, so we instead
+					# check if there are more than zero values in the output array for covstats
+					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+					Float        percentUnmapped = percentsUnmapped[0]
+					Array[Float] meanCoverages = select_all(covstats.coverage)
+					Float        meanCoverage = meanCoverages[0]
+					
+					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")"
+						if(meanCoverage < QC_min_mean_coverage) {
+							String double_bad = "COVSTATS_BOTH_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")_AND_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
+						} 
 					}
-				#}
+					if(meanCoverage < QC_min_mean_coverage) {
+						String too_low_coverage = "COVSTATS_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
+					}
+				}
 			}
 			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
 			if(!(coerced_covstats_error == pass)) {          
@@ -456,30 +370,51 @@ workflow myco {
 	
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
 	# TODO: this is still breaking in Cromwell!
-	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '[["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
-	#Array[String] warnings = flatten(flatten([[select_all(qc_fastqs.warning_codes)], [select_all(warning_decontam)]]))
+	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], 
+	# [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '
+	# [["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
+	#Array[String] warnings = flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], [select_all(warning_decontam)]]))
+	
+	Float this_unmapped = decontam_each_sample.reads_unmapped[0]
+	Float this_kept = decontam_each_sample.reads_clck_kept[0]
+	Float porp_unmapped = this_unmapped/this_kept
+	Float pct_unmapped_decontam = if !clean_after_decontam then (porp_unmapped * 100) else -1.0
 	
 	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
-		"reads_is_contam": select_first([decontam_each_sample.reads_is_contam[0], "NA"]),  # decontamination
-		"reads_reference": select_first([decontam_each_sample.reads_reference[0], "NA"]),  # decontamination
-		"reads_unmapped": select_first([decontam_each_sample.reads_unmapped[0], "NA"]),    # decontamination
-		"pct_above_q30": select_first([qc_fastqs.pct_above_q30[0], "NA"]),                 # fastp
-		"median_coverage": select_first([qc_fastqs.median_coverage[0], "NA"]),             # thiagen!TBProfiler
-		"genome_pct_coverage": select_first([qc_fastqs.pct_genome_covered[0], "NA"]),      # thiagen!TBProfiler
-		"mean_coverage": select_first([meanCoverage, "NA"])                                # covstats
+		"n_reads_contam": decontam_each_sample.reads_is_contam[0],                       # decontamination
+		"n_reads_decon_reference": decontam_each_sample.reads_reference[0],                    # decontamination
+		"n_reads_decon_unmapped": decontam_each_sample.reads_unmapped[0],                      # decontamination
+		"n_reads_decon_kept": decontam_each_sample.reads_clck_kept[0],                        # decontamination  
+		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
+		"pct_mapped_tbprof": select_first([tbprofilerFQ.pct_reads_mapped[0], "NA"]),     # thiagen!TBProfiler
+		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
+		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                   # fastp
+		"median_coverage": select_first([tbprofilerFQ.median_coverage[0], "NA"]),        # thiagen!TBProfiler
+		"genome_pct_coverage": select_first([tbprofilerFQ.pct_genome_covered[0], "NA"]), # thiagen!TBProfiler
+		"mean_coverage": select_first([meanCoverage, "NA"])                              # covstats
 	}
+	String sample_name_inputs_basename = sub(sub(sub(basename(paired_fastq_sets[0][0]), ".fastq", ""), ".gz", ""), ".fq", "")
+	String sample_name_maybe_varcalled = if length(final_bams) > 0 then sub(basename(final_bams[0]), "_to_H37Rv.bam", "") else sample_name_inputs_basename
+	String sample_name_maybe_manually_set = if defined(output_sample_name) then select_first([output_sample_name, "fallback"]) else sample_name_maybe_varcalled
 	
 	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
 		input:
 			the_map = metrics_to_values,
-			column_names = if length(paired_fastq_sets) == 1 then [basename(paired_fastq_sets[0][0])] else ["sample"],
-			outfile = if length(paired_fastq_sets) == 1 then basename(paired_fastq_sets[0][0])+"_qc" else "combined_qc_report.txt"
+			column_names = if length(paired_fastq_sets) == 1 then [sample_name_maybe_manually_set] else ["sample"],
+			outfile = if length(paired_fastq_sets) == 1 then sample_name_maybe_manually_set+"_qc" else "combined_qc_report.txt"
 	}
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
 		String status_code = select_first([finalcode, pass])
+		
+		# debug
+		Float pct_unmapped_decontamm = pct_unmapped_decontam
+		Float n_reads_decon_kept = this_kept
+		Float n_reads_decon_unmapped = this_unmapped
+		Float? pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
+		Float? pct_unmapped_covstats = percentUnmapped
 		
 		# raw files
 		Array[File]  bais  = final_bais
@@ -491,13 +426,12 @@ workflow myco {
 		# metadata
 		Array[File?] covstats_reports          = covstats.covstatsOutfile
 		Array[File?] diff_reports              = real_reports
-		Array[File?] fastp_reports             = qc_fastqs.fastp_txt
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
 		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = qc_fastqs.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = qc_fastqs.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = qc_fastqs.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = qc_fastqs.tbprofiler_lims_report_csv
+		Array[File?] tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
@@ -534,8 +468,8 @@ workflow myco {
 		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
 		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
 		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_map_reads = decontam_each_sample.timer_map_reads[0]
-		Int seconds_to_rm_contam = decontam_each_sample.timer_rm_contam[0]
+		Int seconds_to_map_reads = decontam_each_sample.timer_5_mapFQ[0]
+		Int seconds_to_rm_contam = decontam_each_sample.timer_7_dcnFQ[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }

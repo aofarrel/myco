@@ -25,6 +25,9 @@ It is recommend that you also keep an eye on the total size of your FASTQs. Indi
 myco_cleaned expects that the FASTQs you are putting into have already been cleaned and merged. It's recommend you do this by running [Decontam_and_Combine](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs).  
  
 ## Quality control
+
+**NOTE: This section is outdated and does not reflect latest changes. It is still here as the pipeline is undergoing a major refactoring. Documentation will be updated once inputs are more "stable"**
+
 | name | type | myco_sra default | description |  
 |:---:|:---:|:---:|:---:|  
 | covstatsQC_minimum_coverage | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
@@ -42,6 +45,7 @@ Note that all forms of QC will throw out entire samples, with two exceptions:
   * `fastqc_on_timeout` will run fastQC if true, but does not parse its output - the samples have already been discarded upstream when they timed out
   
 ## Timeouts  
+**NOTE: In myco_raw, this is now handled by guardrail mode.**
 When working with data of unknown quality, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
   
 | name | type | myco_sra default | description |  
@@ -54,6 +58,7 @@ When working with data of unknown quality, it can be helpful to quickly remove s
 
 
 ## Variant caller inputs
+**NOTE: In myco_raw, these are once again task-level attributes.**
 Usually, I write WDLs in a way that makes their runtime attributes and rarely-used optional arguments task-level, and everything else workflow-level. However, myco uses some workarounds that require it to technically have three copies of the variant caller task, which means that if I didn't make the variant caller's inputs workflow-level, there would be three sets of task-level inputs for the variant caller.
 
 | name | type | myco_sra default | description |  
@@ -71,7 +76,8 @@ Usually, I write WDLs in a way that makes their runtime attributes and rarely-us
 
   
 ## Miscellanous workflow-level inputs  
-  
+**NOTE: This section is outdated and does not reflect latest changes. It is still here as the pipeline is undergoing a major refactoring. Documentation will be updated once inputs are more "stable"**
+
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
 | diff_force | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
