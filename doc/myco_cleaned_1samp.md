@@ -1,6 +1,6 @@
 # myco_cleaned_1samp
 
-myco_cleaned_1samp is just a wrapper for myco_cleaned.
+**As of version 6.0, myco_cleaned has been replaced by [myco_simple](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_simple). myco_simple is more flexible and has a cleaner codebase, so use it instead of myco_cleaned.**
 
  myco_cleaned_1samp is designed for [Terra data tables](https://support.terra.bio/hc/en-us/articles/360025758392) specifically. A Terra data table being used as an input for myco_cleaned_1_samp might look like this:
 
