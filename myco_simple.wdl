@@ -58,7 +58,7 @@ workflow myco {
 	}
 
 	output {
-		Array[File] minos = minos_vcfs
+		Array[File] vcfs = minos_vcfs
 		Array[File] masks = make_mask_and_diff.mask_file
 		Array[File?] diffs = make_mask_and_diff.diff
 	}

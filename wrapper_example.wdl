@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco_simple.wdl" as WF
+import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco_simple.wdl" as main
 
 # This is just a one-sample wrapper for myco_simple. It is intended for Terra data tables with a format like this:
 #
@@ -17,23 +17,16 @@ workflow myco_simple_one_sample {
     input {
         File decontaminated_fastq_1
         File decontaminated_fastq_2
-        File? typical_tb_masked_regions
     }
 
-    call WF.myco {
+    call main.myco {
         input:
-            paired_decontaminated_fastq_sets = [[decontaminated_fastq_1, decontaminated_fastq_2]],
-            typical_tb_masked_regions = typical_tb_masked_regions
+            paired_decontaminated_fastq_sets = [[decontaminated_fastq_1, decontaminated_fastq_2]]
     }
 
 output {
-		Array[File] minos = myco.minos
+		Array[File] vcfs = myco.vcfs
 		Array[File] masks = myco.masks
 		Array[File?] diffs = myco.diffs
-		File? tree_usher = myco.tree_usher
-		File? tree_taxonium = myco.tree_taxonium
-		File? tree_nextstrain = myco.tree_nextstrain
-		Array[File]? trees_nextstrain = myco.trees_nextstrain
-		Array[File]? fastqc_reports = myco.fastqc_reports
 	}
 }
