@@ -1,11 +1,7 @@
 # myco_simple
-myco_simple is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis, individually gzipped, and at least one of these is true:
-* your fastqs are already decontaminated and cleaned
-* you do not care about decontaminating/cleaning your fastqs
-* you want to run a very basic version of myco as a test
-* you want to compare the final output of a different version of myco versus what you would get without decontamination/fastp cleaning
+myco_simple is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis. It assumes you do not want to decontaminate your fastqs at all -- perhaps they are non-tuberculosis mycobacteria or already decontaminated -- but it does offer the option of cleaning with fastp.
 
-By "individually gzipped" we mean SAMN02599053_SRR1173122_1.fq.gz and SAMN02599053_SRR1173122_2.fq.gz, not SAMN02599053_SRR1173122.gz which contains two fastqs. Unlike other versions of myco, which are flexible with gzipped or not gzipped fastqs, the inputs to myco_simple **strictly** must be individually gzipped due to limitations of the variant caller.
+Each sample's read direction must be an individual gzipped file, e.g. SRR1173122_1.fq.gz and SRR1173122_2.fq.gz representing sample SRR1173122. Something like SRR1173122.gz which contains two fastqs would not work. Unlike more flexible versions of myco, the inputs to myco_simple **strictly** must be individually gzipped due to limitations of the variant caller.
 
 ## Notable inputs
 All non-fastq inputs are documented here: [inputs.md](./inputs.md)
@@ -32,7 +28,4 @@ Based on clockwork variant_call_single, which itself combines samtools, cortex, 
 If a sample times out in the variant calling step, it is usually due to an issue with the inputs. FastQC examines all inputs that timed out so you can see what might be going on.
 
 ### [3] VCF2diff -- Mask the outputs and optionally create diff files
-When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and optionally creates a diff file, one per sample, which can be used to make some happy little trees.
-
-### [4] (optional) Tree Nine -- Generate UShER, Taxonium, and NextStrain trees
-If decorate_trees = true, and an input tree is passed in, each sample will be placed on the tree by UShER. The resulting tree will then be converted to Taxonium format, allowing it to be viewed in taxonium. NextStrain subtree JSONs will also be generated.
+When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and optionally creates a diff file, one per sample, which can be used to make some happy little phylogenetic trees using [Tree Nine](https://dockstore.org/workflows/github.com/aofarrel/tree_nine/tree_nine).
