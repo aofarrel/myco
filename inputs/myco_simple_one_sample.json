@@ -1,0 +1,6 @@
+{
+	"myco_simple_one_sample.myco.decorate_tree":"true",
+	"myco_simple_one_sample.myco.input_tree":"gs://ucsc-pathogen-genomics-public/tb/tree/alldiffs_mask2ref.L.fixed.pb",
+	"myco_simple_one_sample.myco.timeout_variant_caller":"0",
+	"myco_simple_one_sample.myco.typical_tb_masked_regions":"gs://ucsc-pathogen-genomics-public/tb/mask/R00000039_repregions.bed"
+}

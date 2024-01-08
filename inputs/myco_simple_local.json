@@ -1,0 +1,3 @@
+{
+  "myco.paired_decontaminated_fastq_sets": [["inputs/data/fastqs/SAMEA3512769_ERR987753_1.fastq.gz", "inputs/data/fastqs/SAMEA3512769_ERR987753_2.fastq.gz"]]
+}
