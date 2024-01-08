@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/myco/update-myco-cleaned/myco_simple.wdl" as main
+import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_simple.wdl" as main
 
 # This is just a one-sample wrapper for myco_simple. It is intended for Terra data tables with a format like this:
 #
