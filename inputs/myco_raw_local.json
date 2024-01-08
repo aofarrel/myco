@@ -1,7 +1,3 @@
 {
-  "myco.paired_fastq_sets": [["./inputs/data/fastqs/ERR7057565_tiny_1.fq", "./inputs/data/fastqs/ERR7057565_tiny_2.fq"]],
-  "myco.tree_decoration":true,
-  "myco.timeout_decontam_part1":0,
-  "myco.timeout_decontam_part2":0,
-  "myco.timeout_variant_caller":0
+  "myco.paired_fastq_sets": [["./inputs/data/fastqs/ERR7057565_tiny_1.fq", "./inputs/data/fastqs/ERR7057565_tiny_2.fq"]]
 }
