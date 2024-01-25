@@ -383,11 +383,13 @@ workflow myco {
 	Map[String, String] metrics_to_values = { 
 		"status": select_first([finalcode, "NA"]), 
 		"n_reads_contam": decontam_each_sample.reads_is_contam[0],                       # decontamination
-		"n_reads_decon_reference": decontam_each_sample.reads_reference[0],                    # decontamination
-		"n_reads_decon_unmapped": decontam_each_sample.reads_unmapped[0],                      # decontamination
-		"n_reads_decon_kept": decontam_each_sample.reads_clck_kept[0],                        # decontamination  
-		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
+		"n_reads_decon_reference": decontam_each_sample.reads_reference[0],              # decontamination
+		"n_reads_decon_unmapped": decontam_each_sample.reads_unmapped[0],                # decontamination
+		"n_reads_decon_kept": decontam_each_sample.reads_clck_kept[0],                   # decontamination
+		"pct_loss_decon": decontam_each_sample.pct_loss_decon[0],                        # decontamination
+		"pct_loss_cleaning": decontam_each_sample.pct_loss_cleaning[0],                  # decontamination
 		"pct_mapped_tbprof": select_first([tbprofilerFQ.pct_reads_mapped[0], "NA"]),     # thiagen!TBProfiler
+		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
 		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
 		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                   # fastp
 		"median_coverage": select_first([tbprofilerFQ.median_coverage[0], "NA"]),        # thiagen!TBProfiler
@@ -415,6 +417,8 @@ workflow myco {
 		Float n_reads_decon_unmapped = this_unmapped
 		Float? pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
 		Float? pct_unmapped_covstats = percentUnmapped
+		Float? pct_loss_decon = decontam_each_sample.pct_loss_decon[0]
+		Float? pct_loss_cleaning = decontam_each_sample.pct_loss_cleaning[0]
 		
 		# raw files
 		Array[File]  bais  = final_bais

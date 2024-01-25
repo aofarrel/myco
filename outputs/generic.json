@@ -1,0 +1,13 @@
+{
+"myco.diffs":"${this.diff}",
+"myco.diff_reports":"${this.diff_report}",
+"myco.docker_used":"${this.docker}",
+"myco.masks":"${this.bedgraph}",
+"myco.pct_mapped_tbprof":"${this.pct_mapped_tbprf}",
+"myco.pct_loss_decon":"${this.pct_rmvd_contam}",
+"myco.qc_csv":"${this.qc_report}",
+"myco.status_code":"${this.status}",
+"myco.tbprof_fq_this_strain":"${this.lineage_tbprf}",
+"myco.tbprof_fq_jsons":"${this.tbprf_json}",
+"myco.vcfs":"${this.vcf}"
+}
