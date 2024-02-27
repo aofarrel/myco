@@ -1,13 +1,14 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.15/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.3/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.4/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+
 import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
@@ -27,7 +28,6 @@ workflow myco {
 		Int     diffQC_max_percent_low_coverage =  5
 		
 		# QC
-		Boolean fastqc_on_timeout           = false
 		Boolean earlyQC_skip_QC             = false
 		Int     earlyQC_minimum_percent_q30 = 90
 		Boolean earlyQC_skip_trimming       = false
@@ -77,7 +77,6 @@ workflow myco {
 		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
 		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
 		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
-		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
@@ -364,29 +363,6 @@ workflow myco {
 		}
   	}
 
-	if(fastqc_on_timeout) {
-		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
-		Array[File] bad_fastqs_varcallr_ = select_all(flatten([variant_call_without_earlyQC.check_this_fastq, variant_call_after_earlyQC_but_not_filtering_samples.check_this_fastq]))
-		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
-		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
-			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  
-		}
-		if(length(decontam_each_sample.check_this_fastq)>=1) {
-			Array[File] bad_fastqs_decontam = select_all(bad_fastqs_decontam_)
-		}
-		if(length(bad_fastqs_varcallr_)>=1) {
-			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
-		}
-		Array[File] fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
-		if(length(fastqs)>0) {
-			call fastqc.FastqcWF {
-				input:
-					fastqs = fastqs
-			}
-		}
-		
-	}
-
 	if(tree_decoration) {
 		if(length(real_diffs)>0) {
 			# diff files must exist if tree_decoration is true (unless no samples passed) 
@@ -415,7 +391,6 @@ workflow myco {
 		Array[File?]  covstats_reports       = covstats.covstatsOutfile
 		Array[File?]  diff_reports           = real_reports
 		File          download_report        = merge_reports.outfile
-		Array[File]?  fastqc_reports         = FastqcWF.reports
 		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
 		File?         tbprof_bam_depths      = collate_bam_depth.outfile
 		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
@@ -431,7 +406,7 @@ workflow myco {
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
-		File?        tree_usher       = trees.tree_usher_raw
+		File?        tree_usher       = trees.tree_usher
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
