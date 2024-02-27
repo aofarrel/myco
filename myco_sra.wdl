@@ -9,8 +9,8 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/pull_fa
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.15/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.3/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.4/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tsv-output/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tsv-output/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
@@ -227,25 +227,28 @@ workflow myco {
 	
 		# if there is more than one sample, run some tasks to concatenate the outputs
 		if(length(pulled_fastqs) != 1) {
+			Array[String] bam_strains_with_header = flatten([["sample\tsublineage"], coerced_bam_strains])
+			Array[String] bam_resista_with_header = flatten([["sample\tresistance"], coerced_bam_resistances])
+			Array[String] bam_meddept_with_header = flatten([["sample\tmedn_depth"], coerced_bam_depths])
 	
 			call sranwrp_processing.cat_strings as collate_bam_strains {
 				input:
-					strings = coerced_bam_strains,
-					out = "strain_reports.txt",
+					strings = bam_strains_with_header,
+					out = "strain_reports.tsv",
 					disk_size = quick_tasks_disk_size
 			}
 			
 			call sranwrp_processing.cat_strings as collate_bam_resistance {
 				input:
-					strings = coerced_bam_resistances,
-					out = "resistance_reports.txt",
+					strings = bam_resista_with_header,
+					out = "resistance_reports.tsv",
 					disk_size = quick_tasks_disk_size
 			}
 	
 			call sranwrp_processing.cat_strings as collate_bam_depth {
 				input:
-					strings = coerced_bam_depths,
-					out = "depth_reports.txt",
+					strings = bam_meddept_with_header,
+					out = "depth_reports.tsv",
 					disk_size = quick_tasks_disk_size
 			}
 		}
@@ -270,25 +273,28 @@ workflow myco {
 	
 		# if there is more than one sample, run some tasks to concatenate the outputs
 		if(length(pulled_fastqs) != 1) {
+			Array[String] fq_strains_with_header = flatten([["sample\tsublineage"], coerced_fq_strains])
+			Array[String] fq_resista_with_header = flatten([["sample\tresistance"], coerced_fq_resistances])
+			Array[String] fq_meddept_with_header = flatten([["sample\tmedn_depth"], coerced_fq_depths])
 
 			call sranwrp_processing.cat_strings as collate_fq_strains {
 				input:
-					strings = coerced_fq_strains,
-					out = "strain_reports.txt",
+					strings = fq_strains_with_header,
+					out = "strain_reports.tsv",
 					disk_size = quick_tasks_disk_size
 			}
 			
 			call sranwrp_processing.cat_strings as collate_fq_resistance {
 				input:
-					strings = coerced_fq_resistances,
-					out = "resistance_reports.txt",
+					strings = fq_resista_with_header,
+					out = "resistance_reports.tsv",
 					disk_size = quick_tasks_disk_size
 			}
 			
 			call sranwrp_processing.cat_strings as collate_fq_depth {
 				input:
-					strings = coerced_fq_depths,
-					out = "depth_reports.txt",
+					strings = fq_meddept_with_header,
+					out = "depth_reports.tsv",
 					disk_size = quick_tasks_disk_size
 			}
 		}
