@@ -29,7 +29,7 @@ workflow myco {
 		
 		# creation + masking of diff files
 
-		Int     QC_max_pct_low_coverage_sites  =    20
+		Float   QC_max_pct_low_coverage_sites  =     0.20
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
@@ -68,7 +68,7 @@ workflow myco {
 	}
 	
 	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -133,7 +133,8 @@ workflow myco {
 				}
 			}
 
-			if(tbprofilerFQ.status_code == pass || TBProf_on_bams_not_fastqs) {
+			String tbprofiler_fq_status_or_bogus = select_first([tbprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
+			if(tbprofiler_fq_status_or_bogus == pass || TBProf_on_bams_not_fastqs) {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
@@ -319,149 +320,9 @@ workflow myco {
 			}
 		}
 	}
-	
-	#########################################
-	# error reporting for Terra data tables #
-	#########################################
-	#
-	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
-	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
-	# for an individual sample as workflow-level output, which gets written to the Terra data table.
-	
-	# is there only one sample?
-	if(length(pulled_fastqs) == 1) {
-
-		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
-		# in the workflow this should be okay for now)
-		if(defined(fastp_decontam_check.errorcode)) {
-		
-			# Sidenote: If you have a task taking in fastp_decontam_check.errorcode, even after this defined check, it will fail
-			# command instantiation with "Cannot interpolate Array[String?] into a command string with attribute set 
-			# [PlaceholderAttributeSet(None,None,None,Some( ))]".
-		
-			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
-			String coerced_decontam_errorcode = select_first([fastp_decontam_check.errorcode[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
-			
-			# did the decontamination step return an error?
-			if(!(coerced_decontam_errorcode == pass)) {          
-				String decontam_ERR = coerced_decontam_errorcode
-			}
-		}
-		
-		# handle earlyQC (if it ran at all)
-		
-		Array[String] earlyQC_array_coerced = select_all(tbprofilerFQ.status_code)
-		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
-		if(!(earlyQC_errorcode_array[0] == pass)) {          
-			String earlyQC_ERR = earlyQC_errorcode_array[0]
-		}
-
-		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
-		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
-		Array[String] errorcode_if_earlyQC = select_all(variant_calling.errorcode)
-		
-		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
-		# the final-final-final error code needs to have decontam's error come before the variant caller error.
-		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, ["PASS"]])
-		if(!(varcall_errorcode_array[0] == pass)) {          
-				String varcall_ERR = varcall_errorcode_array[0]
-		}
-		
-		# handle covstats
-		if (!covstatsQC_skip_entirely) {
-			if (varcall_errorcode_array[0] == "PASS") {
-				if(length(covstats.percentUnmapped) > 0) {
-					# cannot use defined(covstats.percentUnmapped) as it is always true, so we instead
-					# check if there are more than zero values in the output array for covstats
-					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
-					Float        percentUnmapped = percentsUnmapped[0]
-					Array[Float] meanCoverages = select_all(covstats.coverage)
-					Float        meanCoverage = meanCoverages[0]
-					
-					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
-						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")"
-						if(meanCoverage < QC_min_mean_coverage) {
-							String double_bad = "COVSTATS_BOTH_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")_AND_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
-						} 
-					}
-					if(meanCoverage < QC_min_mean_coverage) {
-						String too_low_coverage = "COVSTATS_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
-					}
-				}
-			}
-			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
-			if(!(coerced_covstats_error == pass)) {          
-					String covstats_ERR = coerced_covstats_error
-			}
-		}
-		
-		# handle vcf to diff
-		# will use the same workaround as the variant caller
-		Array[String] vcfdiff_errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
-		Array[String] vcfdiff_errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
-		Array[String] vcfdiff_errorcode_array = flatten([vcfdiff_errorcode_if_covstats, vcfdiff_errorcode_if_no_covstats, ["PASS"]])
-		if(!(vcfdiff_errorcode_array[0] == pass)) {          
-				String vcfdiff_ERR = vcfdiff_errorcode_array[0]
-		}
-		
-		# final-final-final error code
-		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
-		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
-	}
-	
-	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
-	# TODO: this is still breaking in Cromwell!
-	# Failed to evaluate 'warnings' (reason 1 of 1): Evaluating flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], 
-	# [select_all(warning_decontam)]])) failed: No coercion defined from wom value(s) '
-	# [["EARLYQC_88.112_PCT_ABOVE_Q30_(MIN_0.9)", "EARLYQC_99.61_PCT_MAPPED_(MIN_99.995)"]]' of type 'Array[Array[String]]' to 'Array[String]'.
-	#Array[String] warnings = flatten(flatten([[select_all(tbprofilerFQ.warning_codes)], [select_all(warning_decontam)]]))
-	
-	Float this_unmapped = fastp_decontam_check.reads_unmapped[0]
-	Float this_kept = fastp_decontam_check.reads_clck_kept[0]
-	Float porp_unmapped = this_unmapped/this_kept
-	Float pct_unmapped_decontam = if !clean_after_decontam then (porp_unmapped * 100) else -1.0
-	
-	Map[String, String] metrics_to_values = { 
-		"status": select_first([finalcode, "NA"]), 
-		"n_reads_contam": fastp_decontam_check.reads_is_contam[0],                       # decontamination
-		"n_reads_decon_reference": fastp_decontam_check.reads_reference[0],              # decontamination
-		"n_reads_decon_unmapped": fastp_decontam_check.reads_unmapped[0],                # decontamination
-		"n_reads_decon_kept": fastp_decontam_check.reads_clck_kept[0],                   # decontamination
-		"pct_loss_decon": fastp_decontam_check.pct_loss_decon[0],                        # decontamination
-		"pct_loss_cleaning": fastp_decontam_check.pct_loss_cleaning[0],                  # decontamination
-		"pct_mapped_tbprof": select_first([tbprofilerFQ.pct_reads_mapped[0], "NA"]),     # thiagen!TBProfiler
-		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
-		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
-		"pct_above_q30": fastp_decontam_check.dcntmd_pct_above_q30[0],                   # fastp
-		"median_coverage": select_first([tbprofilerFQ.median_coverage[0], "NA"]),        # thiagen!TBProfiler
-		"genome_pct_coverage": select_first([tbprofilerFQ.pct_genome_covered[0], "NA"]), # thiagen!TBProfiler
-		"mean_coverage": select_first([meanCoverage, "NA"])                              # covstats
-	}
-	String sample_name_inputs_basename = sub(sub(sub(basename(pulled_fastqs[0][0]), ".fastq", ""), ".gz", ""), ".fq", "")
-	String sample_name_maybe_varcalled = if length(final_bams) > 0 then sub(basename(final_bams[0]), "_to_H37Rv.bam", "") else sample_name_inputs_basename
-	String sample_name_maybe_manually_set = sample_name_maybe_varcalled
-	
-	call sranwrp_processing.map_to_tsv_or_csv as qc_summary {
-		input:
-			the_map = metrics_to_values,
-			column_names = if length(pulled_fastqs) == 1 then [sample_name_maybe_manually_set] else ["sample"],
-			outfile = if length(pulled_fastqs) == 1 then sample_name_maybe_manually_set+"_qc" else "combined_qc_report.txt"
-	}
 		
 	output {
 		File          download_report        = merge_reports.outfile
-
-		# status of sample -- only valid iff this ran on only one sample
-		String status_code = select_first([finalcode, pass])
-		
-		# debug
-		Float pct_unmapped_decontamm = pct_unmapped_decontam
-		Float n_reads_decon_kept = this_kept
-		Float n_reads_decon_unmapped = this_unmapped
-		Float? pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
-		Float? pct_unmapped_covstats = percentUnmapped
-		Float? pct_loss_decon = fastp_decontam_check.pct_loss_decon[0]
-		Float? pct_loss_cleaning = fastp_decontam_check.pct_loss_cleaning[0]
 		
 		# raw files
 		Array[File]  bais  = final_bais
@@ -503,20 +364,5 @@ workflow myco {
 		File?        tree_nextstrain    = trees.tree_nextstrain
 		Array[File]? trees_nextstrain   = trees.subtrees_nextstrain
 		Array[File]? distance_matrices  = trees.max_distance_matrix
-		
-		# useful debugging/run information (only valid iff this ran on only one sample)
-		File qc_csv = qc_summary.tsv_or_csv
-		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
-		String? debug_decontam_ERR  = decontam_ERR
-		String? debug_earlyQC_ERR   = earlyQC_ERR
-		String? debug_varcall_ERR   = varcall_ERR
-		String? debug_covstats_ERR  = covstats_ERR
-		String? debug_vcfdiff_ERR   = vcfdiff_ERR
-		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
-		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
-		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_map_reads = fastp_decontam_check.timer_5_mapFQ[0]
-		Int seconds_to_rm_contam = fastp_decontam_check.timer_7_dcnFQ[0]
-		String docker_used       = fastp_decontam_check.docker_used[0]
 	}
 }

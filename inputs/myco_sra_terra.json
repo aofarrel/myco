@@ -1,7 +1,4 @@
 {
-  "myco.biosample_accessions": "gs://topmed_workflow_testing/tb/sra/20_samples.txt",
-  "myco.decorate_tree": true,
-  "myco.input_tree": "gs://topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb",
-  "myco.min_coverage_per_site": 10,
-  "myco.typical_tb_masked_regions": "gs://topmed_workflow_testing/tb/R00000039_repregions.bed"
+  "myco.biosample_accessions": "gs://ucsc-pathogen-genomics-public/tb/sra/20_samples.txt",
+  "myco.decorate_tree": true
 }

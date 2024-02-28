@@ -1,10 +1,5 @@
 {
   "myco.biosample_accessions": "gs://fc-a1a6f6f6-9b6b-4f91-b4d5-80c194dfe383/quick_lineage_test.txt",
   "myco.tree_decoration": true,
-  "myco.tree_to_decorate": "gs://topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb",
-  "myco.diffQC_low_coverage_cutoff": 10,
-  "myco.diffQC_mask_bedfile": "gs://topmed_workflow_testing/tb/R00000039_repregions.bed",
-  "myco.earlyQC_skip_entirely": "false",
-  "myco.earlyQC_skip_trimming": "false",
   "myco.earlyQC_minimum_percent_q30": "0.90"
 }
