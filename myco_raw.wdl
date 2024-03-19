@@ -455,11 +455,11 @@ workflow myco {
 		
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
-		File?        tree_usher       = trees.tree_usher_raw
+		File?        tree_usher       = trees.tree_usher
 		File?        tree_taxonium    = trees.tree_taxonium
 		File?        tree_nextstrain  = trees.tree_nextstrain
 		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
-		File?        distance_matrix  = trees.distance_matrix
+		Array[File]? distance_matrix  = trees.max_distance_matrix
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
 		File qc_csv = qc_summary.tsv_or_csv
