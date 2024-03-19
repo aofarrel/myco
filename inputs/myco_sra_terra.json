@@ -1,4 +1,4 @@
 {
-  "myco.biosample_accessions": "gs://ucsc-pathogen-genomics-public/tb/sra/20_samples.txt",
+  "myco.biosample_accessions": "gs://ucsc-pathogen-genomics-public/tb/nine_test_files.txt",
   "myco.tree_decoration": true
 }
