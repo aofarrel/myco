@@ -7,11 +7,11 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/co
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/little-additions/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tsv-output/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tsv-output/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
-import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/main/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
