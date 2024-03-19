@@ -23,12 +23,9 @@ workflow myco {
 		Boolean covstatsQC_skip_entirely       = true  # false in myco_raw
 		Boolean decontam_use_CDC_varpipe_ref   = false # true in myco_raw
 		File?   mask_bedfile
-	
-
-		Boolean TBProf_on_bams_not_fastqs = true
+		Boolean TBProf_on_bams_not_fastqs      = true
 		
-		# creation + masking of diff files
-
+		# QC stuff 
 		Float   QC_max_pct_low_coverage_sites  =     0.20
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
@@ -38,20 +35,13 @@ workflow myco {
 		Int     quick_tasks_disk_size          =    10 
 		Boolean guardrail_mode                 = true
 		
-		
-		
 		# shrink large samples
 		Int     subsample_cutoff        =  450
 		Int     subsample_seed          = 1965
 
-				
 		# phylogenetics
 		Boolean tree_decoration         = false
 		File?   tree_to_decorate
-		
-
-				
-
 	}
 
 	parameter_meta {
