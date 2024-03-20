@@ -111,7 +111,7 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
 			if(!(TBProf_on_bams_not_fastqs)) {
-				call tbprofilerFQ_WF.ThiagenTBProfiler as tbprofilerFQ {
+				call tbprofilerFQ_WF.ThiagenTBProfiler as thiagenTBprofilerFQ {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -123,7 +123,7 @@ workflow myco {
 				}
 			}
 
-			String tbprofiler_fq_status_or_bogus = select_first([tbprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
+			String tbprofiler_fq_status_or_bogus = select_first([thiagenTBprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
 			if(tbprofiler_fq_status_or_bogus == pass || TBProf_on_bams_not_fastqs) {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
@@ -209,9 +209,9 @@ workflow myco {
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	
 	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
-	Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-	Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-	Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
+	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
+	Array[String] coerced_bam_resistances=select_all(profile_bam.sample_and_resistance)
+	Array[String] coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
 	
 	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
 	if(!(length(coerced_bam_strains) == 0)) {
@@ -246,7 +246,7 @@ workflow myco {
 		
 		# if there is only one sample, there's no need to run tasks
 		if(length(pulled_fastqs) == 1) {
-			Int    single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
+			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
 			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
 			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 		}
@@ -255,9 +255,9 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	
   	# coerce optional types into required types (doesn't crash if these are null)
-	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.strain)
-	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.resistance)
-	Array[Int]    coerced_fq_depths=select_all(tbprofilerFQ.median_coverage)
+	Array[String] coerced_fq_strains=select_all(thiagenTBprofilerFQ.sample_and_strain)
+	Array[String] coerced_fq_resistances=select_all(thiagenTBprofilerFQ.sample_and_resistance)
+	Array[String] coerced_fq_depths=select_all(thiagenTBprofilerFQ.sample_and_coverage)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -292,7 +292,7 @@ workflow myco {
 	
 		# if there is only one sample, there's no need to run tasks
 		if(length(pulled_fastqs) == 1) {
-			Int    single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
+			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
 			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
 			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
 		}
@@ -326,10 +326,10 @@ workflow myco {
 		Array[File?] diff_reports              = real_reports
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
 		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
+		Array[File?] tbprof_fq_jsons           = thiagenTBprofilerFQ.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = thiagenTBprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = thiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = thiagenTBprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
@@ -340,10 +340,10 @@ workflow myco {
 		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if we ran on a single sample
-		Int?         tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
 		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
 		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
-		Int?         tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
 		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
 		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 		
