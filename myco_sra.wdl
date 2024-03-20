@@ -11,7 +11,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tsv-output/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/tsv-output/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
-import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/main/goleft_functions.wdl" as goleft
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.1/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
