@@ -5,8 +5,8 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/va
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.3/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.4/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
@@ -183,9 +183,9 @@ workflow myco {
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	
 	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
-	Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-	Array[String] coerced_bam_resistances=select_all(profile_bam.resistance)
-	Array[Int]    coerced_bam_depths=select_all(profile_bam.median_depth_as_int)
+	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
+	Array[String] coerced_bam_resistances=select_all(profile_bam.sample_and_resistance)
+	Array[Int]    coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
 	
 	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
 	if(!(length(coerced_bam_strains) == 0)) {
@@ -226,9 +226,9 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	
   	# coerce optional types into required types (doesn't crash if these are null)
-	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.strain)
-	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.resistance)
-	Array[Int]    coerced_fq_depths=select_all(tbprofilerFQ.median_coverage)
+	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.sample_and_strain)
+	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.sample_and_resistance)
+	Array[String] coerced_fq_depths=select_all(tbprofilerFQ.sample_and_coverage)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -260,7 +260,7 @@ workflow myco {
 	
 		# if there is only one sample, there's no need to run tasks
 		if(length(paired_fastq_sets) == 1) {
-			Int    single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
+			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
 			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
 			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
 		}
@@ -338,13 +338,13 @@ workflow myco {
 					Float        meanCoverage = meanCoverages[0]
 					
 					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
-						String too_many_unmapped = "COVSTATS_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")"
+						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})"
 						if(meanCoverage < QC_min_mean_coverage) {
-							String double_bad = "COVSTATS_BOTH_"+percentUnmapped+"_UNMAPPED_(MAX_"+QC_max_pct_unmapped +")_AND_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
+							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
 						} 
 					}
 					if(meanCoverage < QC_min_mean_coverage) {
-						String too_low_coverage = "COVSTATS_"+meanCoverage+"_MEAN_COVERAGE_(MIN_"+QC_min_mean_coverage+")"
+						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
 					}
 				}
 			}
@@ -478,39 +478,3 @@ workflow myco {
 	}
 }
 
-# ** The "Scattered Optional Tasks Have Weird Outputs" (SOTHWO) Issue **
-# Let's say task X and Y are mutually exclusive tasks which each output a single File named outfile.
-#
-# scatter {
-#  if (input_variable = true) { call x }
-#  if (input_variable = false) { call y }
-# }
-#
-# If input_variable is true and this is a three way scatter, it APPEARS that, from outside the scatter...
-#  * x.outfile has type Array[File?] and has three Files in it
-#  * y.outfile has type Array[File?] and has at least one null (not None!) in it
-#  * defined(x.outfile) is true
-#  * defined(y.outfile) is true (!)
-#  * length(x.outfile) is 3
-#  * length(y.outfile) is 0
-#  * select_all(x.outfile) creates an Array[File] with three Files
-#    * You can scatter on the resulting array
-#    * You can output the resulting array as a workflow-level output to a Terra data table
-#  * select_all(y.outfile) creates... ???????
-#    * Attempting to scatter on the resulting array will simply do nothing
-#    * Idk what will happen on Terra if you have an Array[File] that is ONLY null
-#  * flatten(select_all(x.outfile, y.outfile)) will result in an Array[File] that DOES have at least one null
-#  * flatten(select_all(x.outfile), select_all(y.outfile)) will result in an Array[File] that DOES NOT have any nulls
-#    * select_all() will also coerce x.outfile and/or y.outfile from File? to File if necessary
-#  * select_first(select_all(x.outfile), select_all(y.outfile)) will result in an Array[File] that DOES NOT have any nulls
-#
-# Implications:
-#  * nulls and Nones exist in Cromwell-WDL in spite of spec implying otherwise
-#  * the mere act of scattering a task defines one array for each of its outputs, and if that task never
-#    runs, the arrays remain defined and full of null(s)
-#  * length() does not count null values
-#  * select_all() is not "recursive" so flatten(select_all(x.outfile, y.outfile)) can have null(s)
-#  * Array[File] can have nulls, so it may not be much different from Array[File?] in practice
-#
-# So, the correct way to gather mutually exclusive scattered optional task outputs is...
-# Array[File] foo = flatten(select_all(x.outfile), select_all(y.outfile))
