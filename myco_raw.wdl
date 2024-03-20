@@ -7,7 +7,7 @@ import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.11/tree_nine.wd
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.3/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.4/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
-import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
+import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.1/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
