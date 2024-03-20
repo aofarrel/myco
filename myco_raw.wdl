@@ -446,10 +446,10 @@ workflow myco {
 		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if we ran on a single sample
-		Int?         tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
 		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
 		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
-		Int?         tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
 		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
 		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 		
