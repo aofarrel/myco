@@ -1,5 +1,5 @@
 version 1.0
-import "https://raw.githubusercontent.com/dockstore/checker-WDL-templates/v1.1.0/checker_tasks/arraycheck_task.wdl" as verify_array
+import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
 import "./myco_raw.wdl" as myco_raw
 
 # Unlike myco raw, this checker workflow is designed to run as seperate workflow instances.
@@ -29,6 +29,8 @@ workflow checker {
 		Array[File] TRUTH_qc
 		Array[File] TRUTH_report  # TODO fix or remove report
 		Array[File] TRUTH_vcf
+
+		Int? checker_disk_size_override
 	}
 
 	# Default settings -- this should also catch if any meaningful default settings changed
@@ -46,7 +48,8 @@ workflow checker {
 	call verify_array.arraycheck_classic as check_myco_raw_default {
 		input:
 			test = flatten([TEST_bai, TEST_diff, [TEST_qc], TEST_report, TEST_vcf]),
-			truth = flatten(select_all([TRUTH_bai, TRUTH_diff, TRUTH_qc, TRUTH_report, TRUTH_vcf]))
+			truth = flatten(select_all([TRUTH_bai, TRUTH_diff, TRUTH_qc, TRUTH_report, TRUTH_vcf])),
+			disk_size_override = checker_disk_size_override
 	}
 	
     # Extremely strict QC
