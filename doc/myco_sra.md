@@ -35,7 +35,7 @@ For example, let's say this task got SAMN08436121. This has only one run associa
 ## Are there any SRA accessions known to break SRANWRP?
 Accessions belonging to "sample groups" are not supported, as it isn't very clear which run accessions correlate to which sample accessions. Known "sample group" accessions can be found [in SRANWRP's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists). Non-TB accessions are also not supported.
 
-Although none that aren't also in sample groups have been found yet, in theory, samples with a very large number of run accessions could be problematic on a GCP backend. GCP backends require you request a certain amount of disk size before runtime, which can get dicey when what you want to do at runtime is download an unknown number of files of unknown size. As such, SRANWRP requests more disk size than you *probably* need, but there could come a time that guess doesn't prove to be enough.
+Samples with a very large number of run accessions could be problematic on a GCP backend. GCP backends require you request a certain amount of disk size before runtime, which can get dicey when what you want to do at runtime is download an unknown number of files of unknown size. As such, SRANWRP requests more disk size than you *probably* need, but there could come a time that guess doesn't prove to be enough.
 
 The only other accessions known to fail SRANWRP are ones which break prefetch or fasterq-dump. Usually this means the fastqs themselves are invalid (ex: SAMEA1877221, SAMEA2609926, SAMEA2609935) or were not fully processed by NCBI (ex: ERR760606, although SAMEA3231653 has two other run accessions which do work fine).
 
@@ -43,32 +43,30 @@ The only other accessions known to fail SRANWRP are ones which break prefetch or
 We can't always tell that data isn't up to our standards until later down the pipeline. myco (including myco_sra) will filter out samples which:
 * are too heavily contaminated to complete decontamination in a timely manner<sup>†</sup>
 * take too long in the variant caller<sup>†</sup>
-* have low overall coverage  
+* have low overall coverage
 
 <sup>†</sup>This sort of filtering can be disabled by setting the timeout optional variables to 0 -- but be aware that GCP will kill any VM that is still alive after about a week, so if you're on Terra, your samples need to process faster than that!
 
 There is a small number of BioSamples known to return fastqs which, after decontamination, will cause a runtime error in the variant caller. As of version 3.0.1 of myco, this runtime error is handled by throwing out the sample rather than stopping the entire pipeline (unless you set crash_on_error to true). Throwing out samples like this was decided as the default behavior as a quick analysis indicates the runtime error only happens when clockwork's variant calling removes >95% of the fastq during a Trimmomatic run (ie, the sample probably shouldn't be used anyway). The list of these samples can be found [in SRANWRP's denylists](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists).
 
-## Flowchart and explanations of every step
-![Flowchart of myco_sra, part 1](./doc_making_resources/myco_sra_flowchart_1.png)
-![Flowchart of myco_sra, part 2](./doc_making_resources/myco_sra_flowchart_2.png)
+## Process in detail
 
-### [1] clockwork Reference Prepare
-Runs my implementation of [clockwork's reference preparation standards](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#get-and-index-reference-genomes). For more information on the specifics and how to skip this task if your backend doesn't support call cacheing, see [how_to_skip_refprep.md](./how_to_skip_refprep.md)
-
-### [2] Extract BioSample accessions from input file
+### [1] Extract BioSample accessions from input file
 The user is expected to input a text containing BioSample accessions. This task grabs all unique lines in that file and outputs an Array[String] of BioSample accessions.
 
-### [3] Pull fastqs for the BioSample accession
-This task pulls all fastqs for a given BioSample accession using [SRANWRP](https://github.com/aofarrel/SRANWRP), which itself uses[sra-tools](https://github.com/ncbi/sra-tools). One sample might have multiple accessions; all of them are pulled. Once pulled, my script attempts to remove everything that is not a set of paired fastqs.
+### [2] Pull fastqs for the BioSample accession
+This task pulls all fastqs for a given BioSample accession using [SRANWRP](https://github.com/aofarrel/SRANWRP), which itself uses [sra-tools](https://github.com/ncbi/sra-tools). One BioSample might have multiple run accessions; all of them are pulled. Once pulled, my script attempts to remove everything that is not a set of paired fastqs.
 
-### [4] Prepare a report of the results of the pull task
-There are some samples that return no valid fastqs. This task keep track of every sample's run accessions, and the result of trying to pull fastqs from each run accession. The report is a workflow-level output.
+There are some samples that return no valid fastqs. There is an additional task that keeps track of every sample's run accessions, and the result of trying to pull fastqs from each run accession. The "pull report" is a workflow-level output.
 
-### [5] Decontaminate
-Based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#decontaminate-the-reads), which runs clockwork map_reads and clockwork remove_contam in a single WDL task. The output is a group of decontaminated fastq files.
+### [3] Run fastp and decontaminate
+This task is based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#decontaminate-the-reads), which runs clockwork map_reads and clockwork remove_contam in a single WDL task. In recent updates, it has also been merged with [fastp](https://github.com/OpenGene/fastp) as a preliminary cleaning and QC step. On default settings, this is the order of events:
+1. Cleaning of the reads via fastp
+2. clockwork map_reads to map reads to the decontamination reference
+3. clockwork remove_contam to generate cleaned fastqs
+4. A second run of fastp, but instead of cleaning the reads again, we focus on the QC metrics and determine if these samples are good enough
 
-This step will also merge FASTQs if a single sample has more than one pair of FASTQs. For example, SAMN02599053 has four fastqs associated with it: 
+Part three of this process will merge FASTQs if a single sample has more than one pair of FASTQs. For example, SAMN02599053 has four fastqs associated with it: 
 * SAMN02599053_SRR1173122_1.fq.gz
 * SAMN02599053_SRR1173122_2.fq.gz
 * SAMN02599053_SRR1173191_1.fq.gz
@@ -76,14 +74,21 @@ This step will also merge FASTQs if a single sample has more than one pair of FA
 
 The decontamination step will output a single pair: SAMN02599053_1.fastq and SAMN02599053_2.fastq
 
-### [6] Call variants
+### [4] (optional) Run TBProfiler
+If `TBProf_on_bams_not_fastqs` is false, TBProfiler will be run on the fastqs here. This form of TBProfiler is a fork by Thiagen Genomics that features some improvements to its database and generates special outputs for LHJs. Because myco_sra's use case is different from that of myco_raw, this step is optional in order to save money.
+
+### [5] Call variants
 Based on clockwork variant_call_single, which itself combines samtools, cortex, and minos. For each sample, the output is a single VCF file and a BAM file.
 
-### [7] (optional) Run FastQC on slow samples
-If a sample times out in the decontamination or variant calling steps, it is usually due to an issue with the inputs. FastQC examines all inputs that timed out so you can see what might be going on.
+### [6] (optional) Run covstats
+Covstats checks how much of a sample ends up unmapped, and the average coverage. This takes some time to calculate, so it's optional, but it also gives us two additional QC metrics.
 
-### [8] Mask the outputs and optionally create diff files
+### [7] Mask the outputs create diff files
 When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and optionally creates a diff file, one per sample, which can be used to make some happy little trees.
 
-### [9] (optional) Generate UShER, Taxonium, and NextStrain trees
+### [8] Collate QC information
+This pipeline generates a large amount of metadata and intermediate files. This task summarizes QC information into a single file for easy reference.
+
+### [9] (optional) Generate UShER, Taxonium, newick, and NextStrain trees
 If decorate_trees = true, and an input tree is passed in, each sample will be placed on the tree by UShER. The resulting tree will then be converted to Taxonium format, allowing it to be viewed in taxonium. NextStrain subtree JSONs will also be generated.
+
