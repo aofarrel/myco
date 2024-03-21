@@ -30,7 +30,7 @@ workflow checker {
 		Array[File] TRUTH_report  # TODO fix or remove report
 		Array[File] TRUTH_vcf
 
-		Int? checker_disk_size_override
+		Int checker_disk_size_override
 	}
 
 	# Default settings -- this should also catch if any meaningful default settings changed
