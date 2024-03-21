@@ -1,97 +1,61 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.1/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.9.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.12/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.10/tree_nine.wdl" as build_treesWF
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/fastqc-wdl/0.0.2/fastqc.wdl" as fastqc
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.2/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/TBfastProfiler/0.0.6/TBfastProfiler.wdl" as qc_fastqsWF # aka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
-
 
 workflow myco {
 	input {
 		File biosample_accessions
-	
-		# covstats (occurs after variant calling)
-		Float   covstatsQC_max_percent_unmapped = 10
-		Float   covstatsQC_minimum_coverage = 2
-		Boolean covstatsQC_skip_entirely = false
+
+		Boolean clean_after_decontam           = false
+		Int     clean_average_q_score          = 29
+		Boolean clean_before_decontam          = true
+		Boolean covstatsQC_skip_entirely       = true  # false in myco_raw
+		Boolean decontam_use_CDC_varpipe_ref   = false # true in myco_raw
+		File?   mask_bedfile
+		Boolean TBProf_on_bams_not_fastqs      = true
 		
-		# creation + masking of diff files
-		Int     diffQC_low_coverage_cutoff      = 10
-		File?   diffQC_mask_bedfile
-		Int     diffQC_max_percent_low_coverage =  5
-		
-		# QC
-		Boolean fastqc_on_timeout           = false
-		Boolean earlyQC_skip_QC             = false
-		Int     earlyQC_minimum_percent_q30 = 90
-		Boolean earlyQC_skip_trimming       = false
-		Int     earlyQC_trim_qual_below     = 30
-		Boolean earlyQC_skip_entirely       = true
+		# QC stuff 
+		Float   QC_max_pct_low_coverage_sites  =     0.20
+		Int     QC_max_pct_unmapped            =     2
+		Int     QC_min_mean_coverage           =    10
+		Int     QC_min_q30                     =    90
+		Boolean QC_soft_pct_mapped             = false
+		Int     QC_this_is_low_coverage        =    10
+		Int     quick_tasks_disk_size          =    10 
+		Boolean guardrail_mode                 = true
 		
 		# shrink large samples
 		Int     subsample_cutoff        =  450
 		Int     subsample_seed          = 1965
-		
-		# skip samples that take a very long time
-		Int     timeout_decontam_part1  =   20
-		Int     timeout_decontam_part2  =   15
-		Int     timeout_variant_caller  =  120
-		
-		# tbprofiler on BAMs
-		Boolean tbprofiler_on_bam       = true
-		
+
 		# phylogenetics
 		Boolean tree_decoration         = false
 		File?   tree_to_decorate
-
-		# runtime attributes
-		Int quick_tasks_disk_size               =  10
-		Int  variantcalling_addl_disk           = 100
-		Int  variantcalling_cpu                 =  16
-		Boolean variantcalling_crash_on_error   = false
-		Boolean variantcalling_crash_on_timeout = false
-		Int? variantcalling_mem_height
-		Int  variantcalling_memory              =  32
-		Int  variantcalling_preemptibles        =   1
-		Int  variantcalling_retries             =   1
-		Boolean variantcalling_ssd              = true
-		
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		covstatsQC_minimum_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		covstatsQC_max_percent_unmapped: "If covstats thinks this percent (as int, 50 = 50%) of data does not map to H37Rv, throw out this sample"
+		TBProf_on_bams_not_fastqs: "If true, run TBProfiler on BAMs instead of fastqs"
+
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-		diffQC_max_percent_low_coverage: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below diffQC_low_coverage_cutoff will be discarded"
-		diffQC_low_coverage_cutoff: "Positions with coverage below this value will be masked in diff files"
-		earlyQC_minimum_percent_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. Negated by earlyQC_skip_QC or earlyQC_skip_entirely being false."
-		earlyQC_skip_entirely: "Do not run earlyQC (fastp + fastq-TBProfiler) at all - no trimming, no QC, nothing. Does not affect tbprofiler_on_bam."
-		earlyQC_skip_QC: "Run earlyQC (unless earlyQC_skip_entirely is true), but do not throw out samples that fail QC. Independent of earlyQC_skip_trimming."
-		earlyQC_skip_trimming: "Run earlyQC (unless earlyQC_skip_entirely is true), and remove samples that fail QC (unless earlyQC_skip_QC is true), but do not use fastp's cleaned fastqs."
-		earlyQC_trim_qual_below: "Trim reads with an average quality score below this value. Independent of earlyQC_minimum_percent_q30. Overridden by earlyQC_skip_trimming or earlyQC_skip_entirely being true."
-		fastqc_on_timeout: "If true, fastqc one read from a sample when decontamination or variant calling times out"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
-		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
-		timeout_decontam_part1: "Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout)"
-		timeout_decontam_part2: "Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout)"
-		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
 		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
 		tree_to_decorate: "Base tree to use if tree_decoration = true"		
 	}
 	
-	# convert percent integers to floats (except covstatsQC_max_percent_unmapped)
-	Float diffQC_max_percent_low_coverage_float = diffQC_max_percent_low_coverage / 100
-	Float earlyQC_minimum_percent_q30_float = earlyQC_minimum_percent_q30 / 100
+	String pass = "PASS" # used later... much later
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -122,134 +86,60 @@ workflow myco {
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
 	scatter(pulled_fastq in pulled_fastqs) {
-		call clckwrk_combonation.combined_decontamination_single_ref_included as decontam_each_sample {
+		call clckwrk_combonation.clean_and_decontam_and_check as fastp_decontam_check {
 			input:
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.11-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.11-CRyPTIC",
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
-				timeout_map_reads = timeout_decontam_part1,
-				timeout_decontam = timeout_decontam_part2
+				fastp_clean_avg_qual = clean_average_q_score,
+				fastp_clean_before_decontam = clean_before_decontam,
+				fastp_clean_after_decontam = clean_after_decontam,
+				QC_min_q30 = QC_min_q30 / 100.0,
+				preliminary_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
+				timeout_map_reads = if guardrail_mode then 300 else 0,
+				timeout_decontam = if guardrail_mode then 600 else 0
+				# no subsample cutoff here because that happens during the pull task
 		}
 
-		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
+		if(defined(fastp_decontam_check.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
-    		File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, biosample_accessions])
-    		File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, biosample_accessions])
+    		File real_decontaminated_fastq_1=select_first([fastp_decontam_check.decontaminated_fastq_1, biosample_accessions])
+    		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
-			# if we are NOT skipping earlyQC
-			if(!earlyQC_skip_entirely) {
-				call qc_fastqsWF.TBfastProfiler as qc_fastqs {
+			if(!(TBProf_on_bams_not_fastqs)) {
+				call tbprofilerFQ_WF.ThiagenTBProfiler as thiagenTBprofilerFQ {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
-						q30_cutoff = earlyQC_minimum_percent_q30_float,
-						average_qual = earlyQC_trim_qual_below,
-						output_fastps_cleaned_fastqs = !(earlyQC_skip_trimming)
-				}
-				
-				# if we are filtering out samples via earlyQC...
-				if(!(earlyQC_skip_QC)) {
-					if(qc_fastqs.did_this_sample_pass) {
-						File possibly_fastp_cleaned_fastq1_passed=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-				    	File possibly_fastp_cleaned_fastq2_passed=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-				    	
-						call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_filtering {
-							input:
-								reads_files = [possibly_fastp_cleaned_fastq1_passed, possibly_fastp_cleaned_fastq2_passed],
-								
-								addldisk = variantcalling_addl_disk,
-								cpu = variantcalling_cpu,
-								crash_on_error = variantcalling_crash_on_error,
-								crash_on_timeout = variantcalling_crash_on_timeout,
-								mem_height = variantcalling_mem_height,
-								memory = variantcalling_memory,
-								preempt = variantcalling_preemptibles,
-								retries = variantcalling_retries,
-								ssd = variantcalling_ssd,
-								timeout = timeout_variant_caller
-						}
-					}
-				}
-				
-				# if we are not filtering out samples via the early qc step (but ran earlyQC anyway)...
-				if(earlyQC_skip_QC) {
-					File possibly_fastp_cleaned_fastq1=select_first([qc_fastqs.cleaned_fastq1, real_decontaminated_fastq_1])
-			    	File possibly_fastp_cleaned_fastq2=select_first([qc_fastqs.cleaned_fastq2, real_decontaminated_fastq_2])
-				    	
-					call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_after_earlyQC_but_not_filtering_samples {
-						input:
-							reads_files = [possibly_fastp_cleaned_fastq1, possibly_fastp_cleaned_fastq2],
-							
-							addldisk = variantcalling_addl_disk,
-							cpu = variantcalling_cpu,
-							crash_on_error = variantcalling_crash_on_error,
-							crash_on_timeout = variantcalling_crash_on_timeout,
-							mem_height = variantcalling_mem_height,
-							memory = variantcalling_memory,
-							preempt = variantcalling_preemptibles,
-							retries = variantcalling_retries,
-							ssd = variantcalling_ssd,
-							timeout = timeout_variant_caller
-					}
+						soft_pct_mapped = QC_soft_pct_mapped,
+						soft_coverage = if guardrail_mode then false else true,
+						minimum_coverage = if guardrail_mode then 3 else 0,
+						minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
+						sample = fastp_decontam_check.sample
 				}
 			}
-			
-			# if we ARE skipping early QC (but the samples did decontaminate without erroring/timing out)
-			if(earlyQC_skip_entirely) {
-				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_call_without_earlyQC {
+
+			String tbprofiler_fq_status_or_bogus = select_first([thiagenTBprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
+			if(tbprofiler_fq_status_or_bogus == pass || TBProf_on_bams_not_fastqs) {
+				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
-						
-						addldisk = variantcalling_addl_disk,
-						cpu = variantcalling_cpu,
-						crash_on_error = variantcalling_crash_on_error,
-						crash_on_timeout = variantcalling_crash_on_timeout,
-						mem_height = variantcalling_mem_height,
-						memory = variantcalling_memory,
-						preempt = variantcalling_preemptibles,
-						retries = variantcalling_retries,
-						ssd = variantcalling_ssd,
-						timeout = timeout_variant_caller
+						tarball_bams_and_bais = false,
+						timeout = if guardrail_mode then 600 else 0
 				}
 			}
 		}
 			
 	}
 
-	# do some wizardry to deal with optionals
-	Array[File] minos_vcfs_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.adjudicated_vcf)
-	Array[File] minos_vcfs_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.adjudicated_vcf)
-	Array[File] minos_vcfs_if_no_earlyQC = select_all(variant_call_without_earlyQC.adjudicated_vcf)
-	
-	Array[File] bams_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bam)
-	Array[File] bams_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bam)
-	Array[File] bams_if_no_earlyQC = select_all(variant_call_without_earlyQC.bam)
-	
-	Array[File] bais_if_earlyQC_filtered = select_all(variant_call_after_earlyQC_filtering.bai)
-	Array[File] bais_if_earlyQC_but_not_filtering = select_all(variant_call_after_earlyQC_but_not_filtering_samples.bai)
-	Array[File] bais_if_no_earlyQC = select_all(variant_call_without_earlyQC.bai)
-	
-	Array[File] minos_vcfs = flatten([minos_vcfs_if_earlyQC_filtered, minos_vcfs_if_earlyQC_but_not_filtering, minos_vcfs_if_no_earlyQC])
-	Array[File] final_bams = flatten([bams_if_earlyQC_filtered, bams_if_earlyQC_but_not_filtering, bams_if_no_earlyQC])
-	Array[File] final_bais = flatten([bais_if_earlyQC_filtered, bais_if_earlyQC_but_not_filtering, bais_if_no_earlyQC])
-	
-	# Now we need to essentially scatter on three arrays: minos_vcfs, bams, and bais. This is trivial in CWL, but
-	# isn't intutive in WDL -- in fact, it's arguably not possible!
-	#
-	# In WDL, you *should* be able to define a custom struct (think of it like a Python object), which can be seen
-	# in the WDL spec (https://github.com/openwdl/wdl/blob/main/versions/1.0/SPEC.md#struct-definition), and
-	# scatter on that struct. However, in my experience, Cromwell gets pretty buggy when you try to scatter on structs
-	# especially if those structs contain files (and our structs most definitely contain files). We can't use zip() 
-	# either, because that only works if you have two arrays, not three.
-	#
-	# So, naturally, we're going to do something cheesy.
+	Array[File] minos_vcfs = flatten([select_all(variant_calling.adjudicated_vcf)])
+	Array[File] final_bams = flatten([select_all(variant_calling.bam)])
+	Array[File] final_bais = flatten([select_all(variant_calling.bai)])
 	
 	Array[Array[File]] bams_and_bais = [final_bams, final_bais]
 	Array[Array[File]] bam_per_bai = transpose(bams_and_bais)
 	
-	# bams_and_bais might look like this: [[SAM1234.bam, SAM1235.bam], [SAM1234.bam.bai, SAM1235.bam.bai]]
-	# bams_per_bais might look like this: [[SAM1234.bam, SAM1234.bam.bai], [SAM1235.bam, SAM1235.bam.bai]]
-
 	scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) {
 	# scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) is now sort of a three-way scatter:
 	# * bam file accessible via vcfs_and_bams.left[0]
@@ -261,7 +151,6 @@ workflow myco {
 	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
-	
 		if(!covstatsQC_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
@@ -271,17 +160,17 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if(covstats.percentUnmapped < covstatsQC_max_percent_unmapped) {
-				if(covstats.coverage > covstatsQC_minimum_coverage) {
+			if((covstats.percentUnmapped < QC_max_pct_unmapped) || QC_soft_pct_mapped) {
+				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = diffQC_low_coverage_cutoff,
-							tbmf = diffQC_mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
+							min_coverage_per_site = QC_this_is_low_coverage,
+							tbmf = mask_bedfile,
+							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 					}
 				}
 			}
@@ -294,106 +183,122 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = diffQC_low_coverage_cutoff,
-					tbmf = diffQC_mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = diffQC_max_percent_low_coverage_float
+					min_coverage_per_site = QC_this_is_low_coverage,
+					tbmf = mask_bedfile,
+					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 			}
 		}
 		
 		# TBProfiler (will run even if fails covstats qc)
-		if(tbprofiler_on_bam) {
+		if(TBProf_on_bams_not_fastqs) {
 			call profiler.tb_profiler_bam as profile_bam {
 					input:
 						bam = vcfs_and_bams.left[0]
 			}
 		}
 	}
-	
-	# TODO: compare select_first() used here to nested flatten(select_all(), select_all()) used in myco_raw -- are there nulls in output?
-	Array[File?] real_diffs = select_first([make_mask_and_diff_after_covstats.diff, make_mask_and_diff_no_covstats.diff])
-	Array[File?] real_reports = select_first([make_mask_and_diff_after_covstats.report, make_mask_and_diff_no_covstats.report])
-	Array[File?] real_masks = select_first([make_mask_and_diff_after_covstats.mask_file, make_mask_and_diff_no_covstats.mask_file])
-	
-	# these will not crash even if profile_bam/qc_fastqs did not run (see SOTHWO explaination in myco_raw.wdl)
-	Array[String] coerced_bam_strains=select_all(profile_bam.strain)
-	Array[String] coerced_bam_resistance=select_all(profile_bam.resistance)
-	Array[String] coerced_bam_depth=select_all(profile_bam.median_depth)
-	Array[String] coerced_fq_strains=select_all(qc_fastqs.samp_strain)
-	Array[String] coerced_fq_resistance=select_all(qc_fastqs.samp_resistance)
+
+	# even though diffs and reports are technically optional outputs, this does work, and will avoid nulls in the final output
+	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
+	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
+	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
+	
+	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
+	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
+	Array[String] coerced_bam_resistances=select_all(profile_bam.sample_and_resistance)
+	Array[String] coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
+	
+	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
 	if(!(length(coerced_bam_strains) == 0)) {
 	
-		call sranwrp_processing.cat_strings as collate_bam_strains {
-			input:
-				strings = coerced_bam_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-		
-		call sranwrp_processing.cat_strings as collate_bam_resistance {
-			input:
-				strings = coerced_bam_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-
-		call sranwrp_processing.cat_strings as collate_bam_depth {
-			input:
-				strings = coerced_bam_depth,
-				out = "depth_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-  	}
-  	
-  	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	if(!(length(coerced_fq_strains) == 0)) {
-
-		call sranwrp_processing.cat_strings as collate_fq_strains {
-			input:
-				strings = coerced_fq_strains,
-				out = "strain_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-		
-		call sranwrp_processing.cat_strings as collate_fq_resistance {
-			input:
-				strings = coerced_fq_resistance,
-				out = "resistance_reports.txt",
-				disk_size = quick_tasks_disk_size
-		}
-  	}
-
-	if(fastqc_on_timeout) {
-		Array[File] bad_fastqs_decontam_ = select_all(decontam_each_sample.check_this_fastq)
-		Array[File] bad_fastqs_varcallr_ = select_all(flatten([variant_call_without_earlyQC.check_this_fastq, variant_call_after_earlyQC_but_not_filtering_samples.check_this_fastq]))
-		Array[Array[File]] bad_fastqs_   = [bad_fastqs_decontam_, bad_fastqs_varcallr_]
-		if(length(decontam_each_sample.check_this_fastq)>=1 && length(bad_fastqs_varcallr_)>=1) {
-			Array[File] bad_fastqs_both  = flatten(bad_fastqs_)  
-		}
-		if(length(decontam_each_sample.check_this_fastq)>=1) {
-			Array[File] bad_fastqs_decontam = select_all(bad_fastqs_decontam_)
-		}
-		if(length(bad_fastqs_varcallr_)>=1) {
-			Array[File] bad_fastqs_varcallr = select_all(bad_fastqs_varcallr_)
-		}
-		Array[File] fastqs = select_first([bad_fastqs_both, bad_fastqs_decontam, bad_fastqs_varcallr])
-		if(length(fastqs)>0) {
-			call fastqc.FastqcWF {
+		# if there is more than one sample, run some tasks to concatenate the outputs
+		if(length(pulled_fastqs) != 1) {
+			Array[String] bam_strains_with_header = flatten([["sample\tsublineage"], coerced_bam_strains])
+			Array[String] bam_resista_with_header = flatten([["sample\tresistance"], coerced_bam_resistances])
+			Array[String] bam_meddept_with_header = flatten([["sample\tmedn_depth"], coerced_bam_depths])
+	
+			call sranwrp_processing.cat_strings as collate_bam_strains {
 				input:
-					fastqs = fastqs
+					strings = bam_strains_with_header,
+					out = "strain_reports.tsv",
+					disk_size = quick_tasks_disk_size
+			}
+			
+			call sranwrp_processing.cat_strings as collate_bam_resistance {
+				input:
+					strings = bam_resista_with_header,
+					out = "resistance_reports.tsv",
+					disk_size = quick_tasks_disk_size
+			}
+	
+			call sranwrp_processing.cat_strings as collate_bam_depth {
+				input:
+					strings = bam_meddept_with_header,
+					out = "depth_reports.tsv",
+					disk_size = quick_tasks_disk_size
 			}
 		}
 		
+		# if there is only one sample, there's no need to run tasks
+		if(length(pulled_fastqs) == 1) {
+			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
+			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
+			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+		}
+	}
+  	
+  	# pull TBProfiler information, if we ran TBProfiler on fastqs
+  	
+  	# coerce optional types into required types (doesn't crash if these are null)
+	Array[String] coerced_fq_strains=select_all(thiagenTBprofilerFQ.sample_and_strain)
+	Array[String] coerced_fq_resistances=select_all(thiagenTBprofilerFQ.sample_and_resistance)
+	Array[String] coerced_fq_depths=select_all(thiagenTBprofilerFQ.sample_and_coverage)
+	
+	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
+	if(!(length(coerced_fq_strains) == 0)) {
+	
+		# if there is more than one sample, run some tasks to concatenate the outputs
+		if(length(pulled_fastqs) != 1) {
+			Array[String] fq_strains_with_header = flatten([["sample\tsublineage"], coerced_fq_strains])
+			Array[String] fq_resista_with_header = flatten([["sample\tresistance"], coerced_fq_resistances])
+			Array[String] fq_meddept_with_header = flatten([["sample\tmedn_depth"], coerced_fq_depths])
+
+			call sranwrp_processing.cat_strings as collate_fq_strains {
+				input:
+					strings = fq_strains_with_header,
+					out = "strain_reports.tsv",
+					disk_size = quick_tasks_disk_size
+			}
+			
+			call sranwrp_processing.cat_strings as collate_fq_resistance {
+				input:
+					strings = fq_resista_with_header,
+					out = "resistance_reports.tsv",
+					disk_size = quick_tasks_disk_size
+			}
+			
+			call sranwrp_processing.cat_strings as collate_fq_depth {
+				input:
+					strings = fq_meddept_with_header,
+					out = "depth_reports.tsv",
+					disk_size = quick_tasks_disk_size
+			}
+		}
+	
+		# if there is only one sample, there's no need to run tasks
+		if(length(pulled_fastqs) == 1) {
+			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
+			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
+			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+		}
 	}
 
 	if(tree_decoration) {
 		if(length(real_diffs)>0) {
-			# diff files must exist if tree_decoration is true (unless no samples passed) 
-			# so we can force the Array[File?]? into an Array[File] with the classic 
-			# "select_first() with a bogus fallback" hack
-			Array[File] coerced_diffs = select_first([select_all(real_diffs), minos_vcfs])
-			Array[File] coerced_reports = select_first([select_all(real_reports), minos_vcfs])
+			Array[File] coerced_diffs = select_all(real_diffs)
+			Array[File] coerced_reports = select_all(real_reports)
 			call build_treesWF.Tree_Nine as trees {
 				input:
 					diffs = coerced_diffs,
@@ -402,38 +307,49 @@ workflow myco {
 			}
 		}
 	}
-
+		
 	output {
+		File          download_report        = merge_reports.outfile
+		
 		# raw files
-		Array[File]  bais = final_bais
+		Array[File]  bais  = final_bais
 		Array[File]  bams  = final_bams
-		Array[File?] diffs = real_diffs
-		Array[File?] masks = real_masks   # bedgraph
+		Array[File] diffs = real_diffs
+		Array[File] masks = real_masks   # bedgraph
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?]  covstats_reports       = covstats.covstatsOutfile
-		Array[File?]  diff_reports           = real_reports
-		File          download_report        = merge_reports.outfile
-		Array[File]?  fastqc_reports         = FastqcWF.reports
-		Array[File?]  fastp_reports          = qc_fastqs.fastp_txt
-		File?         tbprof_bam_depths      = collate_bam_depth.outfile
-		Array[File?]  tbprof_bam_jsons       = profile_bam.tbprofiler_json
-		File?         tbprof_bam_strains     = collate_bam_strains.outfile
-		Array[File?]  tbprof_bam_summaries   = profile_bam.tbprofiler_txt
-		File?         tbprof_bam_resistances = collate_bam_resistance.outfile
-		Array[File?]  tbprof_fq_jsons        = qc_fastqs.tbprofiler_json
-		Array[File?]  tbprof_fq_looker       = qc_fastqs.tbprofiler_looker_csv
-		Array[File?]  tbprof_fq_laboratorian = qc_fastqs.tbprofiler_laboratorian_report_csv
-		File?         tbprof_fq_strains      = collate_fq_strains.outfile
-		Array[File?]  tbprof_fq_summaries    = qc_fastqs.tbprofiler_txt
-		File?         tbprof_fq_resistances  = collate_fq_resistance.outfile
+		Array[File?] covstats_reports          = covstats.covstatsOutfile
+		Array[File?] diff_reports              = real_reports
+		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbprof_fq_jsons           = thiagenTBprofilerFQ.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = thiagenTBprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = thiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = thiagenTBprofilerFQ.tbprofiler_lims_report_csv
+		
+		# these outputs only exist if there are multiple samples
+		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
+		File?        tbprof_bam_all_strains     = collate_bam_strains.outfile
+		File?        tbprof_bam_all_resistances = collate_bam_resistance.outfile
+		File?        tbprof_fq_all_depths       = collate_fq_depth.outfile
+		File?        tbprof_fq_all_strains      = collate_fq_strains.outfile
+		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
+		
+		# these outputs only exist if we ran on a single sample
+		String?      tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
+		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
+		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
+		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 		
 		# tree nine
-		File?        tree_nwk         = trees.tree_nwk
-		File?        tree_usher       = trees.tree_usher_raw
-		File?        tree_taxonium    = trees.tree_taxonium
-		File?        tree_nextstrain  = trees.tree_nextstrain
-		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
+		File?        tree_nwk           = trees.tree_nwk
+		File?        tree_usher         = trees.tree_usher
+		File?        tree_taxonium      = trees.tree_taxonium
+		File?        tree_nextstrain    = trees.tree_nextstrain
+		Array[File]? trees_nextstrain   = trees.subtrees_nextstrain
+		Array[File]? distance_matrices  = trees.max_distance_matrix
 	}
 }
