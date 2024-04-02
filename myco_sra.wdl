@@ -20,7 +20,7 @@ workflow myco {
 		Boolean covstatsQC_skip_entirely       = true  # false in myco_raw
 		Boolean decontam_use_CDC_varpipe_ref   = false # true in myco_raw
 		File?   mask_bedfile
-		Boolean TBProf_on_bams_not_fastqs      = true
+		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false in myco_raw
 		
 		# QC stuff 
 		Float   QC_max_pct_low_coverage_sites  =     0.20
