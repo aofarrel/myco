@@ -96,8 +96,8 @@ workflow myco {
 				fastp_clean_after_decontam = clean_after_decontam,
 				QC_min_q30 = QC_min_q30 / 100.0,
 				preliminary_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
-				timeout_map_reads = if guardrail_mode then 300 else 0,
-				timeout_decontam = if guardrail_mode then 600 else 0
+				timeout_map_reads = if guardrail_mode then 120 else 0,
+				timeout_decontam = if guardrail_mode then 300 else 0
 				# no subsample cutoff here because that happens during the pull task
 		}
 
