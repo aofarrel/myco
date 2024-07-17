@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.13.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.20/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.18/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
@@ -307,9 +307,24 @@ workflow myco {
 			}
 		}
 	}
+
+	call sranwrp_processing.eleven_arrays_to_tsv as fastp_decont_report {
+		input:
+			row_keys = fastp_decontam_check.sample,
+			value1 = fastp_decontam_check.cleaned_pct_above_q30,
+			value2 = fastp_decontam_check.dcntmd_pct_above_q30,
+			value3 = fastp_decontam_check.pct_loss_cleaning,
+			value4 = fastp_decontam_check.pct_loss_decon,
+			value5 = fastp_decontam_check.cleaned_total_reads,
+			value6 = fastp_decontam_check.dcntmd_total_reads,
+			value7 = fastp_decontam_check.reads_is_contam,
+			value8 = fastp_decontam_check.reads_reference,
+			value9 = fastp_decontam_check.reads_unmapped
+	}
 		
 	output {
-		File          download_report        = merge_reports.outfile
+		File       download_report         = merge_reports.outfile
+		File       fastp_decont_report_tsv = fastp_decont_report.tsv
 		
 		# raw files
 		Array[File]  bais  = final_bais
