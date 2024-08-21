@@ -2,8 +2,8 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.13.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.22/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.22/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.23/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.23/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
@@ -308,18 +308,33 @@ workflow myco {
 		}
 	}
 
-	call sranwrp_processing.eleven_arrays_to_tsv as fastp_decont_report {
+	# TODO: in later releases, the differences between the CDC and CRyPTIC pipelines will
+	# be handled in the decontamination task itself. This is a bandaid fix to avoid breaking
+	# the call cache for some previously processed data.
+	
+	Array[String] CDC_columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_reference","reads_unmapped","docker","status"]
+	
+	Array[String] CRyPTIC_columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_bacteria","reads_human","reads_NTM","docker","status"]
+	
+	Array[String] todays_columns = if decontam_use_CDC_varpipe_ref then CDC_columns else CRyPTIC_columns
+	call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
 		input:
 			row_keys = fastp_decontam_check.sample,
-			value1 = fastp_decontam_check.cleaned_pct_above_q30,
-			value2 = fastp_decontam_check.dcntmd_pct_above_q30,
-			value3 = fastp_decontam_check.pct_loss_cleaning,
-			value4 = fastp_decontam_check.pct_loss_decon,
-			value5 = fastp_decontam_check.cleaned_total_reads,
-			value6 = fastp_decontam_check.dcntmd_total_reads,
-			value7 = fastp_decontam_check.reads_is_contam,
-			value8 = fastp_decontam_check.reads_reference,
-			value9 = fastp_decontam_check.reads_unmapped
+			column_keys = todays_columns,
+			value1 = fastp_decontam_check.raw_pct_above_q20,
+			value2 = fastp_decontam_check.raw_pct_above_q30,
+			value3 = fastp_decontam_check.raw_total_reads,
+			value4 = fastp_decontam_check.cleaned_pct_above_q20,
+			value5 = fastp_decontam_check.cleaned_pct_above_q30,
+			# cleaned_total_reads purposely excluded; it's borked
+			value6 = fastp_decontam_check.dcntmd_pct_above_q20,
+			value7 = fastp_decontam_check.dcntmd_pct_above_q30,
+			value8 = fastp_decontam_check.dcntmd_total_reads,
+			value9 = fastp_decontam_check.reads_is_contam,
+			value10 = fastp_decontam_check.reads_reference,
+			value11 = fastp_decontam_check.reads_unmapped,
+			value12 = fastp_decontam_check.docker_used,
+			value13 = fastp_decontam_check.errorcode
 	}
 		
 	output {
@@ -334,6 +349,7 @@ workflow myco {
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
+		Array[File?] decontam_reports          = fastp_decontam_check.counts_out_tsv
 		Array[File?] covstats_reports          = covstats.covstatsOutfile
 		Array[File?] diff_reports              = real_reports
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
