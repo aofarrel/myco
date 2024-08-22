@@ -428,6 +428,7 @@ workflow myco {
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
+		Array[File?] decontam_reports          = decontam_each_sample.counts_out_tsv
 		Array[File?] covstats_reports          = covstats.covstatsOutfile
 		Array[File?] diff_reports              = real_reports
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
