@@ -20,7 +20,7 @@ workflow myco {
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
 		Boolean covstatsQC_skip_entirely       = false
-		Boolean decontam_use_CDC_varpipe_ref   = true
+		Boolean decontam_use_CDC_varpipe_ref   = false
 		File?   mask_bedfile
 		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
