@@ -2,7 +2,7 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.14.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.14.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.23/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/Update-tbprofiler/tbprofiler_tasks.wdl" as profiler
@@ -428,6 +428,7 @@ workflow myco {
 		Array[File]  vcfs  = minos_vcfs
 		
 		# metadata
+		Array[File?] decontam_reports          = decontam_each_sample.counts_out_tsv
 		Array[File?] covstats_reports          = covstats.covstatsOutfile
 		Array[File?] diff_reports              = real_reports
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json

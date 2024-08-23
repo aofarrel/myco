@@ -48,6 +48,9 @@ myco imports almost all of its code from other repos. Please see those specific 
 #### samtools
 > Danecek, Petr, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Martin O Pollard, Andrew Whitwham, et al. “Twelve Years of SAMtools and BCFtools.” GigaScience 10, no. 2 (January 29, 2021): giab008. https://doi.org/10.1093/gigascience/giab008.
 
+#### seqtk
+> https://github.com/lh3/seqtk
+
 #### TBProfiler (version 4.4.2, database 2023-Mar-27)
 > Phelan, Jody E., Denise M. O’Sullivan, Diana Machado, Jorge Ramos, Yaa E. A. Oppong, Susana Campino, Justin O’Grady, et al. “Integrating Informatics Tools and Portable Sequencing Technology for Rapid Detection of Resistance to Anti-Tuberculous Drugs.” Genome Medicine 11, no. 1 (December 2019): 41. https://doi.org/10.1186/s13073-019-0650-x.
 
