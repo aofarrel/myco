@@ -5,8 +5,8 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.14.0/tasks/va
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/Update-tbprofiler/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/Update-tbprofiler/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
