@@ -473,8 +473,6 @@ workflow myco {
 		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
 		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
 		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_map_reads = decontam_each_sample.timer_5_mapFQ[0]
-		Int seconds_to_rm_contam = decontam_each_sample.timer_7_dcnFQ[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }
