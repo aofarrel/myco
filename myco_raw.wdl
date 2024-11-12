@@ -15,6 +15,7 @@ workflow myco {
 		
 		String? output_sample_name
 		Boolean guardrail_mode                 = true
+		Boolean low_resource_mode              = false
 		
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
@@ -75,7 +76,9 @@ workflow myco {
 				preliminary_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
 				subsample_cutoff = if guardrail_mode then 30000 else -1,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
-				timeout_decontam = if guardrail_mode then 600 else 0
+				timeout_decontam = if guardrail_mode then 600 else 0,
+				addldisk = if low_resource_mode then 10 else 100,
+				memory = if low_resource_mode then 8 else 32
 		}
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
@@ -104,7 +107,10 @@ workflow myco {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						tarball_bams_and_bais = false,
-						timeout = if guardrail_mode then 600 else 0
+						timeout = if guardrail_mode then 600 else 0,
+						addldisk = if low_resource_mode then 10 else 100,
+						cpu = if low_resource_mode then 8 else 16,
+						memory = if low_resource_mode then 8 else 32
 				}
 			}
 		}
