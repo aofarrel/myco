@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
@@ -21,7 +21,7 @@ workflow myco {
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
 		Boolean covstatsQC_skip_entirely       = false
-		Boolean decontam_use_CDC_varpipe_ref   = true
+		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0!!
 		File?   mask_bedfile
 		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
@@ -65,7 +65,7 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.11-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.11-CRyPTIC",
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.12.5.2-CDC" else "ashedpotatoes/clockwork-plus:v0.12.5.2-CRyPTIC",
 				unsorted_sam = true,
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
@@ -479,8 +479,6 @@ workflow myco {
 		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
 		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
 		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_map_reads = decontam_each_sample.timer_5_mapFQ[0]
-		Int seconds_to_rm_contam = decontam_each_sample.timer_7_dcnFQ[0]
 		String docker_used       = decontam_each_sample.docker_used[0]
 	}
 }

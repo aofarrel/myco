@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.13.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
@@ -18,9 +18,9 @@ workflow myco {
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
 		Boolean covstatsQC_skip_entirely       = true  # false in myco_raw
-		Boolean decontam_use_CDC_varpipe_ref   = false # true in myco_raw
 		File?   mask_bedfile
 		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false in myco_raw
+		Boolean decontam_use_CDC_varpipe_ref   = false
 		
 		# QC stuff 
 		Float   QC_max_pct_low_coverage_sites  =     0.20
