@@ -88,7 +88,7 @@ workflow myco {
 	scatter(pulled_fastq in pulled_fastqs) {
 		call clckwrk_combonation.clean_and_decontam_and_check as fastp_decontam_check {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "clockwork-plus:v0.12.5.2-CDC" else "clockwork-plus:v0.12.5.2-CRyPTIC",
+				docker_image = if decontam_use_CDC_varpipe_ref then "clockwork-plus:v0.12.5.2-CDC" else "clockwork-plus:v0.12.5.1-CRyPTIC",
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				fastp_clean_avg_qual = clean_average_q_score,
