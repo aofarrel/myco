@@ -1,17 +1,18 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/main/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
+		String date_pipeline_ran
 		
 		String? output_sample_name
 		Boolean guardrail_mode                 = true
@@ -415,34 +416,34 @@ workflow myco {
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
-		String status_code = select_first([finalcode, pass])
+		String tbd_status_code = select_first([finalcode, pass])
 		
 		# debug
-		Float pct_unmapped_decontamm = pct_unmapped_decontam
-		Float n_reads_decon_kept = this_kept
-		Float n_reads_decon_unmapped = this_unmapped
-		Float? pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
-		Float? pct_unmapped_covstats = percentUnmapped
-		Float? pct_loss_decon = decontam_each_sample.pct_loss_decon[0]
-		Float? pct_loss_cleaning = decontam_each_sample.pct_loss_cleaning[0]
+		Float tbd_pct_unmapped_decontamm = pct_unmapped_decontam
+		Float tbd_n_reads_decon_kept = this_kept
+		Float tbd_n_reads_decon_unmapped = this_unmapped
+		Float? tbd_pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
+		Float? tbd_pct_unmapped_covstats = percentUnmapped
+		Float? tbd_pct_loss_decon = decontam_each_sample.pct_loss_decon[0]
+		Float? tbd_pct_loss_cleaning = decontam_each_sample.pct_loss_cleaning[0]
 		
 		# raw files
-		Array[File]  bais  = final_bais
-		Array[File]  bams  = final_bams
-		Array[File] diffs = real_diffs
-		Array[File] masks = real_masks   # bedgraph
-		Array[File]  vcfs  = minos_vcfs
+		Array[File]  tbd_bais  = final_bais
+		Array[File]  tbd_bams  = final_bams
+		Array[File]  tbd_diffs = real_diffs
+		Array[File]  tbd_masks = real_masks   # bedgraph
+		Array[File]  tbd_vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?] decontam_reports          = decontam_each_sample.counts_out_tsv
-		Array[File?] covstats_reports          = covstats.covstatsOutfile
-		Array[File?] diff_reports              = real_reports
-		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
-		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
+		Array[File?] tbd_decontam_reports          = decontam_each_sample.counts_out_tsv
+		Array[File?] tbd_covstats_reports          = covstats.covstatsOutfile
+		Array[File?] tbd_diff_reports              = real_reports
+		Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbd_tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
+		Array[File?] tbd_tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbd_tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbd_tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
@@ -453,13 +454,13 @@ workflow myco {
 		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if we ran on a single sample
-		String?      tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
-		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
-		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
-		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
-		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
-		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
-		
+		String?      tbd_tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbd_tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
+		String?      tbd_tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
+		String?      tbd_tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbd_tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
+		String?      tbd_tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
+
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
 		File?        tree_usher       = trees.tree_usher
@@ -469,17 +470,17 @@ workflow myco {
 		Array[File]? distance_matrix  = trees.max_distance_matrix
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		File qc_csv = qc_summary.tsv_or_csv
+		File qc_csv = tbd_qc_summary.tsv_or_csv
 		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
-		String? debug_decontam_ERR  = decontam_ERR
-		String? debug_earlyQC_ERR   = earlyQC_ERR
-		String? debug_varcall_ERR   = varcall_ERR
-		String? debug_covstats_ERR  = covstats_ERR
-		String? debug_vcfdiff_ERR   = vcfdiff_ERR
-		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
-		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
-		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		String docker_used       = decontam_each_sample.docker_used[0]
+		String? tbd_debug_decontam_ERR  = decontam_ERR
+		String? tbd_debug_earlyQC_ERR   = earlyQC_ERR
+		String? tbd_debug_varcall_ERR   = varcall_ERR
+		String? tbd_debug_covstats_ERR  = covstats_ERR
+		String? tbd_debug_vcfdiff_ERR   = vcfdiff_ERR
+		Array[String]? tbd_debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
+		Array[String]? tbd_debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
+		Array[String]? tbd_debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
+		String tbd_clockwork_docker       = decontam_each_sample.docker_used[0]
 	}
 }
 
