@@ -470,7 +470,7 @@ workflow myco {
 		Array[File]? distance_matrix  = trees.max_distance_matrix
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		File qc_csv = tbd_qc_summary.tsv_or_csv
+		File tbd_qc_csv = qc_summary.tsv_or_csv
 		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		String? tbd_debug_decontam_ERR  = decontam_ERR
 		String? tbd_debug_earlyQC_ERR   = earlyQC_ERR
