@@ -1,7 +1,7 @@
 version 1.0
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/update-dockers-0.12.5.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/fastp-wdl/0.0.4/fastp_tasks.wdl" as fastp
-import "https://raw.githubusercontent.com/aofarrel/parsevcf/1.2.0/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 
 # This is a stripped-down version of myco which only runs the variant caller, vcf-to-diff, and (optionally) fastp.
 # There is NO decontamination, TB-Profiler, covstats, or QC beyond "does the variant caller crash/time out or not."

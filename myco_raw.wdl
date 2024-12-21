@@ -1,17 +1,18 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_functions.wdl" as goleft
 
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
+		String date_pipeline_ran
 		
 		String? output_sample_name
 		Boolean guardrail_mode                 = true
@@ -21,7 +22,7 @@ workflow myco {
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
 		Boolean covstatsQC_skip_entirely       = false
-		Boolean decontam_use_CDC_varpipe_ref   = true
+		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0!!
 		File?   mask_bedfile
 		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
@@ -65,7 +66,7 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.11.3.11-CDC" else "ashedpotatoes/clockwork-plus:v0.11.3.11-CRyPTIC",
+				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.12.5.2-CDC" else "ashedpotatoes/clockwork-plus:v0.12.5.1-CRyPTIC",
 				unsorted_sam = true,
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
@@ -96,8 +97,8 @@ workflow myco {
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
 					soft_pct_mapped = QC_soft_pct_mapped,
-					soft_coverage = if guardrail_mode then false else true,
-					minimum_coverage = if guardrail_mode then 3 else 0,
+					soft_depth = if guardrail_mode then false else true,
+					minimum_depth = if guardrail_mode then 3 else 0,
 					minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
 					sample = decontam_each_sample.sample
 			}
@@ -234,7 +235,7 @@ workflow myco {
   	# coerce optional types into required types (doesn't crash if these are null)
 	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.sample_and_strain)
 	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.sample_and_resistance)
-	Array[String] coerced_fq_depths=select_all(tbprofilerFQ.sample_and_coverage)
+	Array[String] coerced_fq_depths=select_all(tbprofilerFQ.sample_and_depth)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -398,7 +399,7 @@ workflow myco {
 		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
 		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
 		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                   # fastp
-		"median_coverage": select_first([tbprofilerFQ.median_coverage[0], "NA"]),        # thiagen!TBProfiler
+		"median_depth": select_first([tbprofilerFQ.median_depth[0], "NA"]),              # thiagen!TBProfiler
 		"genome_pct_coverage": select_first([tbprofilerFQ.pct_genome_covered[0], "NA"]), # thiagen!TBProfiler
 		"mean_coverage": select_first([meanCoverage, "NA"])                              # covstats
 	}
@@ -415,34 +416,34 @@ workflow myco {
 		
 	output {
 		# status of sample -- only valid iff this ran on only one sample
-		String status_code = select_first([finalcode, pass])
+		String tbd_status_code = select_first([finalcode, pass])
 		
 		# debug
-		Float pct_unmapped_decontamm = pct_unmapped_decontam
-		Float n_reads_decon_kept = this_kept
-		Float n_reads_decon_unmapped = this_unmapped
-		Float? pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
-		Float? pct_unmapped_covstats = percentUnmapped
-		Float? pct_loss_decon = decontam_each_sample.pct_loss_decon[0]
-		Float? pct_loss_cleaning = decontam_each_sample.pct_loss_cleaning[0]
+		Float tbd_pct_unmapped_decontamm = pct_unmapped_decontam
+		Float tbd_n_reads_decon_kept = this_kept
+		Float tbd_n_reads_decon_unmapped = this_unmapped
+		Float? tbd_pct_mapped_tbprof = tbprofilerFQ.pct_reads_mapped[0]
+		Float? tbd_pct_unmapped_covstats = percentUnmapped
+		Float? tbd_pct_loss_decon = decontam_each_sample.pct_loss_decon[0]
+		Float? tbd_pct_loss_cleaning = decontam_each_sample.pct_loss_cleaning[0]
 		
 		# raw files
-		Array[File]  bais  = final_bais
-		Array[File]  bams  = final_bams
-		Array[File] diffs = real_diffs
-		Array[File] masks = real_masks   # bedgraph
-		Array[File]  vcfs  = minos_vcfs
+		Array[File]  tbd_bais  = final_bais
+		Array[File]  tbd_bams  = final_bams
+		Array[File]  tbd_diffs = real_diffs
+		Array[File]  tbd_masks = real_masks   # bedgraph
+		Array[File]  tbd_vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?] decontam_reports          = decontam_each_sample.counts_out_tsv
-		Array[File?] covstats_reports          = covstats.covstatsOutfile
-		Array[File?] diff_reports              = real_reports
-		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
-		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
+		Array[File?] tbd_decontam_reports          = decontam_each_sample.counts_out_tsv
+		Array[File?] tbd_covstats_reports          = covstats.covstatsOutfile
+		Array[File?] tbd_diff_reports              = real_reports
+		Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbd_tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
+		Array[File?] tbd_tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbd_tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbd_tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
@@ -453,13 +454,13 @@ workflow myco {
 		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
 		
 		# these outputs only exist if we ran on a single sample
-		String?      tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
-		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
-		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
-		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
-		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
-		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
-		
+		String?      tbd_tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
+		String?      tbd_tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
+		String?      tbd_tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
+		String?      tbd_tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
+		String?      tbd_tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
+		String?      tbd_tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
+
 		# tree nine
 		File?        tree_nwk         = trees.tree_nwk
 		File?        tree_usher       = trees.tree_usher
@@ -469,19 +470,17 @@ workflow myco {
 		Array[File]? distance_matrix  = trees.max_distance_matrix
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		File qc_csv = qc_summary.tsv_or_csv
+		File tbd_qc_csv = qc_summary.tsv_or_csv
 		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
-		String? debug_decontam_ERR  = decontam_ERR
-		String? debug_earlyQC_ERR   = earlyQC_ERR
-		String? debug_varcall_ERR   = varcall_ERR
-		String? debug_covstats_ERR  = covstats_ERR
-		String? debug_vcfdiff_ERR   = vcfdiff_ERR
-		Array[String]? debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
-		Array[String]? debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
-		Array[String]? debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
-		Int seconds_to_map_reads = decontam_each_sample.timer_5_mapFQ[0]
-		Int seconds_to_rm_contam = decontam_each_sample.timer_7_dcnFQ[0]
-		String docker_used       = decontam_each_sample.docker_used[0]
+		String? tbd_debug_decontam_ERR  = decontam_ERR
+		String? tbd_debug_earlyQC_ERR   = earlyQC_ERR
+		String? tbd_debug_varcall_ERR   = varcall_ERR
+		String? tbd_debug_covstats_ERR  = covstats_ERR
+		String? tbd_debug_vcfdiff_ERR   = vcfdiff_ERR
+		Array[String]? tbd_debug_vcfdiff_errorcode_if_covstats    = vcfdiff_errorcode_if_covstats
+		Array[String]? tbd_debug_vcfdiff_errorcode_if_no_covstats = vcfdiff_errorcode_if_no_covstats
+		Array[String]? tbd_debug_vcfdiff_errorcode_array          = vcfdiff_errorcode_array
+		String tbd_clockwork_docker       = decontam_each_sample.docker_used[0]
 	}
 }
 
