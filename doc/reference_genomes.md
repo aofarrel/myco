@@ -21,6 +21,7 @@ Ref.download.tar
     └── remove_contam.tsv
 ```
 ### ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref
+--> Note: Starting with v0.12.0, clockwork changed their decontamination reference and now use CHM13 instead of hg38 for human
 ```
  Ref.remove_contam.tar
   ├── ref.fa
