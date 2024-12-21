@@ -308,19 +308,12 @@ workflow myco {
 		}
 	}
 
-	# TODO: in later releases, the differences between the CDC and CRyPTIC pipelines will
-	# be handled in the decontamination task itself. This is a bandaid fix to avoid breaking
-	# the call cache for some previously processed data.
+	Array[String] columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_reference","reads_unmapped","docker","status"]
 	
-	Array[String] CDC_columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_reference","reads_unmapped","docker","status"]
-	
-	Array[String] CRyPTIC_columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_bacteria","reads_human","reads_NTM","docker","status"]
-	
-	Array[String] todays_columns = if decontam_use_CDC_varpipe_ref then CDC_columns else CRyPTIC_columns
 	call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
 		input:
 			row_keys = fastp_decontam_check.sample,
-			column_keys = todays_columns,
+			column_keys = columns,
 			value1 = fastp_decontam_check.raw_pct_above_q20,
 			value2 = fastp_decontam_check.raw_pct_above_q30,
 			value3 = fastp_decontam_check.raw_total_reads,
