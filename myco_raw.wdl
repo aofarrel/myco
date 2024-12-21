@@ -96,8 +96,8 @@ workflow myco {
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
 					soft_pct_mapped = QC_soft_pct_mapped,
-					soft_coverage = if guardrail_mode then false else true,
-					minimum_coverage = if guardrail_mode then 3 else 0,
+					soft_depth = if guardrail_mode then false else true,
+					minimum_depth = if guardrail_mode then 3 else 0,
 					minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
 					sample = decontam_each_sample.sample
 			}
@@ -234,7 +234,7 @@ workflow myco {
   	# coerce optional types into required types (doesn't crash if these are null)
 	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.sample_and_strain)
 	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.sample_and_resistance)
-	Array[String] coerced_fq_depths=select_all(tbprofilerFQ.sample_and_coverage)
+	Array[String] coerced_fq_depths=select_all(tbprofilerFQ.sample_and_depth)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -398,7 +398,7 @@ workflow myco {
 		"pct_unmapped_covstats": select_first([percentUnmapped, "NA"]),                  # covstats 
 		"pct_unmapped_decon": pct_unmapped_decontam,                                     # decontamination
 		"pct_above_q30": decontam_each_sample.dcntmd_pct_above_q30[0],                   # fastp
-		"median_coverage": select_first([tbprofilerFQ.median_coverage[0], "NA"]),        # thiagen!TBProfiler
+		"median_depth": select_first([tbprofilerFQ.median_depth[0], "NA"]),              # thiagen!TBProfiler
 		"genome_pct_coverage": select_first([tbprofilerFQ.pct_genome_covered[0], "NA"]), # thiagen!TBProfiler
 		"mean_coverage": select_first([meanCoverage, "NA"])                              # covstats
 	}
