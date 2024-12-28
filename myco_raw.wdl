@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.3/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
@@ -413,7 +413,7 @@ workflow myco {
 		Int tbd_qc_mean_r1_len_postdecon = decontam_each_sample.mean_r1_len_postdecon[0]
 		Int tbd_qc_mean_r2_len_postdecon = decontam_each_sample.mean_r2_len_postdecon[0]
 		Float tbd_qc_duplication_rate = decontam_each_sample.duplication_rate[0]
-		Int tbd_qc_reads_adapter = decontam_each_sample.reads_adapter[0]
+		Int tbd_qc_reads_adapter_trimmed = decontam_each_sample.reads_adapter_trimmed[0]
 		
 		# theiagen!TBProfiler metadata pulled out directly
 		Float? tbd_qc_median_depth_per_tbprof = tbprofilerFQ.median_depth[0]
