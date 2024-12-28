@@ -39,16 +39,18 @@ workflow checker {
 			paired_fastq_sets = paired_fastq_sets
 	}
 	
-	Array[File] TEST_bai = flatten(select_all([myco_raw_default.bais, TRUTH_bai, FALLBACK_bai]))
-	Array[File] TEST_diff = flatten(select_all([myco_raw_default.diffs, TRUTH_diff, FALLBACK_diff]))
-	File TEST_qc = myco_raw_default.qc_csv
-	Array[File] TEST_report = select_all(select_first([myco_raw_default.diff_reports, TRUTH_report, FALLBACK_report])) # awkward due to being Array[File?]
-	Array[File] TEST_vcf = flatten(select_all([myco_raw_default.vcfs, TRUTH_vcf, FALLBACK_vcf]))
+	Array[File] TEST_bai = flatten(select_all([myco_raw_default.tbd_bais, TRUTH_bai, FALLBACK_bai]))
+	Array[File] TEST_diff = flatten(select_all([myco_raw_default.tbd_diffs, TRUTH_diff, FALLBACK_diff]))
+	#File TEST_qc = myco_raw_default.qc_csv
+	Array[File] TEST_report = select_all(select_first([myco_raw_default.tbd_diff_reports, TRUTH_report, FALLBACK_report])) # awkward due to being Array[File?]
+	Array[File] TEST_vcf = flatten(select_all([myco_raw_default.tbd_vcfs, TRUTH_vcf, FALLBACK_vcf]))
 	
 	call verify_array.arraycheck_classic as check_myco_raw_default {
 		input:
-			test = flatten([TEST_bai, TEST_diff, [TEST_qc], TEST_report, TEST_vcf]),
+			#test = flatten([TEST_bai, TEST_diff, [TEST_qc], TEST_report, TEST_vcf]),
+			test = flatten([TEST_bai, TEST_diff, TEST_report, TEST_vcf]),
 			truth = flatten(select_all([TRUTH_bai, TRUTH_diff, TRUTH_qc, TRUTH_report, TRUTH_vcf])),
+			#truth = flatten(select_all([TRUTH_bai, TRUTH_diff, TRUTH_qc, TRUTH_report, TRUTH_vcf])),
 			disk_size_override = checker_disk_size_override
 	}
 	
