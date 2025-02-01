@@ -4,7 +4,6 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/co
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -35,10 +34,6 @@ workflow myco {
 		# shrink large samples
 		Int     subsample_cutoff        =  450
 		Int     subsample_seed          = 1965
-
-		# phylogenetics
-		Boolean tree_decoration         = false
-		File?   tree_to_decorate
 	}
 
 	parameter_meta {
@@ -295,19 +290,6 @@ workflow myco {
 		}
 	}
 
-	if(tree_decoration) {
-		if(length(real_diffs)>0) {
-			Array[File] coerced_diffs = select_all(real_diffs)
-			Array[File] coerced_reports = select_all(real_reports)
-			call build_treesWF.Tree_Nine as trees {
-				input:
-					diffs = coerced_diffs,
-					input_tree = tree_to_decorate,
-					coverage_reports = coerced_reports
-			}
-		}
-	}
-
 	Array[String] columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_reference","reads_unmapped","docker","status"]
 	
 	call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
@@ -367,13 +349,5 @@ workflow myco {
 		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
 		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
 		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
-		
-		# tree nine
-		File?        tree_nwk           = trees.tree_nwk
-		File?        tree_usher         = trees.tree_usher
-		File?        tree_taxonium      = trees.tree_taxonium
-		File?        tree_nextstrain    = trees.tree_nextstrain
-		Array[File]? trees_nextstrain   = trees.subtrees_nextstrain
-		Array[File]? distance_matrices  = trees.max_distance_matrix
 	}
 }

@@ -3,7 +3,6 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.3/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.15.0/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -31,8 +30,6 @@ workflow myco {
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
 		Boolean tbprofiler_on_bam              = false
-		Boolean tree_decoration                = false
-		File?   tree_to_decorate
 	}
 
 	parameter_meta {
@@ -53,8 +50,6 @@ workflow myco {
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
-		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
-		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
 											  
 	String pass = "PASS" # used later... much later
@@ -269,19 +264,6 @@ workflow myco {
 			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
 		}
 	}
-
-	if(tree_decoration) {
-		if(length(real_diffs)>0) {
-			Array[File] coerced_diffs = select_all(real_diffs)
-			Array[File] coerced_reports = select_all(real_reports)
-			call build_treesWF.Tree_Nine as trees {
-				input:
-					diffs = coerced_diffs,
-					input_tree = tree_to_decorate,
-					coverage_reports = coerced_reports
-			}
-		}
-	}
 	
 	#########################################
 	# error reporting for Terra data tables #
@@ -447,14 +429,6 @@ workflow myco {
 		Array[File?] tbd_tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
 		Array[File?] tbd_tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
 
-		# tree nine
-		File?        tree_nwk         = trees.tree_nwk
-		File?        tree_usher       = trees.tree_usher
-		File?        tree_taxonium    = trees.tree_taxonium
-		File?        tree_nextstrain  = trees.tree_nextstrain
-		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
-		Array[File]? distance_matrix  = trees.max_distance_matrix
-		
 		# useful debugging/run information (only valid iff this ran on only one sample)
 		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
 		#String? tbd_debug_decontam_ERR  = decontam_ERR
