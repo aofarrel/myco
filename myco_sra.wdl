@@ -25,7 +25,7 @@ workflow myco {
 		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false some versions of myco_raw
 		
 		# QC stuff 
-		Float   QC_max_pct_low_coverage_sites  =     0.20
+		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
@@ -49,7 +49,7 @@ workflow myco {
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as float, .5 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
@@ -60,7 +60,7 @@ workflow myco {
 	}
 	
 	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:

@@ -30,7 +30,7 @@ workflow myco {
 		Boolean covstatsQC_skip_entirely       = true   # false in original version of myco_raw 6.2.4
 		Boolean decontam_use_CDC_varpipe_ref   = false  # true in original version of myco_raw 6.2.4
 		File?   mask_bedfile
-		Float   QC_max_pct_low_coverage_sites  =     0.20 # integer in original version of myco_raw 6.2.4, actual value was basically this
+		Int   QC_max_pct_low_coverage_sites    =    20
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
@@ -50,7 +50,7 @@ workflow myco {
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		output_sample_name: "Override all sample names with this string instead."
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as float, .5 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
@@ -61,7 +61,7 @@ workflow myco {
 	}
 											  
 	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
