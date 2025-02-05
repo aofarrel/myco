@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+
 # myco_sra
 myco_sra is the [SRA](https://www.ncbi.nlm.nih.gov/sra) version of myco. Use this version of myco if you want to analysze fastqs from SRA. This is powered by [SRANWRP](https://github.com/aofarrel/SRANWRP), most notably the [pull-FASTQs-from-biosample](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/pull_FASTQs_from_SRA_by_biosample:main?tab=info) workflow. (For the sake of simplicity this readme calls the part of myco_sra that downloads from SRA "SRANWRP", even thought SRANWRP contains a few additional utility functions and workflows.)
 
@@ -15,7 +18,7 @@ SAMEA111556114
 
 SAME, SAMN, SRS, ERS, and numeric BioSample accessions are all supported, as well as any combination of these formats. **Run accessions (SRR, ERR, DRR) are not supported, [but you can use this workflow to convert your run accessions to BioSample accessions](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info).**
 
-All other inputs are documented here: [inputs.md](./inputs.md)
+Other inputs are documented in [inputs.md](./inputs.md) and the workflow's parameter_meta section.
 
 ## How does the fastq downloading part differ from similar workflows?
 There are several existing workflows which can pull from SRA, such as [SRA Fetch](https://dockstore.org/workflows/github.com/theiagen/terra_utilities/SRA_Fetch:v1.4.1?tab=info) and [DownloadFromSRA](https://dockstore.org/workflows/github.com/broadinstitute/long-read-pipelines/DownloadFromSRA:kvg_update_downloaders?tab=info). If you need your reads downloaded with no processing, need PacBio reads downloaded, or need your fastqs saved to a specific GCS directory, these workflows might be better suited to your needs than SRANWRP. **SRANWRP assumes you only want paired-end Illumina data while also making no assumptions that the BioSamples you are giving it actually have any paired-end Illumina data.**
@@ -83,12 +86,9 @@ Based on clockwork variant_call_single, which itself combines samtools, cortex, 
 ### [6] (optional) Run covstats
 Covstats checks how much of a sample ends up unmapped, and the average coverage. This takes some time to calculate, so it's optional, but it also gives us two additional QC metrics.
 
-### [7] Mask the outputs create diff files
+### [7] Mask the outputs and create diff files
 When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and optionally creates a diff file, one per sample, which can be used to make some happy little trees.
 
 ### [8] Collate QC information
 This pipeline generates a large amount of metadata and intermediate files. This task summarizes QC information into a single file for easy reference.
-
-### [9] (optional) Generate UShER, Taxonium, newick, and NextStrain trees
-If decorate_trees = true, and an input tree is passed in, each sample will be placed on the tree by UShER. The resulting tree will then be converted to Taxonium format, allowing it to be viewed in taxonium. NextStrain subtree JSONs will also be generated.
 

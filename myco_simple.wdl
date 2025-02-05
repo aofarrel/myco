@@ -1,3 +1,6 @@
+# myco_simple version 6.2.4-REPRO
+# This is an archived version of myco_simple that probably should never be used, unless you're trying to do a small-scale test before running 6.2.4-REPRO versions of myco_sra or myco_raw.
+# The "version 1.0" string below references the WDL syntax version
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.1/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/fastp-wdl/0.0.4/fastp_tasks.wdl" as fastp

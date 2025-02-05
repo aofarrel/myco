@@ -1,5 +1,8 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+
 # Quality Control / Sample filtering
-Not all data is "good" data. Maybe the data is too heavily contaminated, maybe the sequencing machine had trouble with it, maybe its format is incompatiable with our downstream tools, or maybe it's actually a boar from the French countryside that somehow ended up tagged as Mycobacterium tuberculosis. These sorts of things (yes, even the boar one) can and have happened while developing this pipeline, leading to the development of several metrics to help us quickly find and filter out bad data without crashing the entire pipeline. This pipeline was developed further with input from CDPH, who wish to implement QC standards similar to those of the CDC.
+Not all data is "good" data. Maybe the data is too heavily contaminated, maybe the sequencing machine had trouble with it, maybe its format is incompatiable with our downstream tools, or maybe it's actually a boar from the French countryside that somehow ended up tagged as Mycobacterium tuberculosis. To deal with these issues, we developed several metrics to help us quickly find and filter out bad data without crashing the entire pipeline. This pipeline was developed further with input from CDPH, who wish to implement QC standards similar to those of used by CDC.
 
 Beause there is so much QC going on in this pipeline, it can be helpful to divide each QC step into two catagories:
 * Site-specific QC: Forms of QC that will remove particular **parts** of a sample. 

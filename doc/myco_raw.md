@@ -1,12 +1,15 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+
 # myco_raw
 myco_raw is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis, and you want to decontaminate them before calling variants.
 
-## Notable inputs
+## FASTQ input
 You need your FASTQs as a nested array, where each inner array represents one sample. For example, let's say you the following samples in a google bucket located at gs://my-cool-bucket/fqs/
 * SAMN02599053, consisting of SAMN02599053_SRR1173122_1.fq.gz, SAMN02599053_SRR1173122_2.fq.gz, SAMN02599053_SRR1173191_1.fq.gz, and SAMN02599053_SRR1173191_2.fq.gz
 * SAMN13813990, consisting of SAMN13813990_SRR10869128_1.fq.gz and SAMN13813990_SRR10869128_2.fq.gz
 
-You would input the following for **paired_fastq_sets**:
+Assuming the gs URIs are valid and your WDL executor can handle gs URIs, you would input the following for **paired_fastq_sets**:
 
 ```
 [["gs://my-cool-bucket/fqs/SAMN02599053_SRR1173122_1.fq.gz", "gs://my-cool-bucket/fqs/SAMN02599053_SRR1173122_2.fq.gz", "gs://my-cool-bucket/fqs/SAMN02599053_SRR1173191_1.fq.gz", "gs://my-cool-bucket/fqs/SAMN02599053_SRR1173191_2.fq.gz"], ["gs://my-cool-bucket/fqs/SAMN13813990_SRR10869128_1.fq.gz", gs://my-cool-bucket/fqs/SAMN13813990_SRR10869128_2.fq.gz"]]
@@ -14,7 +17,13 @@ You would input the following for **paired_fastq_sets**:
 
 The first array represents sample SAMN02599053. The second array represents sample SAMN13813990. You will note that SAMN02599053 has two pairs of fastqs, while SAMN13813990 only has one pair of fastqs -- this is fine!
 
-All other inputs are documented here: [inputs.md](./inputs.md)
+Alternatively, let's say you were running this workflow on just one sample, and it only had one pair of reads. You might enter it like this:
+
+```
+[["gs://some_bucket/foo/SAMN1234_1.fq", "gs://some_bucket/foo/SAMN1234_2.fq"]]
+```
+
+Other inputs and documented in [inputs.md](./inputs.md) and in the workflow's parameter_meta section.
 
 ## Full workflow process
 ![Flowchart of myco_raw](./doc_making_resources/myco_basic_flowchart.png)

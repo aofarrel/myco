@@ -1,3 +1,6 @@
+# myco checker version 6.2.4-REPRO
+# This checker workflow should NOT be used on more recent versions of myco, as the decontamination reference has since changed.
+# The "version 1.0" string below references the WDL syntax version
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
 import "./myco_raw.wdl" as myco_raw

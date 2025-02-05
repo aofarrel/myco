@@ -3,9 +3,6 @@ myco_simple is the version of myco to use if you already have a bunch of fastqs,
 
 Each sample's read direction must be an individual gzipped file, e.g. SRR1173122_1.fq.gz and SRR1173122_2.fq.gz representing sample SRR1173122. Something like SRR1173122.gz which contains two fastqs would not work. Unlike more flexible versions of myco, the inputs to myco_simple **strictly** must be individually gzipped due to limitations of the variant caller.
 
-## Notable inputs
-All non-fastq inputs are documented here: [inputs.md](./inputs.md)
-
 ### FASTQs
 You need your FASTQs as a nested array, where each inner array represents one sample. For example, let's say you the following samples in a google bucket located at gs://my-cool-bucket/fqs/
 * SAMN02599053, consisting of SAMN02599053_SRR1173122_1.fq.gz, SAMN02599053_SRR1173122_2.fq.gz, SAMN02599053_SRR1173191_1.fq.gz, and SAMN02599053_SRR1173191_2.fq.gz

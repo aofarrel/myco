@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+
 # Reference genome information
 As of release 4.3.0, all Docker images used by myco now come with their own copy of the reference genome by packaging the appropriate output of clockwork refprep. Refprep is my implementation of [clockwork's reference preparation standards](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#get-and-index-reference-genomes). Prior to release 4.3.0, refprep had to run in each version of myco unless the user can use call cacheing or provided "bluepeter" inputs, which could be confusing for users, so nowadays I've packaged the outputs myself. Refprep takes about an hour total to do the following:
 1. Download TB reference files

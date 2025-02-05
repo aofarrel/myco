@@ -1,4 +1,4 @@
-# myco version 6.2.4-REPRO
+# myco_sra version 6.2.4-REPRO
 # This is an archived version of myco that exists solely for reproducing published results -- it is HIGHLY recommended you use a more recent version!
 # The "version 1.0" string below references the WDL syntax version
 version 1.0
@@ -15,6 +15,7 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_funct
 workflow myco {
 	input {
 		File biosample_accessions
+		Boolean guardrail_mode                 = true
 
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
@@ -32,22 +33,22 @@ workflow myco {
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
-		Boolean guardrail_mode                 = true
 		
 		# shrink large samples
-		Int     subsample_cutoff        =  450
-		Int     subsample_seed          = 1965
+		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
+		Int     subsample_seed          = 1965  # if you're trying replicate our results, leave this untouched!
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
-		TBProf_on_bams_not_fastqs: "If true, run TBProfiler on BAMs instead of fastqs"
 
 		clean_after_decontam: "Should we clean reads with fastp AFTER decontaminating? (Not mutually exclusive with clean_before_decontam)"
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30. Overridden by clean_before_decontam and clean_after_decontam BOTH being false."
 		clean_before_decontam: "Should we clean reads with fastp BEFORE decontaminating? (Not mutually exclusive with clean_after_decontam)"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		TBProf_on_bams_not_fastqs: "If true, run TBProfiler on BAMs instead of fastqs"
+
 		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
@@ -55,6 +56,7 @@ workflow myco {
 		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
 	}

@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+
 # wrapper_example
 
 wrapper_example.wdl, aka myco_simple_one_sample, is just a wrapper for myco_simple. It is designed for [Terra data tables](https://support.terra.bio/hc/en-us/articles/360025758392) specifically. A Terra data table being used as an input for wrapper_example might look like this:

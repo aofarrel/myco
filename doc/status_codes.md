@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+
 # status codes
 Status codes represent the status of a given sample after it has completed the pipeline, providing information as to whether it completed the pipeline successfully or was filtered out somewhere along the way. They are visible to the user as a workflow-level output only if you are running myco_raw on a Terra data table, where each instance of the myco_raw workflow recieves one sample.
 

@@ -1,4 +1,4 @@
-# myco version 6.2.4-REPRO
+# myco_raw version 6.2.4-REPRO
 # This is an archived version of myco that exists solely for reproducing published results -- it is HIGHLY recommended you use a more recent version!
 # The "version 1.0" string below references the WDL syntax version
 version 1.0
@@ -19,7 +19,13 @@ workflow myco {
 		# we published was always based on on myco_sra 6.2.4's defaults, we've changed the defaults of this reproducible version of
 		# myco_raw to better match myco_sra 6.2.4's defaults.
 		#
+		# On 6.2.4-REPRO's default settings, TBProfiler will run twice. The first time will be an archived version of Theiagen's
+		# fork of TBProfiler, running on FASTQs. The second time will be the non-Theiagen archived version, running on BAMs.
+		# If you're trying to get myco_sra-like results, use the second run's; the output variables are named accordingly.
+		#
 		# Please be aware that myco_raw currently does not support automatic downsampling, unlike myco_sra.
+		#
+		# Also, apologies to Theiagen Genomics for mispelling their name far too many times in this pipeline.
 		
 		Array[Array[File]] paired_fastq_sets
 		
@@ -32,7 +38,7 @@ workflow myco {
 		Boolean covstatsQC_skip_entirely       = true   # false in original version of myco_raw 6.2.4
 		Boolean decontam_use_CDC_varpipe_ref   = false  # true in original version of myco_raw 6.2.4
 		File?   mask_bedfile
-		Int   QC_max_pct_low_coverage_sites    =    20
+		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
