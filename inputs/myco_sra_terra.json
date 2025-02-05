@@ -1,4 +1,3 @@
 {
-  "myco.biosample_accessions": "gs://ucsc-pathogen-genomics-public/tb/nine_test_files.txt",
-  "myco.tree_decoration": true
+  "myco.biosample_accessions": "gs://ucsc-pathogen-genomics-public/tb/nine_test_files.txt"
 }

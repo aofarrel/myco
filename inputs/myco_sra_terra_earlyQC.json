@@ -1,5 +1,0 @@
-{
-  "myco.biosample_accessions": "gs://fc-a1a6f6f6-9b6b-4f91-b4d5-80c194dfe383/quick_lineage_test.txt",
-  "myco.tree_decoration": true,
-  "myco.earlyQC_minimum_percent_q30": "0.90"
-}
