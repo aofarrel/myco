@@ -13,12 +13,14 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_funct
 
 workflow myco {
 	input {
+		
 		# In the original 6.2.4 of this pipeline, some defaults varied from what you see here. This is because myco_raw was orignally
 		# just the CDPH version of myco_sra, and CDPH has some different standards (some of which have since changed). Because what
 		# we published was always based on on myco_sra 6.2.4's defaults, we've changed the defaults of this reproducible version of
 		# myco_raw to better match myco_sra 6.2.4's defaults.
 		#
 		# Please be aware that myco_raw currently does not support automatic downsampling, unlike myco_sra.
+		
 		Array[Array[File]] paired_fastq_sets
 		
 		String? output_sample_name
@@ -41,21 +43,25 @@ workflow myco {
 	}
 
 	parameter_meta {
-		clean_after_decontam: "Should we clean reads with fastp AFTER decontaminating? (Not mutually exclusive with clean_before_decontam)"
+		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
+
+		output_sample_name: "Override all sample names with this string instead"
+		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times"
+
+		clean_after_decontam: "Clean fqs with fastp AFTER decontaminating (not mutually exclusive with clean_before_decontam)"
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30. Overridden by clean_before_decontam and clean_after_decontam BOTH being false."
-		clean_before_decontam: "Should we clean reads with fastp BEFORE decontaminating? (Not mutually exclusive with clean_after_decontam)"
+		clean_before_decontam: "Clean fqs with fastp BEFORE decontamination (not mutually exclusive with clean_after_decontam)"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
-		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-		output_sample_name: "Override all sample names with this string instead."
-		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
+		
 		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
 		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
+		
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
 	}
