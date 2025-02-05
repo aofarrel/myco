@@ -1,5 +1,10 @@
+> [!IMPORTANT]  
+> You are currently on an outdated branch of myco that exists solely for reproducing published results. It is HIGHLY recommended you use [a more recent version](https://github.com/aofarrel/myco) in order to take advantage of new updates to clockwork, TBProfiler, and other dependencies.
+>
+> Additionally, you might be better served by [TB-D](https://github.com/aofarrel/TB-D), which combines myco and Tree Nine into a single workflow.
+
 # myco 🍄
-myco is group of pipelines built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
+myco is group of pipelines built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) to accomplish this task.
 
 ## Which workflow should I use?
 Each version of myco largely only differs in how you are passing in FASTQ files. **In all cases, your FASTQs must be paired-end Illumina reads.**
@@ -22,8 +27,6 @@ myco imports almost all of its code from other repos. Please see those specific 
 * Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)
 * Decontamination and calling variants: [clockwork-wdl](https://github.com/aofarrel/clockwork-wdl)
 * Turning VCFs into diff files: [parsevcf](https://github.com/lilymaryam/parsevcf)
-* Building UShER, Taxonium, and Nextstrain/Auspice trees: [tree-nine](https://github.com/aofarrel/tree-nine)
-* Determining why your sample spent 20 hours in the decontamination task: [FastQC-wdl](https://qa.dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)
 
 ## Citations
 
@@ -38,9 +41,6 @@ myco imports almost all of its code from other repos. Please see those specific 
 
 #### goleft
 > https://github.com/brentp/goleft
-
-#### matUtils
-> McBroome, Jakob, Bryan Thornlow, Angie S. Hinrichs, Alexander Kramer, Nicola De Maio, Nick Goldman, David Haussler, Russell Corbett-Detig, and Yatish Turakhia. “A Daily-Updated Database and Tools for Comprehensive Sars-Cov-2 Mutation-Annotated Trees.” Molecular Biology and Evolution 38, no. 12 (December 9, 2021): 5819–24. https://doi.org/10.1093/molbev/msab264.
 
 #### minimap2
 > Li, Heng. “Minimap2: Pairwise Alignment for Nucleotide Sequences.” Edited by Inanc Birol. Bioinformatics 34, no. 18 (September 15, 2018): 3094–3100. https://doi.org/10.1093/bioinformatics/bty191.
@@ -60,6 +60,3 @@ Note that some versions of this pipeline specifically uses Thiagen's fork of TBP
 
 #### Trimmomatic
 > Bolger, Anthony M., Marc Lohse, and Bjoern Usadel. “Trimmomatic: A Flexible Trimmer for Illumina Sequence Data.” Bioinformatics 30, no. 15 (August 1, 2014): 2114–20. https://doi.org/10.1093/bioinformatics/btu170.
-
-#### UShER
-> Turakhia, Yatish, Bryan Thornlow, Angie S. Hinrichs, Nicola De Maio, Landen Gozashti, Robert Lanfear, David Haussler, and Russell Corbett-Detig. “Ultrafast Sample Placement on Existing tRees (UShER) Enables Real-Time Phylogenetics for the SARS-CoV-2 Pandemic.” Nature Genetics 53, no. 6 (June 2021): 809–16. https://doi.org/10.1038/s41588-021-00862-7.

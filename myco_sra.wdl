@@ -1,10 +1,12 @@
+# myco version 6.2.4-REPRO
+# This is an archived version of myco that exists solely for reproducing published results -- it is HIGHLY recommended you use a more recent version!
+# The "version 1.0" string below references the WDL syntax version
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.13.0/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -17,10 +19,10 @@ workflow myco {
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
-		Boolean covstatsQC_skip_entirely       = true  # false in myco_raw
-		Boolean decontam_use_CDC_varpipe_ref   = false # true in myco_raw
+		Boolean covstatsQC_skip_entirely       = true  # false in some versions of myco_raw
+		Boolean decontam_use_CDC_varpipe_ref   = false # true in some versions of myco_raw
 		File?   mask_bedfile
-		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false in myco_raw
+		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false some versions of myco_raw
 		
 		# QC stuff 
 		Float   QC_max_pct_low_coverage_sites  =     0.20
@@ -45,13 +47,20 @@ workflow myco {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 		TBProf_on_bams_not_fastqs: "If true, run TBProfiler on BAMs instead of fastqs"
 
+		clean_after_decontam: "Should we clean reads with fastp AFTER decontaminating? (Not mutually exclusive with clean_before_decontam)"
+		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30. Overridden by clean_before_decontam and clean_after_decontam BOTH being false."
+		clean_before_decontam: "Should we clean reads with fastp BEFORE decontaminating? (Not mutually exclusive with clean_after_decontam)"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
-		diffQC_mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as float, .5 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
+		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
+		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
+		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 		subsample_seed: "Seed used for subsampling with seqtk"
-		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
-		tree_to_decorate: "Base tree to use if tree_decoration = true"		
 	}
 	
 	String pass = "PASS" # used later... much later
@@ -295,19 +304,6 @@ workflow myco {
 		}
 	}
 
-	if(tree_decoration) {
-		if(length(real_diffs)>0) {
-			Array[File] coerced_diffs = select_all(real_diffs)
-			Array[File] coerced_reports = select_all(real_reports)
-			call build_treesWF.Tree_Nine as trees {
-				input:
-					diffs = coerced_diffs,
-					input_tree = tree_to_decorate,
-					coverage_reports = coerced_reports
-			}
-		}
-	}
-
 	# TODO: in later releases, the differences between the CDC and CRyPTIC pipelines will
 	# be handled in the decontamination task itself. This is a bandaid fix to avoid breaking
 	# the call cache for some previously processed data.
@@ -375,12 +371,5 @@ workflow myco {
 		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
 		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 		
-		# tree nine
-		File?        tree_nwk           = trees.tree_nwk
-		File?        tree_usher         = trees.tree_usher
-		File?        tree_taxonium      = trees.tree_taxonium
-		File?        tree_nextstrain    = trees.tree_nextstrain
-		Array[File]? trees_nextstrain   = trees.subtrees_nextstrain
-		Array[File]? distance_matrices  = trees.max_distance_matrix
 	}
 }

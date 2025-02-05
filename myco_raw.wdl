@@ -1,9 +1,11 @@
+# myco version 6.2.4-REPRO
+# This is an archived version of myco that exists solely for reproducing published results -- it is HIGHLY recommended you use a more recent version!
+# The "version 1.0" string below references the WDL syntax version
 version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.12.2/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/tree_nine/0.0.16/tree_nine.wdl" as build_treesWF
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.2.5/thiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -11,6 +13,12 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.2/goleft_funct
 
 workflow myco {
 	input {
+		# In the original 6.2.4 of this pipeline, some defaults varied from what you see here. This is because myco_raw was orignally
+		# just the CDPH version of myco_sra, and CDPH has some different standards (some of which have since changed). Because what
+		# we published was always based on on myco_sra 6.2.4's defaults, we've changed the defaults of this reproducible version of
+		# myco_raw to better match myco_sra 6.2.4's defaults.
+		#
+		# Please be aware that myco_raw currently does not support automatic downsampling, unlike myco_sra.
 		Array[Array[File]] paired_fastq_sets
 		
 		String? output_sample_name
@@ -19,32 +27,30 @@ workflow myco {
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
-		Boolean covstatsQC_skip_entirely       = false
-		Boolean decontam_use_CDC_varpipe_ref   = true
+		Boolean covstatsQC_skip_entirely       = true   # false in original version of myco_raw 6.2.4
+		Boolean decontam_use_CDC_varpipe_ref   = false  # true in original version of myco_raw 6.2.4
 		File?   mask_bedfile
-		Int     QC_max_pct_low_coverage_sites  =    20
+		Float   QC_max_pct_low_coverage_sites  =     0.20 # integer in original version of myco_raw 6.2.4, actual value was basically this
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
-		Boolean tbprofiler_on_bam              = false
-		Boolean tree_decoration                = false
-		File?   tree_to_decorate
+		Boolean tbprofiler_on_bam              = true  # false in original version of myco_raw 6.2.4
 	}
 
 	parameter_meta {
-		clean_after_decontam: "Clean fqs with fastp AFTER decontaminating. Redundant if clean_before_decontam is true."
+		clean_after_decontam: "Should we clean reads with fastp AFTER decontaminating? (Not mutually exclusive with clean_before_decontam)"
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30. Overridden by clean_before_decontam and clean_after_decontam BOTH being false."
-		clean_before_decontam: "Clean fqs with fastp BEFORE decontamination."
+		clean_before_decontam: "Should we clean reads with fastp BEFORE decontaminating? (Not mutually exclusive with clean_after_decontam)"
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
 		decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
 		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		output_sample_name: "Override all sample names with this string instead."
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as float, .5 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
@@ -52,14 +58,10 @@ workflow myco {
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
 		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
-		tree_decoration: "Should usher, taxonium, and NextStrain trees be generated?"
-		tree_to_decorate: "Base tree to use if tree_decoration = true"
 	}
 											  
 	String pass = "PASS" # used later... much later
-	
-	# flip some QC stuff around
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
@@ -265,19 +267,6 @@ workflow myco {
 			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
 		}
 	}
-
-	if(tree_decoration) {
-		if(length(real_diffs)>0) {
-			Array[File] coerced_diffs = select_all(real_diffs)
-			Array[File] coerced_reports = select_all(real_reports)
-			call build_treesWF.Tree_Nine as trees {
-				input:
-					diffs = coerced_diffs,
-					input_tree = tree_to_decorate,
-					coverage_reports = coerced_reports
-			}
-		}
-	}
 	
 	#########################################
 	# error reporting for Terra data tables #
@@ -453,14 +442,6 @@ workflow myco {
 		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
 		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
 		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
-		
-		# tree nine
-		File?        tree_nwk         = trees.tree_nwk
-		File?        tree_usher       = trees.tree_usher
-		File?        tree_taxonium    = trees.tree_taxonium
-		File?        tree_nextstrain  = trees.tree_nextstrain
-		Array[File]? trees_nextstrain = trees.subtrees_nextstrain
-		Array[File]? distance_matrix  = trees.max_distance_matrix
 		
 		# useful debugging/run information (only valid iff this ran on only one sample)
 		File qc_csv = qc_summary.tsv_or_csv

@@ -12,7 +12,7 @@ When guardrail mode is active, if any of these are true about a sample, the samp
 * Variant calling takes more 600 minutes
 * fastp determines that a less than 20% of the sample has a q score above 30, as measured before fastp cleaning and before decontam
 
-Additionally, if any input fastq is larger than 30 GB, it will be heavily downsampled.
+Additionally, if any input fastq is larger than `subsample_cutoff` GB, it will be heavily downsampled.
 
 
 ## Are there really samples out there that would fail these filters?

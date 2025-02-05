@@ -5,7 +5,6 @@ Short answer: If you are are an LHJ or anyone else who has non-SRA TB samples ly
 
 Longer answer:
 * pairs of FASTQs which have been decontaminated and merged such that each sample has precisely two FASTQs associated with it: **myco_simple** 
-  * if these are in Terra data table format, you may want to use the **wrapper_example** 
  * pairs of FASTQs which have yet to be decontaminated or merged: 
      * if each sample has its FASTQs in a single array: **myco_raw** 
      * if each sample has its forward FASTQs in one array and reverse FASTQs in another array: [Decontam_And_Combine_One_Samples_Fastqs](https://dockstore.org/workflows/github.com/aofarrel/clockwork-wdl/Decontam_And_Combine_One_Samples_Fastqs), then **myco_simple** 
@@ -15,8 +14,6 @@ Longer answer:
 
 ## When a sample is filtered out, does the entire pipeline/workflow/Terra run crash?
 On default settings, myco_raw and myco_sra will attempt to throw out bad samples silently, without causing the workflow to exit with an error. This is great for people who want to run as many samples as possible at once, because one bad sample will not cause everything else to halt. It's also useful for those who use Terra data tables, as intermediate outputs and a status code can be saved to the Terra data table, making it possible to keep some intermediate outputs and see at a glance which samples are problematic.
-
-You can set `variantcalling_crash_on_error` to true (default: false) to make the pipeline crash if any error is encountered in the variant caller. "Any error" includes the variant caller running out of memory, timing out, getting an unknown error, or (most relevant to data QC) failing to actually call enough variants due to the sample being too small/corrupt/contaminated. In other words, the variant caller task getting an error is a strong sign that the input data is of questionable quality, so you may want to crash there if you are unsure about the quality of your samples and would prefer to cut your losses early if one of them proves suspect.
 
 ## How do I know where a sample got filtered out?
 If you are using myco_raw such that each instance of myco_raw receives only one sample -- if you use Terra data tables where each row represents one sample, this means you! -- you can get info on where your sample got dropped from the status code output. See status_codes.md for more info and how to interpret status codes.
