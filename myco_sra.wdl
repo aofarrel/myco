@@ -37,10 +37,6 @@ workflow myco {
 		# shrink large samples
 		Int     subsample_cutoff        =  450
 		Int     subsample_seed          = 1965
-
-		# phylogenetics
-		Boolean tree_decoration         = false
-		File?   tree_to_decorate
 	}
 
 	parameter_meta {
