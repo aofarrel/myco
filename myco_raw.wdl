@@ -184,7 +184,7 @@ workflow myco {
 	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
 	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
 	Array[String] coerced_bam_resistances=select_all(profile_bam.sample_and_resistance)
-	Array[Int]    coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
+	Array[String] coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
 	
 	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
 	if(!(length(coerced_bam_strains) == 0)) {
@@ -216,7 +216,7 @@ workflow myco {
 		
 		# if there is only one sample, there's no need to run tasks
 		if(length(paired_fastq_sets) == 1) {
-			Int    single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
+			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
 			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
 			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 		}
