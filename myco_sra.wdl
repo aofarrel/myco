@@ -22,7 +22,7 @@ workflow myco {
 		Boolean decontam_use_CDC_varpipe_ref   = false
 		
 		# QC stuff 
-		Float   QC_max_pct_low_coverage_sites  =     0.20
+		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
 		Int     QC_min_mean_coverage           =    10
 		Int     QC_min_q30                     =    90
@@ -32,8 +32,8 @@ workflow myco {
 		Boolean guardrail_mode                 = true
 		
 		# shrink large samples
-		Int     subsample_cutoff        =  450
-		Int     subsample_seed          = 1965
+		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
+		Int     subsample_seed          = 1965  # if you're trying replicate our results, leave this untouched!
 	}
 
 	parameter_meta {
@@ -50,7 +50,7 @@ workflow myco {
 	}
 	
 	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites
+	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
