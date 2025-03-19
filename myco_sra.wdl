@@ -20,10 +20,10 @@ workflow myco {
 		Boolean clean_after_decontam           = false
 		Int     clean_average_q_score          = 29
 		Boolean clean_before_decontam          = true
-		Boolean covstatsQC_skip_entirely       = true  # false in some versions of myco_raw
-		Boolean decontam_use_CDC_varpipe_ref   = false # true in some versions of myco_raw
+		Boolean covstatsQC_skip_entirely       = true
+		Boolean decontam_use_CDC_varpipe_ref   = false
 		File?   mask_bedfile
-		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false some versions of myco_raw
+		Boolean TBProf_on_bams_not_fastqs      = true
 		
 		# QC stuff 
 		Int     QC_max_pct_low_coverage_sites  =    20
