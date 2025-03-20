@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.6/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.7/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
@@ -21,7 +21,7 @@ workflow myco {
 		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true   # changed in myco 6.4.0
-		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0
+		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0 -- # TODO: null op
 		File?   mask_bedfile
 		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =    10  # changed in myco 6.4.0

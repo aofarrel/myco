@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.7/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
@@ -13,11 +13,12 @@ workflow myco {
 	input {
 		File biosample_accessions
 
+		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true  # false in myco_raw
 		File?   mask_bedfile
 		Boolean TBProf_on_bams_not_fastqs      = true  # effectively false in myco_raw
-		Boolean decontam_use_CDC_varpipe_ref   = false
+		Boolean decontam_use_CDC_varpipe_ref   = false # TODO: null op
 		
 		# QC stuff 
 		Int     QC_max_pct_low_coverage_sites  =    20
@@ -88,7 +89,8 @@ workflow myco {
 	scatter(pulled_fastq in pulled_fastqs) {
 		call clckwrk_combonation.clean_and_decontam_and_check as fastp_decontam_check {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.12.5.2-CDC" else "ashedpotatoes/clockwork-plus:v0.12.5.1-CRyPTIC",
+				CDC_decontamination_reference = decontam_use_CDC_varpipe_ref,
+				oldschool_docker = just_like_2024,
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				fastp_clean_avg_qual = clean_average_q_score,
