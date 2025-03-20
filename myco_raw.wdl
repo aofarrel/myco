@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.6/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
@@ -18,6 +18,7 @@ workflow myco {
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
 		
+		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true   # changed in myco 6.4.0
 		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0
@@ -60,7 +61,8 @@ workflow myco {
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
-				docker_image = if decontam_use_CDC_varpipe_ref then "ashedpotatoes/clockwork-plus:v0.12.5.3-CDC" else "ashedpotatoes/clockwork-plus:v0.12.5.3-CRyPTIC",
+				CDC_decontamination_reference = decontam_use_CDC_varpipe_ref,
+				oldschool_docker = just_like_2024,
 				unsorted_sam = true,
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
