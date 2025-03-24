@@ -30,7 +30,6 @@ workflow myco {
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
-		Boolean tbprofiler_on_bam              = false
 	}
 
 	parameter_meta {
@@ -48,10 +47,10 @@ workflow myco {
 		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
-		tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
 	}
 											  
 	String pass = "PASS" # used later... much later
+	Boolean tbprofiler_on_bam              = just_like_2024
 	
 	# flip some QC stuff around
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
