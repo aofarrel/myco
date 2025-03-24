@@ -1,6 +1,6 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.7/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.8/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
@@ -94,8 +94,8 @@ workflow myco {
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				fastp_clean_avg_qual = clean_average_q_score,
-				QC_min_q30 = QC_min_q30 / 100.0,
-				preliminary_min_q30 = if guardrail_mode then 0.2 else 0.0000001,
+				QC_min_q30 = QC_min_q30,
+				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				timeout_map_reads = if guardrail_mode then 120 else 0,
 				timeout_decontam = if guardrail_mode then 300 else 0
 				# no subsample cutoff here because that happens during the pull task
@@ -108,19 +108,19 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
 			if(!(TBProf_on_bams_not_fastqs)) {
-				call tbprofilerFQ_WF.ThiagenTBProfiler as thiagenTBprofilerFQ {
+				call tbprofilerFQ_WF.ThiagenTBProfiler as theiagenTBprofilerFQ {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
 						soft_pct_mapped = QC_soft_pct_mapped,
-						soft_coverage = if guardrail_mode then false else true,
-						minimum_coverage = if guardrail_mode then 3 else 0,
+						soft_depth = if guardrail_mode then false else true,
+						minimum_depth = if guardrail_mode then 3 else 0,
 						minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
 						sample = fastp_decontam_check.sample
 				}
 			}
 
-			String tbprofiler_fq_status_or_bogus = select_first([thiagenTBprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
+			String tbprofiler_fq_status_or_bogus = select_first([theiagenTBprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
 			if(tbprofiler_fq_status_or_bogus == pass || TBProf_on_bams_not_fastqs) {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
@@ -252,9 +252,9 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	
   	# coerce optional types into required types (doesn't crash if these are null)
-	Array[String] coerced_fq_strains=select_all(thiagenTBprofilerFQ.sample_and_strain)
-	Array[String] coerced_fq_resistances=select_all(thiagenTBprofilerFQ.sample_and_resistance)
-	Array[String] coerced_fq_depths=select_all(thiagenTBprofilerFQ.sample_and_coverage)
+	Array[String] coerced_fq_strains=select_all(theiagenTBprofilerFQ.sample_and_strain)
+	Array[String] coerced_fq_resistances=select_all(theiagenTBprofilerFQ.sample_and_resistance)
+	Array[String] coerced_fq_depths=select_all(theiagenTBprofilerFQ.sample_and_depth)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -295,26 +295,26 @@ workflow myco {
 		}
 	}
 
-	Array[String] columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_reference","reads_unmapped","docker","status"]
+	Array[String] columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_TB_reference","reads_NTM","docker","status"]
 	
 	call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
 		input:
 			row_keys = fastp_decontam_check.sample,
 			column_keys = columns,
-			value1 = fastp_decontam_check.raw_pct_above_q20,
-			value2 = fastp_decontam_check.raw_pct_above_q30,
-			value3 = fastp_decontam_check.raw_total_reads,
-			value4 = fastp_decontam_check.cleaned_pct_above_q20,
-			value5 = fastp_decontam_check.cleaned_pct_above_q30,
+			value1 = fastp_decontam_check.q20_in,
+			value2 = fastp_decontam_check.q30_in,
+			value3 = fastp_decontam_check.reads_in,
+			value4 = fastp_decontam_check.q20_postclean,
+			value5 = fastp_decontam_check.q30_postclean,
 			# cleaned_total_reads purposely excluded; it's borked
-			value6 = fastp_decontam_check.dcntmd_pct_above_q20,
-			value7 = fastp_decontam_check.dcntmd_pct_above_q30,
-			value8 = fastp_decontam_check.dcntmd_total_reads,
-			value9 = fastp_decontam_check.reads_is_contam,
-			value10 = fastp_decontam_check.reads_reference,
-			value11 = fastp_decontam_check.reads_unmapped,
+			value6 = fastp_decontam_check.q20_postdecon,
+			value7 = fastp_decontam_check.q30_postdecon,
+			value8 = fastp_decontam_check.reads_postdecon_per_fastp,
+			value9 = fastp_decontam_check.reads_contam,
+			value10 = fastp_decontam_check.reads_TB,
+			value11 = fastp_decontam_check.reads_NTM,
 			value12 = fastp_decontam_check.docker_used,
-			value13 = fastp_decontam_check.errorcode
+			value13 = fastp_decontam_check.error_code
 	}
 		
 	output {
@@ -334,10 +334,10 @@ workflow myco {
 		Array[File?] diff_reports              = real_reports
 		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
 		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = thiagenTBprofilerFQ.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = thiagenTBprofilerFQ.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = thiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = thiagenTBprofilerFQ.tbprofiler_lims_report_csv
+		Array[File?] tbprof_fq_jsons           = theiagenTBprofilerFQ.tbprofiler_json
+		Array[File?] tbprof_fq_looker          = theiagenTBprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbprof_fq_laboratorian    = theiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
