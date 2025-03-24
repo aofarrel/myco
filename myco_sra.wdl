@@ -55,6 +55,7 @@ workflow myco {
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
 	String pass = "PASS" # used later... much later
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
+	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -67,7 +68,7 @@ workflow myco {
 			input:
 				biosample_accession = biosample_accession,
 				fail_on_invalid = false,
-				subsample_cutoff = subsample_cutoff,
+				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
 				subsample_seed = subsample_seed,
 				tar_outputs = false
 		} # output: pull.fastqs
@@ -320,22 +321,22 @@ workflow myco {
 		File       fastp_decont_report_tsv = fastp_decont_report.tsv
 		
 		# raw files
-		Array[File]  bais  = final_bais
-		Array[File]  bams  = final_bams
-		Array[File] diffs = real_diffs
-		Array[File] masks = real_masks   # bedgraph
-		Array[File]  vcfs  = minos_vcfs
+		Array[File]  tbd_bais  = final_bais
+		Array[File]  tbd_bams  = final_bams
+		Array[File]  tbd_diffs = real_diffs
+		Array[File]  tbd_masks = real_masks   # bedgraph
+		Array[File]  tbd_vcfs  = minos_vcfs
 		
 		# metadata
-		Array[File?] decontam_reports          = fastp_decontam_check.counts_out_tsv
-		Array[File?] covstats_reports          = covstats.covstatsOutfile
-		Array[File?] diff_reports              = real_reports
-		Array[File?] tbprof_bam_jsons          = profile_bam.tbprofiler_json
-		Array[File?] tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbprof_fq_jsons           = theiagenTBprofilerFQ.tbprofiler_json
-		Array[File?] tbprof_fq_looker          = theiagenTBprofilerFQ.tbprofiler_looker_csv
-		Array[File?] tbprof_fq_laboratorian    = theiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
-		Array[File?] tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
+		Array[File?] tbd_decontam_reports          = fastp_decontam_check.counts_out_tsv
+		Array[File?] tbd_covstats_reports          = covstats.covstatsOutfile
+		Array[File?] tbd_diff_reports              = real_reports
+		Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbd_tbprof_fq_jsons           = theiagenTBprofilerFQ.tbprofiler_json
+		Array[File?] tbd_tbprof_fq_looker          = theiagenTBprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbd_tbprof_fq_laboratorian    = theiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile

@@ -14,11 +14,12 @@ workflow myco {
 		String date_pipeline_ran
 		String? date_pipeline_previously_ran
 		
+		Boolean just_like_2024                 = false
 		String? output_sample_name
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
+		Int     subsample_cutoff               =  -1 # note inconsistency with myco_sra!!
 		
-		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true   # changed in myco 6.4.0
 		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0 -- # TODO: null op
@@ -51,6 +52,7 @@ workflow myco {
 											  
 	String pass = "PASS" # used later... much later
 	Boolean tbprofiler_on_bam              = just_like_2024
+	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
 	
 	# flip some QC stuff around
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
@@ -66,7 +68,7 @@ workflow myco {
 				fastp_clean_avg_qual = clean_average_q_score,
 				QC_min_q30 = QC_min_q30,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
-				subsample_cutoff = if guardrail_mode then 30000 else -1,
+				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0,
 				addldisk = if low_resource_mode then 10 else 100,
