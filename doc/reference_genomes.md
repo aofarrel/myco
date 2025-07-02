@@ -1,41 +1,18 @@
 # Reference genome information
-As of release 4.3.0, all Docker images used by myco now come with their own copy of the reference genome by packaging the appropriate output of clockwork refprep. Refprep is my implementation of [clockwork's reference preparation standards](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#get-and-index-reference-genomes). Prior to release 4.3.0, refprep had to run in each version of myco unless the user can use call cacheing or provided "bluepeter" inputs, which could be confusing for users, so nowadays I've packaged the outputs myself. Refprep takes about an hour total to do the following:
-1. Download TB reference files
-2. Index the decontamination reference
-3. Index the H37Rv reference
+Reference genomes are handled automatically, but there are a few things the typical user should know.
 
-This is a deterministic<sup>†</sup> subworkflow, and several WDL executors (including Terra) allow for cacheing of previous workflow outputs, so this process usually only ran once pre-4.3.0. If you are using a backend/executor that doesn't support call cacheing, you could skip this process by letting refprep run once, then inputting the following:
-* ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw
-* ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref
-* ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref
+As of release 4.3.0, all Docker images used by myco now come with their own copy of the reference genome by packaging the appropriate output of clockwork refprep. Refprep is my implementation of [clockwork's reference preparation standards](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#get-and-index-reference-genomes). For most tasks, this is just H37Rv, for the decontamination task, this also includes a decontamination reference.
 
-These files are too large for me to provide on GitHub, but here's the structure of these tars for reference:
+**Because the decontamination reference is quite large (~12 GB), it will take some time to download from Docker Hub if it's not already present on your machine. This may cause the decontamination task to look "stuck" before it starts properly executing.**
 
-### ClockworkRefPrepTB.bluepeter__tar_tb_ref_raw
-```
-Ref.download.tar
-    ├── NC_000962.1.fa
-    ├── NC_000962.2.fa
-    ├── NC_000962.3.fa
-    ├── remove_contam.fa.gz
-    └── remove_contam.tsv
-```
-### ClockworkRefPrepTB.bluepeter__tar_indexd_dcontm_ref
---> Note: Starting with v0.12.0, clockwork changed their decontamination reference and now use CHM13 instead of hg38 for human
-```
- Ref.remove_contam.tar
-  ├── ref.fa
-  ├── ref.fa.fai
-  ├── ref.fa.minimap2_idx
-  └── remove_contam_metadata.tsv
-```
-### ClockworkRefPrepTB.bluepeter__tar_indexd_H37Rv_ref
-```
- Ref.H37Rv.tar
-  ├── ref.fa
-  ├── ref.fa.fai
-  ├── ref.fa.minimap2_idx
-  └── ref.k31.ctx
-```
+## More on the decontamination reference
+The decontamination reference I use is the same one clockwork v0.12.5 uses. This is *not* the same decontamination reference CDC uses, which you can use instead by flipping `decontam_use_CDC_varpipe_ref` to true, but I do not recommended doing so unless compliance with CDC's standards is a hard requirement
 
-<sup>†</sup> If there is significant update to the TB reference that gets pulled by this script, that would change the output of refprep and the contents of the Docker images would need to be updated.
+The following Docker images contain the two decontamination reference genomes I support for this pipeline.
+* ashedpotatoes/clockwork-plus:v0.12.5.3-CRyPTIC
+    * This is the default
+    * Also contains clockwork-plus:v0.12.5
+* ashedpotatoes/clockwork-plus:v0.12.5.3-CDC
+    * Uses the same decontamination reference used by [CDC's NCHHSTP-DTBE-Varpipe-WGS workflow](https://github.com/CDCgov/NCHHSTP-DTBE-Varpipe-WGS)
+    * Functional, but missing some contigs and metadata, so not recommended unless you must strictly replicate CDC results
+    * Also contains clockwork-plus:v0.12.5

@@ -16,4 +16,4 @@ Additionally, if any input fastq is larger than 30 GB, it will be heavily downsa
 
 
 ## Are there really samples out there that would fail these filters?
-Yes. All filters implemented by Guardrail mode represent actual issues I had with SRA data. The Q30 filter is the only exception -- the verison of the pipeline that ran on SRA data did not have fastp, so that one is more of a hypothetical.
+All filters implemented by Guardrail mode represent actual issues found when running on data submitted to NCBI SRA.

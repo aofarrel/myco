@@ -1,7 +1,5 @@
 # Quality Control / Sample filtering
-Not all data is "good" data. Maybe the data is too heavily contaminated, maybe the sequencing machine had trouble with it, maybe its format is incompatiable with our downstream tools, or maybe it's actually a boar from the French countryside that somehow ended up tagged as Mycobacterium tuberculosis. These sorts of things (yes, even the boar one) can and have happened while developing this pipeline, leading to the development of several metrics to help us quickly find and filter out bad data without crashing the entire pipeline. This pipeline was developed further with input from CDPH, who wish to implement QC standards similar to those of the CDC.
-
-Beause there is so much QC going on in this pipeline, it can be helpful to divide each QC step into two catagories:
+Because there is so much QC going on in this pipeline, it can be helpful to divide each QC step into two catagories:
 * Site-specific QC: Forms of QC that will remove particular **parts** of a sample. 
 * Sample QC: Forms of QC that will remove **an entire sample** from the downstream analysis.
 

@@ -1,5 +1,4 @@
-
-## implemented
+## QC CSV Fields
 sample
     Sample ID
 genome_pct_coverage
@@ -15,16 +14,6 @@ reads_is_contam
 reads_reference
     Reads considered mapping to reference by the decontaminator
 reads_unmapped
-    Reads considered unmapped by the decontaminator
+    Reads considered unmapped by the decontaminator (NOT the variant caller!)
 status
     The status of this sample
-
-## ideas
-warnings
-    Non-fatal warnings for this sample
-out_pct_pass_fastp
-    Percent of reads that pass fastp's filters
-coverage_cutoff
-    Coverage below this is considered "low coverage" wrt in_pct_low_cov
-in_pct_low_cov
-    Percent of sites (CHECK!!) determined with coverage below coverage_cutoff; these sites get masked when creating diff files
