@@ -1,5 +1,5 @@
 ### A quick introduction to input variables in WDL
-There are two kinds of input user-accessible variables in WDL: Workflow-level inputs and task-level inputs. If you are using Terra, you probably don't need to know anything about the difference between them except that task-level inputs get alphabetically sorted in Terra's UI below workflow-level inputs. 
+There are two kinds of user-accessible input variables in WDL: Workflow-level inputs and task-level inputs. If you are using Terra, you probably don't need to know anything about the difference between them except that task-level inputs get alphabetically sorted in Terra's UI below workflow-level inputs. 
 
 This pipeline uses a lot of external tools, and I tend to WDLize every possible input variable, so there are a lot of input variables in this pipeline. **The vast majority of them are optional.** What's most important is your fastqs.
 
