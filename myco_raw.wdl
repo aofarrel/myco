@@ -8,22 +8,20 @@ import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
 
-/*
- * Copyright (C) 2025 Ash O'Farrell
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+# Copyright (C) 2025 Ash O'Farrell
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 workflow myco {
 	input {
@@ -136,9 +134,9 @@ workflow myco {
 	
 	scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) {
 	# scatter(vcfs_and_bams in zip(bam_per_bai, minos_vcfs)) is now sort of a three-way scatter:
-	# * bam file accessible via vcfs_and_bams.left[0]
-	# * bai file accessible via vcfs_and_bams.left[1]
-	# * vcf file accessible via vcfs_and_bams.right
+	# bam file accessible via vcfs_and_bams.left[0]
+	# bai file accessible via vcfs_and_bams.left[1]
+	# vcf file accessible via vcfs_and_bams.right
 	
 	# This relies on your WDL executor being consistent with how it orders arrays. That SHOULD always be the case per
 	# the spec, but if things break catastrophically, let me save you some debug time: As of 2.9.2, clockwork-wdl's
