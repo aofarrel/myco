@@ -92,13 +92,21 @@ workflow myco {
 
 		if(defined(decontam_each_sample.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
-			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
-			# Originally I wanted to set the second element to something that isn't valid in hopes that may help catch 
-			# otherwise silent errors should the behavior of Cromwell changes in the future with regard to defined()...
-			# But it seems all members of a select_first() array are evaulated and checked for "is this valid" even if
-			# the first (0 index) member of the select_first() array is defined (eg, is selected).
-			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, paired_fastqs[0]])
-			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, paired_fastqs[0]])
+			# select_first() where the first element is the File? we know must exist, and the second element never gets used.
+			#
+			# But what happens if Cromwell changes the behavior of defined() and select_first() so that an undefined File?
+			# triggers defined() but not select_first()? This should never happen but given inconsistent handling of optional
+			# types in Cromwell over the years, it is worth accounting for.
+			#
+			# We can't make the second element of the select_first() array completely bogus, because for some reason, all members
+			# of select_first() are checked for "is this even remotely valid" even if the first (0 index) member of the
+			# select_first() array is defined (eg, is selected). In other words this isn't like a boolean or where you can
+			# make the second value some nonsense. (In other words WDL doesn't do short-circuit evaulation for select_first().)
+			#
+			# So we need something "valid" but still wrong enough to throw an error. The easiest way to do this is to use
+			# counts_out_tsv, a File? that is absolutely not going to be valid for tbprofilerFQ.
+			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.arg_counts_out])
+			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, decontam_each_sample.arg_counts_out])
     		
 			call tbprofilerFQ_WF.ThiagenTBProfiler as tbprofilerFQ {
 				input:
@@ -427,7 +435,7 @@ workflow myco {
 		# covstats
 		Float? tbd_qc_pct_unmapped_covstats = percentUnmapped
 		
-		# intermediate files
+		# genomic data files
 		Array[File]  tbd_bais  = final_bais
 		Array[File]  tbd_bams  = final_bams
 		Array[File]  tbd_diffs = real_diffs
