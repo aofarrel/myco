@@ -27,7 +27,8 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 
 workflow myco {
 	input {
-		File biosample_accessions
+		File? biosample_accessions
+		Array[String]? biosample_accessions_as_array
 
 		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
@@ -51,7 +52,9 @@ workflow myco {
 	}
 
 	parameter_meta {
-		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
+		# You MUST provide one of these
+		biosample_accessions: "File of BioSample accessions to pull, one accession per line (will be ignored if biosample_accessions_as_array also defined)"
+		biosample_accessions_as_array: "String array of BioSample accessions to pull (designed for Terra data tables)"
 
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
@@ -73,8 +76,9 @@ workflow myco {
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
 
-	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
+	call sranwrp_processing.extract_accessions_from_file_or_string as get_sample_IDs {
 		input:
+			accessions_array = biosample_accessions_as_array,
 			accessions_file = biosample_accessions,
 			filter_na = true
 	}
