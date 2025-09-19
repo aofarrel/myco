@@ -183,7 +183,7 @@ workflow myco {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
-					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
+					call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
@@ -198,7 +198,7 @@ workflow myco {
 		if(covstatsQC_skip_entirely) {
 		
 			# make diff files
-			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
+			call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_no_covstats {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
@@ -221,6 +221,8 @@ workflow myco {
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
+	Array[String] real_metadata_fields = flatten([select_all(make_mask_and_diff_after_covstats.metadata_fields), select_all(make_mask_and_diff_no_covstats.metadata_fields)])
+	Array[String] real_metadata_values = flatten([select_all(make_mask_and_diff_after_covstats.metadata_values), select_all(make_mask_and_diff_no_covstats.metadata_values)])
 
 	# pull TBProfiler information, if we ran TBProfiler on bams
 	
@@ -357,6 +359,9 @@ workflow myco {
 		Array[File?] tbd_tbprof_fq_looker          = theiagenTBprofilerFQ.tbprofiler_looker_csv
 		Array[File?] tbd_tbprof_fq_laboratorian    = theiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
 		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
+		
+		Array[String?] metadata_fields = real_metadata_fields
+		Array[String?] metadata_values = real_metadata_values
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
