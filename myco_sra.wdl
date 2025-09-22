@@ -49,6 +49,16 @@ workflow myco {
 		# shrink large samples
 		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
 		Int     subsample_seed          = 1965  # if you're trying replicate our results, leave this untouched!
+
+		# metadata
+		String? a_key
+		String? a_value
+		String? b_key
+		String? b_value
+		String? c_key
+		String? c_value
+		String? d_key
+		String? d_value
 	}
 
 	parameter_meta {
@@ -204,7 +214,15 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = QC_this_is_low_coverage,
 					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
+					a_key = a_key,
+					a_value = a_value,
+					b_key = b_key,
+					b_value = b_value,
+					c_key = c_key,
+					c_value = c_value,
+					d_key = d_key,
+					d_value = d_value
 			}
 		}
 		
