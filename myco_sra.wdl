@@ -57,8 +57,6 @@ workflow myco {
 		String? b_value
 		String? c_key
 		String? c_value
-		String? d_key
-		String? d_value
 	}
 
 	parameter_meta {
@@ -174,12 +172,14 @@ workflow myco {
 	# * bam file accessible via vcfs_and_bams.left[0]
 	# * bai file accessible via vcfs_and_bams.left[1]
 	# * vcf file accessible via vcfs_and_bams.right
-	
+	#
 	# This relies on your WDL executor being consistent with how it orders arrays. That SHOULD always be the case per
 	# the spec, but if things break catastrophically, let me save you some debug time: As of 2.9.2, clockwork-wdl's
 	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
+
+		# If NOT skip covstats QC, run it, and if passing, make diff files
 		if(!covstatsQC_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
@@ -205,6 +205,8 @@ workflow myco {
 			}
 		}
 		
+		# WDL does not have a concept of mutual exclusivity, so we have to handle the skip covstats QC situation
+		# like this (giving it a different task name)
 		if(covstatsQC_skip_entirely) {
 		
 			# make diff files
@@ -221,8 +223,10 @@ workflow myco {
 					b_value = b_value,
 					c_key = c_key,
 					c_value = c_value,
-					d_key = d_key,
-					d_value = d_value
+					d_key = "tbprof_resistance",
+					d_value = select_first([theiagenTBprofilerFQ.resistance, "UNDEFINED"]),
+					e_key = "tbprof_pct_reads_mapped",
+					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped, "UNDEFINED"])
 			}
 		}
 		
