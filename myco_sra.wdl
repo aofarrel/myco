@@ -224,9 +224,9 @@ workflow myco {
 					c_key = c_key,
 					c_value = c_value,
 					d_key = "tbprof_resistance",
-					d_value = select_first([theiagenTBprofilerFQ.resistance, "UNDEFINED"]),
+					d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
 					e_key = "tbprof_pct_reads_mapped",
-					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped, "UNDEFINED"])
+					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"])
 			}
 		}
 		
