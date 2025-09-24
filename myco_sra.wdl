@@ -3,8 +3,8 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.8/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/main/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/process-metadata/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
@@ -27,11 +27,7 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 
 workflow myco {
 	input {
-
-		# Terra users -- these will unfortunately not sort to the top anymore, you may need to
-		# search to find these options on Terra's workflow submission UI
-		File? biosample_accessions
-		Array[String]? biosample_accessions_as_array
+		File biosample_accessions
 
 		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
@@ -52,20 +48,10 @@ workflow myco {
 		# shrink large samples
 		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
 		Int     subsample_seed          = 1965  # if you're trying replicate our results, leave this untouched!
-
-		# metadata
-		String? a_key
-		String? a_value
-		String? b_key
-		String? b_value
-		String? c_key
-		String? c_value
 	}
 
 	parameter_meta {
-		# You MUST provide one of these
-		biosample_accessions: "File of BioSample accessions to pull, one accession per line (will be ignored if biosample_accessions_as_array also defined)"
-		biosample_accessions_as_array: "String array of BioSample accessions to pull (designed for Terra data tables)"
+		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
@@ -87,9 +73,8 @@ workflow myco {
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
 
-	call sranwrp_processing.extract_accessions_from_file_or_string as get_sample_IDs {
+	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
-			accessions_array = biosample_accessions_as_array,
 			accessions_file = biosample_accessions,
 			filter_na = true
 	}
@@ -175,14 +160,12 @@ workflow myco {
 	# * bam file accessible via vcfs_and_bams.left[0]
 	# * bai file accessible via vcfs_and_bams.left[1]
 	# * vcf file accessible via vcfs_and_bams.right
-	#
+	
 	# This relies on your WDL executor being consistent with how it orders arrays. That SHOULD always be the case per
 	# the spec, but if things break catastrophically, let me save you some debug time: As of 2.9.2, clockwork-wdl's
 	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
-
-		# If NOT skip covstats QC, run it, and if passing, make diff files
 		if(!covstatsQC_skip_entirely) {
 	
 			# covstats to check coverage and percent mapped to reference
@@ -196,7 +179,7 @@ workflow myco {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
-					call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_after_covstats {
+					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
@@ -208,28 +191,16 @@ workflow myco {
 			}
 		}
 		
-		# WDL does not have a concept of mutual exclusivity, so we have to handle the skip covstats QC situation
-		# like this (giving it a different task name)
 		if(covstatsQC_skip_entirely) {
 		
 			# make diff files
-			call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_no_covstats {
+			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = QC_this_is_low_coverage,
 					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
-					a_key = a_key,
-					a_value = a_value,
-					b_key = b_key,
-					b_value = b_value,
-					c_key = c_key,
-					c_value = c_value,
-					d_key = "tbprof_resistance",
-					d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
-					e_key = "tbprof_pct_reads_mapped",
-					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"])
+					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 			}
 		}
 		
@@ -242,12 +213,10 @@ workflow myco {
 		}
 	}
 
-
+	# even though diffs and reports are technically optional outputs, this does work, and will avoid nulls in the final output
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
-	Array[String] real_metadata_fields = flatten([select_all(make_mask_and_diff_after_covstats.metadata_fields), select_all(make_mask_and_diff_no_covstats.metadata_fields)])
-	Array[String] real_metadata_values = flatten([select_all(make_mask_and_diff_after_covstats.metadata_values), select_all(make_mask_and_diff_no_covstats.metadata_values)])
 
 	#########################################
 	#      TBProfiler metadata handling     #
@@ -271,15 +240,15 @@ workflow myco {
 	# ---> If we are running on multiple samples it is worth our time concatenating a bunch of lists into one
 	#      metadata file. If we are running on just one sample this is not worth the compute cost/time.
 	
-	# 1. Coerce bam-flavored TBProfiler into required types
+	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
 	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
 	Array[String] coerced_bam_resistances=select_all(profile_bam.sample_and_resistance)
 	Array[String] coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
 	
-	# 2. Determine if we ran TBProfiler on bams, without relying on defined()
+	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
 	if(!(length(coerced_bam_strains) == 0)) {
 	
-		# 3. Determine if we are running on one sample or multiple samples
+		# if there is more than one sample, run some tasks to concatenate the outputs
 		if(length(pulled_fastqs) != 1) {
 			Array[String] bam_strains_with_header = flatten([["sample\tsublineage"], coerced_bam_strains])
 			Array[String] bam_resista_with_header = flatten([["sample\tresistance"], coerced_bam_resistances])
@@ -314,16 +283,18 @@ workflow myco {
 			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 		}
 	}
-  	  	
-  	# 1. Coerce FQ-flavored TBProfiler into required types
+  	
+  	# pull TBProfiler information, if we ran TBProfiler on fastqs
+  	
+  	# coerce optional types into required types (doesn't crash if these are null)
 	Array[String] coerced_fq_strains=select_all(theiagenTBprofilerFQ.sample_and_strain)
 	Array[String] coerced_fq_resistances=select_all(theiagenTBprofilerFQ.sample_and_resistance)
 	Array[String] coerced_fq_depths=select_all(theiagenTBprofilerFQ.sample_and_depth)
 	
-	# 2. Determine if we ran TBProfiler on bams, without relying on defined()
+	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
 	
-		# 3. Determine if we are running on one sample or multiple samples
+		# if there is more than one sample, run some tasks to concatenate the outputs
 		if(length(pulled_fastqs) != 1) {
 			Array[String] fq_strains_with_header = flatten([["sample\tsublineage"], coerced_fq_strains])
 			Array[String] fq_resista_with_header = flatten([["sample\tresistance"], coerced_fq_resistances])
@@ -402,9 +373,6 @@ workflow myco {
 		Array[File?] tbd_tbprof_fq_looker          = theiagenTBprofilerFQ.tbprofiler_looker_csv
 		Array[File?] tbd_tbprof_fq_laboratorian    = theiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
 		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
-		
-		Array[String?] metadata_fields = real_metadata_fields
-		Array[String?] metadata_values = real_metadata_values
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
