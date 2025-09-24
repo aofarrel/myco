@@ -47,6 +47,7 @@ workflow myco {
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
 		Boolean guardrail_mode                 = true
+		Boolean generate_download_report_file  = true
 		
 		# shrink large samples
 		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
@@ -99,11 +100,15 @@ workflow myco {
   		}
 	}
 
-	call sranwrp_processing.cat_strings as merge_reports {
-		input:
-			strings = pull.results,
-			out = "pull_reports.txt",
-			disk_size = quick_tasks_disk_size
+	# This one doesn't check length of pulled fastqs because by definition that might be less than
+	# we expect! This is why it's a user toggle instead.
+	if(generate_download_report_file) {
+		call sranwrp_processing.cat_strings as merge_reports {
+			input:
+				strings = pull.results,
+				out = "pull_reports.txt",
+				disk_size = quick_tasks_disk_size
+		}
 	}
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
@@ -318,29 +323,32 @@ workflow myco {
 
 	Array[String] columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_TB_reference","reads_NTM","docker","status"]
 	
-	call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
-		input:
-			row_keys = fastp_decontam_check.sample,
-			column_keys = columns,
-			value1 = fastp_decontam_check.q20_in,
-			value2 = fastp_decontam_check.q30_in,
-			value3 = fastp_decontam_check.reads_in,
-			value4 = fastp_decontam_check.q20_postclean,
-			value5 = fastp_decontam_check.q30_postclean,
-			# cleaned_total_reads purposely excluded; it's borked
-			value6 = fastp_decontam_check.q20_postdecon,
-			value7 = fastp_decontam_check.q30_postdecon,
-			value8 = fastp_decontam_check.reads_postdecon_per_fastp,
-			value9 = fastp_decontam_check.reads_contam,
-			value10 = fastp_decontam_check.reads_TB,
-			value11 = fastp_decontam_check.reads_NTM,
-			value12 = fastp_decontam_check.docker_used,
-			value13 = fastp_decontam_check.error_code
+	if(length(pulled_fastqs) != 1) {
+		call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
+			input:
+				row_keys = fastp_decontam_check.sample,
+				column_keys = columns,
+				value1 = fastp_decontam_check.q20_in,
+				value2 = fastp_decontam_check.q30_in,
+				value3 = fastp_decontam_check.reads_in,
+				value4 = fastp_decontam_check.q20_postclean,
+				value5 = fastp_decontam_check.q30_postclean,
+				# cleaned_total_reads purposely excluded; it's borked
+				value6 = fastp_decontam_check.q20_postdecon,
+				value7 = fastp_decontam_check.q30_postdecon,
+				value8 = fastp_decontam_check.reads_postdecon_per_fastp,
+				value9 = fastp_decontam_check.reads_contam,
+				value10 = fastp_decontam_check.reads_TB,
+				value11 = fastp_decontam_check.reads_NTM,
+				value12 = fastp_decontam_check.docker_used,
+				value13 = fastp_decontam_check.error_code
+		}
 	}
 		
 	output {
-		File       download_report         = merge_reports.outfile
-		File       fastp_decont_report_tsv = fastp_decont_report.tsv
+		String      tbd_first_download_status   = pull.results[0]
+		File?       tbd_download_report         = merge_reports.outfile
+		File?       tbd_fastp_decont_report_tsv = fastp_decont_report.tsv
 		
 		# raw files
 		Array[File]  tbd_bais  = final_bais
