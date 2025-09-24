@@ -27,6 +27,8 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 
 workflow myco {
 	input {
+		# Terra users -- these will unfortunately not sort to the top anymore, you may need to
+		# search to find these options on Terra's workflow submission UI
 		File? biosample_accessions
 		Array[String]? biosample_accessions_as_array
 
