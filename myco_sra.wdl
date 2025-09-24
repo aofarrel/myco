@@ -242,24 +242,44 @@ workflow myco {
 		}
 	}
 
-	# even though diffs and reports are technically optional outputs, this does work, and will avoid nulls in the final output
+
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
 	Array[String] real_metadata_fields = flatten([select_all(make_mask_and_diff_after_covstats.metadata_fields), select_all(make_mask_and_diff_no_covstats.metadata_fields)])
 	Array[String] real_metadata_values = flatten([select_all(make_mask_and_diff_after_covstats.metadata_values), select_all(make_mask_and_diff_no_covstats.metadata_values)])
 
-	# pull TBProfiler information, if we ran TBProfiler on bams
+	#########################################
+	#      TBProfiler metadata handling     #
+	#########################################
+	# This next section follows this line of logic:
+	# 1. Coerce TBProfiler's optional outputs into required types
+	# ---> This prevents certain WDL crashes and, somehow, doesn't crash even if the files don't exist
+	#      at runtime.
+	# 2. Determine if we ran TBProfiler on bams/FQs
+	# ---> Ideally we would know if TBProfiler ran on bams (which as a task is called profile_bam) by checking
+	#      if one of the outputs of profile_bam is defined(). However, for some bloody reason (see my comments
+	#      elsewhere about "SOTHWO", even if profile_bam didn't run, defined(profile_bam.strain) is always true!
+	#      This seems to be a result of Cromwell creating empty arrays for all possible outputs within a scatter(),
+	#      so the array itself is defined, it just has no values. Now, WHY Cromwell would premake empty arrays for
+	#      tasks that will never run is beyond me... but it does (at least it did in 2023; even if this behavior has
+	#      since changed that would mean I couldn't rely upon defined() not chaging b/n versions.)
+	# ---> As a workaround, we check if the metadata we coerced in #1 is an array of a non-zero length.
+	# ---> Can't we just check if length(profile_bam.sample_and_strain), ie the non-coerced version, has a non-zero
+	#      length? Maybe. IIRC there is a miniwdl/Cromwell inconsistency so don't do that unless something breaks.
+	# 3. Determine if we are running on one sample or multiple samples
+	# ---> If we are running on multiple samples it is worth our time concatenating a bunch of lists into one
+	#      metadata file. If we are running on just one sample this is not worth the compute cost/time.
 	
-	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
+	# 1. Coerce bam-flavored TBProfiler into required types
 	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
 	Array[String] coerced_bam_resistances=select_all(profile_bam.sample_and_resistance)
 	Array[String] coerced_bam_depths=select_all(profile_bam.sample_and_median_depth)
 	
-	# workaround for "defined(profile_bam.strain) is always true even if profile_bam didn't run" part of SOTHWO
+	# 2. Determine if we ran TBProfiler on bams, without relying on defined()
 	if(!(length(coerced_bam_strains) == 0)) {
 	
-		# if there is more than one sample, run some tasks to concatenate the outputs
+		# 3. Determine if we are running on one sample or multiple samples
 		if(length(pulled_fastqs) != 1) {
 			Array[String] bam_strains_with_header = flatten([["sample\tsublineage"], coerced_bam_strains])
 			Array[String] bam_resista_with_header = flatten([["sample\tresistance"], coerced_bam_resistances])
@@ -294,18 +314,16 @@ workflow myco {
 			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
 		}
 	}
-  	
-  	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	
-  	# coerce optional types into required types (doesn't crash if these are null)
+  	  	
+  	# 1. Coerce FQ-flavored TBProfiler into required types
 	Array[String] coerced_fq_strains=select_all(theiagenTBprofilerFQ.sample_and_strain)
 	Array[String] coerced_fq_resistances=select_all(theiagenTBprofilerFQ.sample_and_resistance)
 	Array[String] coerced_fq_depths=select_all(theiagenTBprofilerFQ.sample_and_depth)
 	
-	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
+	# 2. Determine if we ran TBProfiler on bams, without relying on defined()
 	if(!(length(coerced_fq_strains) == 0)) {
 	
-		# if there is more than one sample, run some tasks to concatenate the outputs
+		# 3. Determine if we are running on one sample or multiple samples
 		if(length(pulled_fastqs) != 1) {
 			Array[String] fq_strains_with_header = flatten([["sample\tsublineage"], coerced_fq_strains])
 			Array[String] fq_resista_with_header = flatten([["sample\tresistance"], coerced_fq_resistances])
