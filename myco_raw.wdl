@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.8/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/process-metadata/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
@@ -46,6 +46,13 @@ workflow myco {
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
+
+		String?  metadata_field_a
+		String?  metadata_value_a
+		String?  metadata_field_b
+		String?  metadata_value_b
+		String?  metadata_field_c
+		String?  metadata_value_c
 	}
 
 	parameter_meta {
@@ -107,8 +114,8 @@ workflow myco {
 			# counts_out_tsv, a File? that is absolutely not going to be valid for tbprofilerFQ. This means Cromwell changing
 			# behavior will still bug out, but it will bug out in a way that is immediately detectable.
 			#
-			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.arg_counts_out])
-			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, decontam_each_sample.arg_counts_out])
+			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.counts_out_tsv])
+			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, decontam_each_sample.counts_out_tsv])
     		
 			call tbprofilerFQ_WF.ThiagenTBProfiler as theiagenTBprofilerFQ {
 				input:
@@ -166,13 +173,23 @@ workflow myco {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
-					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
+					call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = QC_this_is_low_coverage,
 							tbmf = mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
+							a_key = metadata_field_a,
+							a_value = metadata_value_a,
+							b_key = metadata_field_b,
+							b_value = metadata_value_b,
+							c_key = metadata_field_c,
+							c_value = metadata_value_c,
+							d_key = "tbprof_resistance",
+							d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
+							e_key = "tbprof_pct_reads_mapped",
+							e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]) # yes, this is StringCoercion but should be acceptable
 					}
 				}
 			}
@@ -181,13 +198,23 @@ workflow myco {
 		if(covstatsQC_skip_entirely) {
 		
 			# make diff files
-			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
+			call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_no_covstats {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = QC_this_is_low_coverage,
 					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
+					a_key = metadata_field_a,
+					a_value = metadata_value_a,
+					b_key = metadata_field_b,
+					b_value = metadata_value_b,
+					c_key = metadata_field_c,
+					c_value = metadata_value_c,
+					d_key = "tbprof_resistance",
+					d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
+					e_key = "tbprof_pct_reads_mapped",
+					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]) # yes, this is StringCoercion but should be acceptable
 			}
 		}
 		
@@ -204,6 +231,8 @@ workflow myco {
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
+	Array[String] real_metadata_fields = flatten([select_all(make_mask_and_diff_after_covstats.metadata_fields), select_all(make_mask_and_diff_no_covstats.metadata_fields)])
+	Array[String] real_metadata_values = flatten([select_all(make_mask_and_diff_after_covstats.metadata_values), select_all(make_mask_and_diff_no_covstats.metadata_values)])
 
 
 	#########################################
@@ -228,6 +257,8 @@ workflow myco {
 	# ---> If we are running on multiple samples it is worth our time concatenating a bunch of lists into one
 	#      metadata file. If we are running on just one sample this is not worth the compute cost/time.
 
+	# NOTE -- currently none of the bam-flavored TBProfiler is a workflow-level out, but I'm leaving this section here
+	# in case someone wants to use bam-flavored TBProfiler in the future
 
 	# 1. Coerce bam-flavored TBProfiler into required types
 	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
@@ -240,21 +271,21 @@ workflow myco {
 		# 3. Determine if we are running on one sample or multiple samples
 		if(length(paired_fastq_sets) != 1) {
 	
-			call sranwrp_processing.cat_strings as collate_bam_strains {
+			call sranwrp_processing.cat_strings as collate_bam_strains {      #!UnusedCall
 				input:
 					strings = coerced_bam_strains,
 					out = "strain_reports.txt",
 					disk_size = quick_tasks_disk_size
 			}
 			
-			call sranwrp_processing.cat_strings as collate_bam_resistance {
+			call sranwrp_processing.cat_strings as collate_bam_resistance {   #!UnusedCall
 				input:
 					strings = coerced_bam_resistances,
 					out = "resistance_reports.txt",
 					disk_size = quick_tasks_disk_size
 			}
 	
-			call sranwrp_processing.cat_strings as collate_bam_depth {
+			call sranwrp_processing.cat_strings as collate_bam_depth {        #!UnusedCall
 				input:
 					strings = coerced_bam_depths,
 					out = "depth_reports.txt",
@@ -263,10 +294,11 @@ workflow myco {
 		}
 		
 		# if there is only one sample, there's no need to run tasks
+		# currently not output and unusued, but I'm leaving them here in case someone needs it later
 		if(length(paired_fastq_sets) == 1) {
-			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
-			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
-			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]      #!UnusedDeclaration
+			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0] #!UnusedDeclaration
+			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]     #!UnusedDeclaration
 		}
 	}
   	  	
@@ -453,6 +485,11 @@ workflow myco {
 		Int?    tbd_n_other_variants = theiagenTBprofilerFQ.n_other_variants[0]
 		String? tbd_resistance = theiagenTBprofilerFQ.resistance[0]
 		String? tbd_strain_per_tbprof = theiagenTBprofilerFQ.strain[0]
+
+		# In a single sample case, these should only exist if the sample is passing (due to Cromwell
+		# nonsense they may exist in failing samples too, but as empty arrays)
+		Array[String?] metadata_fields = real_metadata_fields
+		Array[String?] metadata_values = real_metadata_values
 		
 		# genomic data files
 		Array[File]  tbd_bais  = final_bais
