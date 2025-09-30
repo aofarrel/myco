@@ -184,12 +184,14 @@ workflow myco {
 							a_value = metadata_value_a,
 							b_key = metadata_field_b,
 							b_value = metadata_value_b,
-							c_key = "tbprof_mean_depth",
-							c_value = select_first([theiagenTBprofilerFQ.avg_depth[0], "UNDEFINED"]),
+							c_key = metadata_field_c,
+							c_value = metadata_value_c,
 							d_key = "tbprof_resistance",
 							d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
 							e_key = "tbprof_pct_reads_mapped",
-							e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]) # yes, this is StringCoercion but should be acceptable
+							e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]), # yes, this is StringCoercion but should be acceptable
+							f_key = "tbprof_mean_depth",
+							f_value = select_first([theiagenTBprofilerFQ.avg_depth[0], "UNDEFINED"])
 					}
 				}
 			}
@@ -209,12 +211,14 @@ workflow myco {
 					a_value = metadata_value_a,
 					b_key = metadata_field_b,
 					b_value = metadata_value_b,
-					c_key = "tbprof_mean_depth",
-					c_value = select_first([theiagenTBprofilerFQ.avg_depth[0], "UNDEFINED"]),
+					c_key = metadata_field_c,
+					c_value = metadata_value_c,
 					d_key = "tbprof_resistance",
 					d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
 					e_key = "tbprof_pct_reads_mapped",
-					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]) # yes, this is StringCoercion but should be acceptable
+					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]), # yes, this is StringCoercion but should be acceptable
+					f_key = "tbprof_mean_depth",
+					f_value = select_first([theiagenTBprofilerFQ.avg_depth[0], "UNDEFINED"])
 			}
 		}
 		
@@ -231,8 +235,12 @@ workflow myco {
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
-	Array[String] real_metadata_fields = flatten([select_all(make_mask_and_diff_after_covstats.metadata_fields), select_all(make_mask_and_diff_no_covstats.metadata_fields)])
-	Array[String] real_metadata_values = flatten([select_all(make_mask_and_diff_after_covstats.metadata_values), select_all(make_mask_and_diff_no_covstats.metadata_values)])
+	Array[String] real_metadata_header_tsv = flatten([select_all(make_mask_and_diff_after_covstats.meta_header_tsv), select_all(make_mask_and_diff_no_covstats.meta_header_tsv)])
+	Array[String] real_metadata_header_csv = flatten([select_all(make_mask_and_diff_after_covstats.meta_header_csv), select_all(make_mask_and_diff_no_covstats.meta_header_csv)])
+	Array[String] real_metadata_values_tsv = flatten([select_all(make_mask_and_diff_after_covstats.meta_values_tsv), select_all(make_mask_and_diff_no_covstats.meta_values_tsv)])
+	Array[String] real_metadata_values_csv = flatten([select_all(make_mask_and_diff_after_covstats.meta_values_csv), select_all(make_mask_and_diff_no_covstats.meta_values_csv)])
+	Array[String] real_metadata_full_tsv = flatten([select_all(make_mask_and_diff_after_covstats.meta_full_tsv), select_all(make_mask_and_diff_no_covstats.meta_full_tsv)])
+	Array[String] real_metadata_full_csv = flatten([select_all(make_mask_and_diff_after_covstats.meta_full_csv), select_all(make_mask_and_diff_no_covstats.meta_full_csv)])
 
 
 	#########################################
@@ -476,7 +484,7 @@ workflow myco {
 		Float tbd_qc_duplication_rate = decontam_each_sample.duplication_rate[0]
 		Int tbd_qc_reads_adapter_trimmed = decontam_each_sample.reads_adapter_trimmed[0]
 		
-		# theiagen!TBProfiler metadata pulled out directly
+		# theiagen!TBProfiler metadata pulled out directly, only valid if single sample
 		Float? tbd_qc_median_depth_per_tbprof = theiagenTBprofilerFQ.median_depth[0]
 		Float? tbd_qc_avg_depth_per_tbprof = theiagenTBprofilerFQ.avg_depth[0]
 		Float? tbd_qc_pct_mapped_per_tbprof = theiagenTBprofilerFQ.pct_reads_mapped[0]
@@ -486,10 +494,11 @@ workflow myco {
 		String? tbd_resistance = theiagenTBprofilerFQ.resistance[0]
 		String? tbd_strain_per_tbprof = theiagenTBprofilerFQ.strain[0]
 
-		# In a single sample case, these should only exist if the sample is passing (due to Cromwell
-		# nonsense they may exist in failing samples too, but as empty arrays)
-		Array[String?] metadata_fields = real_metadata_fields
-		Array[String?] metadata_values = real_metadata_values
+		# various options for metadata, including single-sample options
+		Array[String?] tbd_metadata_tsvs = real_metadata_full_tsv
+		Array[String?] tbd_metadata_csvs = real_metadata_full_csv
+		String? tbd_metadata_tsv = real_metadata_full_tsv[0]
+		String? tbd_metadata_csv = real_metadata_full_csv[0]
 		
 		# genomic data files
 		Array[File]  tbd_bais  = final_bais
@@ -513,8 +522,10 @@ workflow myco {
 		#Float? tbd_qc_pct_unmapped_covstats        = percentUnmapped
 
 		# useful debugging/run information (only valid iff this ran on only one sample)
-		String tbd_clockwork_docker       = decontam_each_sample.docker_used[0]
-		#Array[String] pass_or_warnings = if (length(warnings) > 0) then warnings else ["PASS"]
+		String tbd_clockwork_docker      = decontam_each_sample.docker_used[0]
+		#String tbd_resistance_coerced    = single_sample_tbprof_fq_resistance
+		#String tbd_strain_coerced        = single_sample_tbprof_fq_strain
+		#Array[String] pass_or_warnings  = if (length(warnings) > 0) then warnings else ["PASS"] # might not work properly
 		#String? tbd_debug_decontam_ERR  = decontam_ERR
 		#String? tbd_debug_earlyQC_ERR   = earlyQC_ERR
 		#String? tbd_debug_varcall_ERR   = varcall_ERR
