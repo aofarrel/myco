@@ -218,7 +218,27 @@ workflow myco {
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
 
-	# pull TBProfiler information, if we ran TBProfiler on bams
+	#########################################
+	#      TBProfiler metadata handling     #
+	#########################################
+	# This next section follows this line of logic:
+	# 1. Coerce TBProfiler's optional outputs into required types
+	# ---> This prevents certain WDL crashes and, somehow, doesn't crash even if the files don't exist
+	#      at runtime.
+	# 2. Determine if we ran TBProfiler on bams/FQs
+	# ---> Ideally we would know if TBProfiler ran on bams (which as a task is called profile_bam) by checking
+	#      if one of the outputs of profile_bam is defined(). However, for some bloody reason (see my comments
+	#      elsewhere about "SOTHWO", even if profile_bam didn't run, defined(profile_bam.strain) is always true!
+	#      This seems to be a result of Cromwell creating empty arrays for all possible outputs within a scatter(),
+	#      so the array itself is defined, it just has no values. Now, WHY Cromwell would premake empty arrays for
+	#      tasks that will never run is beyond me... but it does (at least it did in 2023; even if this behavior has
+	#      since changed that would mean I couldn't rely upon defined() not chaging b/n versions.)
+	# ---> As a workaround, we check if the metadata we coerced in #1 is an array of a non-zero length.
+	# ---> Can't we just check if length(profile_bam.sample_and_strain), ie the non-coerced version, has a non-zero
+	#      length? Maybe. IIRC there is a miniwdl/Cromwell inconsistency so don't do that unless something breaks.
+	# 3. Determine if we are running on one sample or multiple samples
+	# ---> If we are running on multiple samples it is worth our time concatenating a bunch of lists into one
+	#      metadata file. If we are running on just one sample this is not worth the compute cost/time.
 	
 	# coerce optional types into required types (doesn't crash even if profile_bam didn't run)
 	Array[String] coerced_bam_strains=select_all(profile_bam.sample_and_strain)
