@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.8/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.4/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
@@ -33,7 +33,7 @@ workflow myco {
 		String? output_sample_name
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
-		Int     subsample_cutoff               =  -1 # note inconsistency with myco_sra!!
+		Int     subsample_cutoff               =  -1    # note inconsistency with myco_sra and how guardrail_mode affects this
 		
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true   # changed in myco 6.4.0
@@ -46,13 +46,6 @@ workflow myco {
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
-
-		String?  metadata_field_a
-		String?  metadata_value_a
-		String?  metadata_field_b
-		String?  metadata_value_b
-		String?  metadata_field_c
-		String?  metadata_value_c
 	}
 
 	parameter_meta {
@@ -70,11 +63,11 @@ workflow myco {
 		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
 		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
 		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable, overridden to 500000 (500 GB) if guardrail_mode=True)"
 	}
 											  
 	String pass = "PASS" # used later... much later
 	Boolean tbprofiler_on_bam              = just_like_2024
-	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
 	
 	# flip some QC stuff around
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
@@ -90,7 +83,7 @@ workflow myco {
 				fastp_clean_avg_qual = clean_average_q_score,
 				QC_min_q30 = QC_min_q30,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
-				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
+				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0,
 				addldisk = if low_resource_mode then 10 else 100,
@@ -114,7 +107,7 @@ workflow myco {
 			# counts_out_tsv, a File? that is absolutely not going to be valid for tbprofilerFQ. This means Cromwell changing
 			# behavior will still bug out, but it will bug out in a way that is immediately detectable.
 			#
-			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.counts_out_tsv])
+			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.counts_out_tsv]) #!SelectArray
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, decontam_each_sample.counts_out_tsv])
     		
 			call tbprofilerFQ_WF.TheiagenTBProfiler as theiagenTBprofilerFQ {
@@ -290,21 +283,21 @@ workflow myco {
 		# 3. Determine if we are running on one sample or multiple samples
 		if(length(paired_fastq_sets) != 1) {
 
-			call sranwrp_processing.cat_strings as collate_fq_strains {
+			call sranwrp_processing.cat_strings as collate_fq_strains {     #!UnusedCall
 				input:
 					strings = coerced_fq_strains,
 					out = "strain_reports.txt",
 					disk_size = quick_tasks_disk_size
 			}
 			
-			call sranwrp_processing.cat_strings as collate_fq_resistance {
+			call sranwrp_processing.cat_strings as collate_fq_resistance {  #!UnusedCall
 				input:
 					strings = coerced_fq_resistances,
 					out = "resistance_reports.txt",
 					disk_size = quick_tasks_disk_size
 			}
 			
-			call sranwrp_processing.cat_strings as collate_fq_depth {
+			call sranwrp_processing.cat_strings as collate_fq_depth {      #!UnusedCall
 				input:
 					strings = coerced_fq_depths,
 					out = "depth_reports.txt",
@@ -314,9 +307,9 @@ workflow myco {
 	
 		# if there is only one sample, there's no need to run tasks
 		if(length(paired_fastq_sets) == 1) {
-			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
-			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
-			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]      #!UnusedDeclaration
+			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0] #!UnusedDeclaration
+			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]     #!UnusedDeclaration
 		}
 	}
 	
