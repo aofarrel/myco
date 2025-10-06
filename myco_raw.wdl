@@ -3,7 +3,7 @@ version 1.0
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.8/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/process-metadata/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.4/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/refs/heads/update-theiagen-tbprof/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
@@ -173,25 +173,13 @@ workflow myco {
 				if(covstats.coverage > QC_min_mean_coverage) {
 					
 					# make diff files
-					call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_after_covstats {
+					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = QC_this_is_low_coverage,
 							tbmf = mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
-							a_key = metadata_field_a,
-							a_value = metadata_value_a,
-							b_key = metadata_field_b,
-							b_value = metadata_value_b,
-							c_key = metadata_field_c,
-							c_value = metadata_value_c,
-							d_key = "tbprof_resistance",
-							d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
-							e_key = "tbprof_pct_reads_mapped",
-							e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]), # yes, this is StringCoercion but should be acceptable
-							f_key = "tbprof_mean_depth",
-							f_value = select_first([theiagenTBprofilerFQ.avg_depth[0], "UNDEFINED"])
+							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 					}
 				}
 			}
@@ -200,25 +188,13 @@ workflow myco {
 		if(covstatsQC_skip_entirely) {
 		
 			# make diff files
-			call diff.make_mask_and_diff_and_process_metadata as make_mask_and_diff_no_covstats {
+			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = QC_this_is_low_coverage,
 					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
-					a_key = metadata_field_a,
-					a_value = metadata_value_a,
-					b_key = metadata_field_b,
-					b_value = metadata_value_b,
-					c_key = metadata_field_c,
-					c_value = metadata_value_c,
-					d_key = "tbprof_resistance",
-					d_value = select_first([theiagenTBprofilerFQ.resistance[0], "UNDEFINED"]),
-					e_key = "tbprof_pct_reads_mapped",
-					e_value = select_first([theiagenTBprofilerFQ.pct_reads_mapped[0], "UNDEFINED"]), # yes, this is StringCoercion but should be acceptable
-					f_key = "tbprof_mean_depth",
-					f_value = select_first([theiagenTBprofilerFQ.avg_depth[0], "UNDEFINED"])
+					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
 			}
 		}
 		
@@ -235,13 +211,6 @@ workflow myco {
 	Array[File] real_diffs = flatten([select_all(make_mask_and_diff_after_covstats.diff), select_all(make_mask_and_diff_no_covstats.diff)])
 	Array[File] real_reports = flatten([select_all(make_mask_and_diff_after_covstats.report), select_all(make_mask_and_diff_no_covstats.report)])
 	Array[File] real_masks = flatten([select_all(make_mask_and_diff_after_covstats.mask_file), select_all(make_mask_and_diff_no_covstats.mask_file)])
-	Array[String] real_metadata_header_tsv = flatten([select_all(make_mask_and_diff_after_covstats.meta_header_tsv), select_all(make_mask_and_diff_no_covstats.meta_header_tsv)])
-	Array[String] real_metadata_header_csv = flatten([select_all(make_mask_and_diff_after_covstats.meta_header_csv), select_all(make_mask_and_diff_no_covstats.meta_header_csv)])
-	Array[String] real_metadata_values_tsv = flatten([select_all(make_mask_and_diff_after_covstats.meta_values_tsv), select_all(make_mask_and_diff_no_covstats.meta_values_tsv)])
-	Array[String] real_metadata_values_csv = flatten([select_all(make_mask_and_diff_after_covstats.meta_values_csv), select_all(make_mask_and_diff_no_covstats.meta_values_csv)])
-	Array[String] real_metadata_full_tsv = flatten([select_all(make_mask_and_diff_after_covstats.meta_full_tsv), select_all(make_mask_and_diff_no_covstats.meta_full_tsv)])
-	Array[String] real_metadata_full_csv = flatten([select_all(make_mask_and_diff_after_covstats.meta_full_csv), select_all(make_mask_and_diff_no_covstats.meta_full_csv)])
-
 
 	#########################################
 	#      TBProfiler metadata handling     #
@@ -493,12 +462,6 @@ workflow myco {
 		Int?    tbd_n_other_variants = theiagenTBprofilerFQ.n_other_variants[0]
 		String? tbd_resistance = theiagenTBprofilerFQ.resistance[0]
 		String? tbd_strain_per_tbprof = theiagenTBprofilerFQ.strain[0]
-
-		# various options for metadata, including single-sample options
-		Array[String?] tbd_metadata_tsvs = real_metadata_full_tsv
-		Array[String?] tbd_metadata_csvs = real_metadata_full_csv
-		String? tbd_metadata_tsv = real_metadata_full_tsv[0]
-		String? tbd_metadata_csv = real_metadata_full_csv[0]
 		
 		# genomic data files
 		Array[File]  tbd_bais  = final_bais
