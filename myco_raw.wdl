@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.8/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.5/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/main/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/tbprofiler_tasks.wdl" as profiler
@@ -82,6 +82,7 @@ workflow myco {
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = clean_average_q_score,
 				QC_min_q30 = QC_min_q30,
+				strip_all_underscores = false,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
