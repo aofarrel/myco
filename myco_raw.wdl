@@ -83,7 +83,7 @@ workflow myco {
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = clean_average_q_score,
 				QC_min_q30 = QC_min_q30,
-				strip_all_underscores = false,
+				strip_all_underscores = true, # we can get away with this only because of force_rename_out
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
