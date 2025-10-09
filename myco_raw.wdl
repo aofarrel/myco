@@ -26,11 +26,12 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-		String date_pipeline_ran
-		String? date_pipeline_previously_ran
+		String  date_pipeline_ran
+
+		# for CalTBNet, always set this to table's entity_id
+		String? output_sample_name
 		
 		Boolean just_like_2024                 = false
-		String? output_sample_name
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
 		Int     subsample_cutoff               =  -1    # note inconsistency with myco_sra and how guardrail_mode affects this
@@ -54,7 +55,7 @@ workflow myco {
 		decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
 		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-		output_sample_name: "Override all sample names with this string instead."
+		output_sample_name: "Override ALL sample names with this string instead."
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
 		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
@@ -412,7 +413,7 @@ workflow myco {
 		
 	output {
 		String tbd_status = select_first([finalcode, pass])
-		String tbd_pipeline_run = select_first([date_pipeline_previously_ran, date_pipeline_ran])
+		String tbd_pipeline_run = date_pipeline_ran
 
 		# decon/fastp metadata pulled out directly -- only valid if this pipeline ran on a single sample
 		Float tbd_qc_q20_in = decontam_each_sample.q20_in[0]
