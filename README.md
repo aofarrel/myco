@@ -1,5 +1,7 @@
-# myco 🍄
+# myco 
 myco is group of pipelines built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
+
+In an amusing repeat of [somewhat questionable naming decisions made in 1896](https://wwwnc.cdc.gov/eid/article/14/3/et-1403_article), myco should not be confused with the similiarly-named fungal pathogen pipeline [MycoSNP](https://github.com/CDCgov/mycosnp-nf).
 
 ## Which workflow should I use?
 Each version of myco largely only differs in how you are passing in FASTQ files. **In all cases, your FASTQs must be paired-end Illumina reads.**
