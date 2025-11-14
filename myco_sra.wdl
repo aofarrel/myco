@@ -134,7 +134,7 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
 			if(!(TBProf_on_bams_not_fastqs)) {
-				call tbprofilerFQ_WF.ThiagenTBProfiler as theiagenTBprofilerFQ {
+				call tbprofilerFQ_WF.ThiagenTBProfiler as tbprofilerFQ {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -146,7 +146,7 @@ workflow myco {
 				}
 			}
 
-			String tbprofiler_fq_status_or_bogus = select_first([theiagenTBprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
+			String tbprofiler_fq_status_or_bogus = select_first([tbprofilerFQ.status_code, "bogus"]) # prevent "cannot compare String? to String" error
 			if(tbprofiler_fq_status_or_bogus == pass || TBProf_on_bams_not_fastqs) {
 				call clckwrk_var_call.variant_call_one_sample_ref_included as variant_calling {
 					input:
@@ -300,9 +300,9 @@ workflow myco {
   	# pull TBProfiler information, if we ran TBProfiler on fastqs
   	
   	# coerce optional types into required types (doesn't crash if these are null)
-	Array[String] coerced_fq_strains=select_all(theiagenTBprofilerFQ.sample_and_strain)
-	Array[String] coerced_fq_resistances=select_all(theiagenTBprofilerFQ.sample_and_resistance)
-	Array[String] coerced_fq_depths=select_all(theiagenTBprofilerFQ.sample_and_depth)
+	Array[String] coerced_fq_strains=select_all(tbprofilerFQ.sample_and_strain)
+	Array[String] coerced_fq_resistances=select_all(tbprofilerFQ.sample_and_resistance)
+	Array[String] coerced_fq_depths=select_all(tbprofilerFQ.sample_and_depth)
 	
 	# workaround for "defined(qc_fastq.strains) is always true" part of SOTHWO
 	if(!(length(coerced_fq_strains) == 0)) {
@@ -366,8 +366,99 @@ workflow myco {
 				value13 = fastp_decontam_check.error_code
 		}
 	}
+
+	#########################################
+	# error reporting for Terra data tables #
+	#########################################
+	#
+	# When running on a Terra data table, one instance of the workflow is created for every sample. This is in contrast to how
+	# running one instance of the workflow to handle multiple samples. In the one-instance case, we can return an error code
+	# for an individual sample as workflow-level output, which gets written to the Terra data table.
+	
+	# is there only one sample?
+	Array[String] fallback_if_not_biosample_accessions_as_array = ["you", "did", "not", "run", "in", "string", "mode"]
+	if(length(select_first([biosample_accessions_as_array, fallback_if_not_biosample_accessions_as_array])) == 1) {
+
+		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
+		# in the workflow this should be okay for now)
+		if(defined(fastp_decontam_check.error_code)) {
+		
+			# Sidenote: If you have a task taking in fastp_decontam_check.error_code, even after this defined check, it will fail
+			# command instantiation with "Cannot interpolate Array[String?] into a command string with attribute set 
+			# [PlaceholderAttributeSet(None,None,None,Some( ))]".
+		
+			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
+			String coerced_decontam_errorcode = select_first([fastp_decontam_check.error_code[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			
+			# did the decontamination step return an error?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String decontam_ERR = coerced_decontam_errorcode
+			}
+		}
+		
+		# handle earlyQC (if it ran at all)
+		
+		Array[String] earlyQC_array_coerced = select_all(tbprofilerFQ.status_code)
+		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
+		if(!(earlyQC_errorcode_array[0] == pass)) {          
+			String earlyQC_ERR = earlyQC_errorcode_array[0]
+		}
+
+		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
+		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
+		Array[String] errorcode_if_earlyQC = select_all(variant_calling.errorcode)
+		
+		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
+		# the final-final-final error code needs to have decontam's error come before the variant caller error.
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, ["PASS"]])
+		if(!(varcall_errorcode_array[0] == pass)) {          
+				String varcall_ERR = varcall_errorcode_array[0]
+		}
+		
+		# handle covstats
+		if (!covstatsQC_skip_entirely) {
+			if (varcall_errorcode_array[0] == "PASS") {
+				if(length(covstats.percentUnmapped) > 0) {
+					# cannot use defined(covstats.percentUnmapped) as it is always true, so we instead
+					# check if there are more than zero values in the output array for covstats
+					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+					Float        percentUnmapped = percentsUnmapped[0]
+					Array[Float] meanCoverages = select_all(covstats.coverage)
+					Float        meanCoverage = meanCoverages[0]
+					
+					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})"
+						if(meanCoverage < QC_min_mean_coverage) {
+							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+						} 
+					}
+					if(meanCoverage < QC_min_mean_coverage) {
+						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					}
+				}
+			}
+			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
+			if(!(coerced_covstats_error == pass)) {          
+					String covstats_ERR = coerced_covstats_error
+			}
+		}
+		
+		# handle vcf to diff
+		# will use the same workaround as the variant caller
+		Array[String] vcfdiff_errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_array = flatten([vcfdiff_errorcode_if_covstats, vcfdiff_errorcode_if_no_covstats, ["PASS"]])
+		if(!(vcfdiff_errorcode_array[0] == pass)) {          
+				String vcfdiff_ERR = vcfdiff_errorcode_array[0]
+		}
+		
+		# final-final-final error code
+		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
+		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
+	}
 		
 	output {
+		String tbd_status = select_first([finalcode, pass])
 		String      tbd_first_download_status   = pull.results[0]
 		File?       tbd_download_report         = merge_reports.outfile
 		File?       tbd_fastp_decont_report_tsv = fastp_decont_report.tsv
@@ -385,10 +476,10 @@ workflow myco {
 		Array[File?] tbd_diff_reports              = real_reports
 		Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
 		Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
-		Array[File?] tbd_tbprof_fq_jsons           = theiagenTBprofilerFQ.tbprofiler_json
-		Array[File?] tbd_tbprof_fq_looker          = theiagenTBprofilerFQ.tbprofiler_looker_csv
-		Array[File?] tbd_tbprof_fq_laboratorian    = theiagenTBprofilerFQ.tbprofiler_laboratorian_report_csv
-		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
+		Array[File?] tbd_tbprof_fq_jsons           = tbprofilerFQ.tbprofiler_json
+		Array[File?] tbd_tbprof_fq_looker          = tbprofilerFQ.tbprofiler_looker_csv
+		Array[File?] tbd_tbprof_fq_laboratorian    = tbprofilerFQ.tbprofiler_laboratorian_report_csv
+		Array[File?] tbd_tbprof_fq_lims            = tbprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
