@@ -42,7 +42,7 @@ workflow myco {
 		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =    10  # changed in myco 6.4.0
 		Int     QC_min_mean_coverage           =    10  # CDC minimum: 50x
-		Int     QC_min_q30                     =    80  # CDC minimum: 85%
+		Int     QC_min_q30                     =    80  # CDC minimum: 85%, not used if just_like_2024
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
@@ -81,7 +81,7 @@ workflow myco {
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = clean_average_q_score,
-				QC_min_q30 = QC_min_q30,
+				QC_min_q30 = if just_like_2024 then 1 else QC_min_q30,,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
 				timeout_map_reads = if guardrail_mode then 300 else 0,
