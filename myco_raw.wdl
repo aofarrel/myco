@@ -414,7 +414,7 @@ workflow myco {
 		
 	output {
 		String tbd_status = select_first([finalcode, pass])
-		String tbd_pipeline_run = date_pipeline_ran
+		String? tbd_pipeline_run = date_pipeline_ran
 
 		# decon/fastp metadata pulled out directly -- only valid if this pipeline ran on a single sample
 		Float tbd_qc_q20_in = decontam_each_sample.q20_in[0]
