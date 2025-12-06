@@ -26,10 +26,9 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-		String  date_pipeline_ran
 
-		# for CalTBNet, always set this to table's entity_id
-		String? output_sample_name
+		# overrides FQ's file names; for Terra data tables, you should probably this to table's entity_id
+		String output_sample_name
 		
 		Boolean just_like_2024                 = false
 		Boolean guardrail_mode                 = true
@@ -38,6 +37,7 @@ workflow myco {
 		
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true   # changed in myco 6.4.0
+		String?  date_pipeline_ran
 		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0 -- # TODO: null op
 		File?   mask_bedfile
 		Int     QC_max_pct_low_coverage_sites  =    20
@@ -47,6 +47,7 @@ workflow myco {
 		Boolean QC_soft_pct_mapped             = false
 		Int     QC_this_is_low_coverage        =    10
 		Int     quick_tasks_disk_size          =    10 
+		Boolean strip_all_underscores          = false # if this is true and not defined(output_sample_name) you may slice R1/R2 by mistake!
 	}
 
 	parameter_meta {
@@ -83,7 +84,7 @@ workflow myco {
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = clean_average_q_score,
 				QC_min_q30 = QC_min_q30,
-				strip_all_underscores = true, # we can get away with this only because of force_rename_out
+				strip_all_underscores = strip_all_underscores, # we can get away with this only because of force_rename_out if output_sample_name defined
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
