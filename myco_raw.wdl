@@ -28,20 +28,19 @@ workflow myco {
 		Array[Array[File]] paired_fastq_sets
 		String output_sample_name
 
+		File?   call_as_reference_bedfile           # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
-		Boolean covstatsQC_skip_entirely    = true
 		Int     fastp_avg_qual              = 29
 		Boolean just_like_2024              = false
 		Boolean guardrail_mode              = true
 		Boolean low_resource_mode           = false
-		File?   mask_bedfile
-		Int     sample_pct_masked           = 20
+		Int     sample_max_pct_masked       = 20
 		Int     sample_min_pct_mapped       = 90
 		Int     sample_min_avg_depth        = 30
 		Int     sample_min_q30              = 80
 		Int     site_min_depth              = 10
+		Boolean skip_covstats               = true
 		Int     subsample_cutoff            = -1     # note inconsistency with myco_sra and how guardrail_mode affects this
-		Boolean strip_all_underscores       = false  # if this is true and not defined(output_sample_name) you may slice R1/R2 by mistake!
 	}
 
 	parameter_meta {
@@ -52,6 +51,11 @@ workflow myco {
 		# * pass/fail an entire read/pair, where failing reads are trimmed or discarded as per fastp standards
 		# * pass/fail a specific site, where failing sites are masked in the final diff file
 
+		call_as_reference_bedfile: "Bed file of regions to mask to reference when making diff files (default: R00000039_repregions.bed)"
+		# Default: https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed
+		# Note that masking *to reference* is not the same as low-coverage masking. Reference (and masked-to reference) positions are not mentioned
+		# in diff files at all, but when we low-coverage mask we explictly say -. Reference and - may be treated differently by matUtils/UShER.
+
 		comment: "Information about this run; this is echoed as a workflow level output"
 		# This is useful for tracking provenance/versioning for Terra data tables
 		
@@ -60,9 +64,6 @@ workflow myco {
 		# "if one read's average quality score <avg_qual, then this read/pair is discarded. Default 0 means no requirement (int [=0])"
 		# What you set this value to you might affect the results of sample_min_q30, but keep in mind that is a whole-sample filter.
 
-		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
-		# Covstats might be entirely removed in a future version as the current version of TBProfiler replaces our old use cases for covstats.
-
 		#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
 		# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
 		# This is currently a null op since it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs
@@ -70,13 +71,8 @@ workflow myco {
 		# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
 		
 		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
-		# Previously guardrail_mode set TBProfiler's min % masked to 10% and TBProfiler's min depth to 3, but now these use (100 - sample_max_pct_unmapped)
+		# Previously guardrail_mode set TBProfiler's min % masked to 10% and TBProfiler's min depth to 3, but now these use (100 - sample_max_pct_masked)
 		# and sample_min_avg_depth instead.
-
-		mask_bedfile: "Bed file of regions to mask to reference when making diff files (default: R00000039_repregions.bed)"
-		# Default: https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed
-		# Note that masking *to reference* is not the same as low-coverage masking. Reference (and masked-to reference) positions are not mentioned
-		# in diff files at all, but when we low-coverage mask we explictly say -. Reference and - may be treated differently by matUtils/UShER.
 
 		output_sample_name: "Override ALL sample names with this string instead."
 		# Currently required to deal with certain CDPH edge cases. For Terra data tables, set this to the sample's entity_id column (the one on the far
@@ -93,37 +89,45 @@ workflow myco {
 		# the rest of the pipeline (ie generate diff files) even if other samples "drop out" earlier. This requires some special handling in WDL 1.0 however; please
 		# be cautious if you update this pipeline to WDL 1.1 as the workarounds I use for this may require some tinkering under WDL 1.1 standards.
 
-		sample_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
+		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
 		# It'd be more accurate to call this sample_pct_below_site_min_depth but that's far too long!
 
 		sample_min_avg_depth: "If covstats or TBProfiler thinks mean (not median!) depth is below this, throw out this sample"
-		# CDC minimum: 50x estimated from read length (but we measure directly so not directly comparable)
+		# CDC minimum: 50x estimated from read length. We don't estimate from read length, we measure directly, so our values will always be less.
 
 		sample_min_pct_mapped: "If covstats or TBProfiler thinks less than this percent of your sample (after decontam) maps to H37Rv, throw out this sample"
 		# This is downstream of fastp cleaning too
+		# CDC minimum: 90% mapped to MTBC (not H37Rv) using something like Kraken
 
 		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
 		# This runs after decontamination, which by default runs after an initial fastp clean, and is therefore sort of influenced by fastp_avg_qual
-		# CDC minimum: 85% (we go lower because if we don't we lose a ton of pretty-good samples and this pipeline becomes less helpful for disease tracking)
+		# CDC minimum: 85%. After discussing with CDPH, we're defaulting to 80% instead, because 85% would result in removing so many mostly-good
+		# samples that it'd meaningfully affect TB-D's utility for tracking disease.
 
-		site_min_depth: "Positions with coverage below this value will be masked in diff files; see also sample_pct_masked"
+		site_min_depth: "Positions with coverage below this value will be masked in diff files; see also sample_max_pct_masked"
+		# This is explict masking with -, as opposed to "masking to reference"
 
-		strip_all_underscores: "Strip all underscores from a sample name (not recommended)"
-		# This was developed at CDPH's request, but we don't currently use it, and it can mess with R1/R2 detection
+		skip_covstats: "Should we skip covstats entirely?"
+		# Covstats might be entirely removed in a future version as the current version of TBProfiler replaces our old use cases for covstats.
 
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable, overridden to 500000 (500 GB) if guardrail_mode=True)"
+		# One thing SRA taught me is that there will always be somebody who, with the best of intentions, uploads a terabyte of reads as a single sample
 	}
-											  
-	String pass = "PASS" # used later... much later
+
+	# Flip some QC stuff around
+	Int   sample_max_pct_unmapped = 100 - sample_min_pct_mapped
+	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
 
 	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
-	Boolean tbprofiler_on_bam  = just_like_2024
 	Boolean QC_soft_pct_mapped = false
-	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; increasing this for extreme (>10,000 samples) workflows speed up file localization
+	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; if running one-workflow-many-samples,
+	                                 # increasing this might speed up file localization if you have >5,000 samples
+	Boolean strip_all_underscores = false  # currently unused proposed workaround for irregular sample names; 
+	                                       # setting this to true can mess with R1/R2 detection if not defined(output_sample_name)
+	Boolean tbprofiler_on_bam = just_like_2024
 	
-	# flip some QC stuff around
-	Float sample_pct_masked_float = sample_pct_masked / 100.0
-	Int   sample_max_pct_unmapped = 100 - sample_min_pct_mapped
+	# Used for some workarounds
+	String pass = "PASS"
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
@@ -135,7 +139,7 @@ workflow myco {
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = fastp_avg_qual,
 				QC_min_q30 = sample_min_q30,
-				strip_all_underscores = strip_all_underscores, # we can get away with this only because of force_rename_out if output_sample_name defined
+				strip_all_underscores = strip_all_underscores,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
@@ -208,7 +212,7 @@ workflow myco {
 	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
-		if(!covstatsQC_skip_entirely) {
+		if(!skip_covstats) {
 	
 			# covstats to check coverage and percent mapped to reference
 			call goleft.covstats as covstats {
@@ -226,14 +230,14 @@ workflow myco {
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = site_min_depth,
-							tbmf = mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = sample_pct_masked_float
+							tbmf = call_as_reference_bedfile,
+							max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 					}
 				}
 			}
 		}
 		
-		if(covstatsQC_skip_entirely) {
+		if(skip_covstats) {
 		
 			# make diff files
 			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
@@ -241,8 +245,8 @@ workflow myco {
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = site_min_depth,
-					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = sample_pct_masked_float
+					tbmf = call_as_reference_bedfile,
+					max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 			}
 		}
 		
@@ -416,7 +420,7 @@ workflow myco {
 		}
 		
 		# handle covstats
-		if (!covstatsQC_skip_entirely) {
+		if (!skip_covstats) {
 			if (varcall_errorcode_array[0] == "PASS") {
 				if(length(covstats.percentUnmapped) > 0) {
 					# cannot use defined(covstats.percentUnmapped) as it is always true, so we instead
@@ -534,8 +538,8 @@ workflow myco {
 
 		# useful debugging/run information (only valid iff this ran on only one sample)
 		String tbd_clockwork_docker      = decontam_each_sample.docker_used[0]
-		#String tbd_resistance_coerced    = single_sample_tbprof_fq_resistance
-		#String tbd_strain_coerced        = single_sample_tbprof_fq_strain
+		#String tbd_resistance_coerced   = single_sample_tbprof_fq_resistance
+		#String tbd_strain_coerced       = single_sample_tbprof_fq_strain
 		#Array[String] pass_or_warnings  = if (length(warnings) > 0) then warnings else ["PASS"] # might not work properly
 		#String? tbd_debug_decontam_ERR  = decontam_ERR
 		#String? tbd_debug_earlyQC_ERR   = earlyQC_ERR
