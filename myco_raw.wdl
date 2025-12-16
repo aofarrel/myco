@@ -4,8 +4,8 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/co
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
 
 # Copyright (C) 2025 Ash O'Farrell
@@ -26,64 +26,115 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-
-		# overrides FQ's file names; for Terra data tables, you should probably this to table's entity_id
 		String output_sample_name
-		
-		Boolean just_like_2024                 = false
-		Boolean guardrail_mode                 = true
-		Boolean low_resource_mode              = false
-		Int     subsample_cutoff               =  -1    # note inconsistency with myco_sra and how guardrail_mode affects this
-		
-		Int     clean_average_q_score          = 29
-		Boolean covstatsQC_skip_entirely       = true   # changed in myco 6.4.0
-		String?  date_pipeline_ran
-		Boolean decontam_use_CDC_varpipe_ref   = false  # changed in myco 6.3.0 -- # TODO: null op
+
+		String? comment
+		Boolean covstatsQC_skip_entirely    = true
+		Int     fastp_avg_qual              = 29
+		Boolean just_like_2024              = false
+		Boolean guardrail_mode              = true
+		Boolean low_resource_mode           = false
 		File?   mask_bedfile
-		Int     QC_max_pct_low_coverage_sites  =    20
-		Int     QC_max_pct_unmapped            =    10  # changed in myco 6.4.0
-		Int     QC_min_mean_coverage           =    10  # CDC minimum: 50x
-		Int     QC_min_q30                     =    80  # CDC minimum: 85%
-		Boolean QC_soft_pct_mapped             = false
-		Int     QC_this_is_low_coverage        =    10
-		Int     quick_tasks_disk_size          =    10 
-		Boolean strip_all_underscores          = false # if this is true and not defined(output_sample_name) you may slice R1/R2 by mistake!
+		Int     sample_pct_masked           = 20
+		Int     sample_min_pct_mapped       = 90
+		Int     sample_min_avg_depth        = 30
+		Int     sample_min_q30              = 80
+		Int     site_min_depth              = 10
+		Int     subsample_cutoff            = -1     # note inconsistency with myco_sra and how guardrail_mode affects this
+		Boolean strip_all_underscores       = false  # if this is true and not defined(output_sample_name) you may slice R1/R2 by mistake!
 	}
 
 	parameter_meta {
-		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
+		# parameter_meta doesn't support multi-line strings, so I'll include additional information in comments to avoid making this file super wide
+		#
+		# There's basically three levels of QC going on here:
+		# * pass/fail an entire sample (note that "fail" does NOT mean "pipeline will return 1")
+		# * pass/fail an entire read/pair, where failing reads are trimmed or discarded as per fastp standards
+		# * pass/fail a specific site, where failing sites are masked in the final diff file
+
+		comment: "Information about this run; this is echoed as a workflow level output"
+		# This is useful for tracking provenance/versioning for Terra data tables
+		
+		fastp_avg_qual: "Discard read pairs with an average quality score below this value via fastp --average_qual. Not the same as sample_min_q30."
+		# Fastp defines this as:
+		# "if one read's average quality score <avg_qual, then this read/pair is discarded. Default 0 means no requirement (int [=0])"
+		# What you set this value to you might affect the results of sample_min_q30, but keep in mind that is a whole-sample filter.
+
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
-		decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
+		# Covstats might be entirely removed in a future version as the current version of TBProfiler replaces our old use cases for covstats.
+
+		#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
+		# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
+		# This is currently a null op since it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs
+		# NTM vs other forms of contamination (which the task currently requires for some outputs). If there is a demand for CDC varpipe I can
+		# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
+		
 		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
-		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		# Previously guardrail_mode set TBProfiler's min % masked to 10% and TBProfiler's min depth to 3, but now these use (100 - sample_max_pct_unmapped)
+		# and sample_min_avg_depth instead.
+
+		mask_bedfile: "Bed file of regions to mask to reference when making diff files (default: R00000039_repregions.bed)"
+		# Default: https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed
+		# Note that masking *to reference* is not the same as low-coverage masking. Reference (and masked-to reference) positions are not mentioned
+		# in diff files at all, but when we low-coverage mask we explictly say -. Reference and - may be treated differently by matUtils/UShER.
+
 		output_sample_name: "Override ALL sample names with this string instead."
+		# Currently required to deal with certain CDPH edge cases. For Terra data tables, set this to the sample's entity_id column (the one on the far
+		# left that acts like an index).
+		# TODO: This makes the multi-sample-per-workflow case give the same output. All WDL executers I'm aware of put all scattered outs in different folders,
+		# so this won't overwrite per say, but it's not ideal... I need to make sure paired_fastqs being Array[Array[File]] will zip() nicely with an
+		# Array[String] version of output_sample_name.
+
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
-		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
-		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
-		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
-		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
-		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		# On a sample-indexed data table on Terra, you'll probably want something like `[[this.read1, this.read2]]`, but you also have the option of running
+		# multiple samples at once thanks to the nesting. For example, if you have three samples:
+		# [["gs://bucket/foo_1.fq", "gs://bucket/foo_2.fq"], ["gs://bucket/bar_1.fq", "gs://bucket/bar_2.fq"], ["gs://bucket/bizz_1.fq", "gs://bucket/bizz_2.fq"]]
+		# Will be read processed as three different samples using WDL scatter(). It is okay if some samples fail and others pass; the passing samples will complete
+		# the rest of the pipeline (ie generate diff files) even if other samples "drop out" earlier. This requires some special handling in WDL 1.0 however; please
+		# be cautious if you update this pipeline to WDL 1.1 as the workarounds I use for this may require some tinkering under WDL 1.1 standards.
+
+		sample_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
+		# It'd be more accurate to call this sample_pct_below_site_min_depth but that's far too long!
+
+		sample_min_avg_depth: "If covstats or TBProfiler thinks mean (not median!) depth is below this, throw out this sample"
+		# CDC minimum: 50x estimated from read length (but we measure directly so not directly comparable)
+
+		sample_min_pct_mapped: "If covstats or TBProfiler thinks less than this percent of your sample (after decontam) maps to H37Rv, throw out this sample"
+		# This is downstream of fastp cleaning too
+
+		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+		# This runs after decontamination, which by default runs after an initial fastp clean, and is therefore sort of influenced by fastp_avg_qual
+		# CDC minimum: 85% (we go lower because if we don't we lose a ton of pretty-good samples and this pipeline becomes less helpful for disease tracking)
+
+		site_min_depth: "Positions with coverage below this value will be masked in diff files; see also sample_pct_masked"
+
+		strip_all_underscores: "Strip all underscores from a sample name (not recommended)"
+		# This was developed at CDPH's request, but we don't currently use it, and it can mess with R1/R2 detection
+
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable, overridden to 500000 (500 GB) if guardrail_mode=True)"
 	}
 											  
 	String pass = "PASS" # used later... much later
-	Boolean tbprofiler_on_bam              = just_like_2024
+
+	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
+	Boolean tbprofiler_on_bam  = just_like_2024
+	Boolean QC_soft_pct_mapped = false
+	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; increasing this for extreme (>10,000 samples) workflows speed up file localization
 	
 	# flip some QC stuff around
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
+	Float sample_pct_masked_float = sample_pct_masked / 100.0
+	Int   sample_max_pct_unmapped = 100 - sample_min_pct_mapped
 
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
-				CDC_decontamination_reference = decontam_use_CDC_varpipe_ref,
+				CDC_decontamination_reference = false,  # previously decontam_use_CDC_varpipe_ref but not currently supported
 				oldschool_docker = just_like_2024,
 				unsorted_sam = true,
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
-				fastp_clean_avg_qual = clean_average_q_score,
-				QC_min_q30 = QC_min_q30,
+				fastp_clean_avg_qual = fastp_avg_qual,
+				QC_min_q30 = sample_min_q30,
 				strip_all_underscores = strip_all_underscores, # we can get away with this only because of force_rename_out if output_sample_name defined
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
@@ -117,10 +168,11 @@ workflow myco {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
-					soft_pct_mapped = QC_soft_pct_mapped,
-					soft_depth = if guardrail_mode then false else true,
-					minimum_depth = if guardrail_mode then 3 else 0,
-					minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
+					soft_pct_mapped = false,
+					soft_depth = false,
+					minimum_median_depth = if guardrail_mode then 3 else 0, # super low to avoid conflict with avg depth
+					minimum_mean_depth = sample_min_avg_depth,
+					minimum_pct_mapped = sample_min_pct_mapped,
 					sample = decontam_each_sample.sample
 			}
 			# if this sample passes...
@@ -165,17 +217,17 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if((covstats.percentUnmapped < QC_max_pct_unmapped) || QC_soft_pct_mapped) {
-				if(covstats.coverage > QC_min_mean_coverage) {
+			if((covstats.percentUnmapped < sample_max_pct_unmapped) || QC_soft_pct_mapped) {
+				if(covstats.coverage > sample_min_avg_depth) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = QC_this_is_low_coverage,
+							min_coverage_per_site = site_min_depth,
 							tbmf = mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+							max_ratio_low_coverage_sites_per_sample = sample_pct_masked_float
 					}
 				}
 			}
@@ -188,9 +240,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = QC_this_is_low_coverage,
+					min_coverage_per_site = site_min_depth,
 					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+					max_ratio_low_coverage_sites_per_sample = sample_pct_masked_float
 			}
 		}
 		
@@ -374,14 +426,14 @@ workflow myco {
 					Array[Float] meanCoverages = select_all(covstats.coverage)
 					Float        meanCoverage = meanCoverages[0]
 					
-					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
-						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})"
-						if(meanCoverage < QC_min_mean_coverage) {
-							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					if((percentUnmapped > sample_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${sample_max_pct_unmapped})"
+						if(meanCoverage < sample_min_avg_depth) {
+							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${sample_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${sample_min_avg_depth})"
 						} 
 					}
-					if(meanCoverage < QC_min_mean_coverage) {
-						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					if(meanCoverage < sample_min_avg_depth) {
+						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${sample_min_avg_depth})"
 					}
 				}
 			}
@@ -413,8 +465,8 @@ workflow myco {
 	#Array[String] warnings = flatten(flatten([[select_all(theiagenTBprofilerFQ.warning_codes)], [select_all(warning_decontam)]]))
 		
 	output {
-		String tbd_status = select_first([finalcode, pass])
-		String? tbd_pipeline_run = date_pipeline_ran
+		String  tbd_status = select_first([finalcode, pass])
+		String? tbd_comment = comment
 
 		# decon/fastp metadata pulled out directly -- only valid if this pipeline ran on a single sample
 		Float tbd_qc_q20_in = decontam_each_sample.q20_in[0]
