@@ -19,12 +19,27 @@ Regardless of which version of myco you use, please make sure your FASTQs:
 * is grouped per-sample   
 * len(quality scores) = len(nucleotides) for every line <sup>†</sup>  
 * is actually [MTBC](https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=77643)  
-<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.
+
+<sup>†</sup> myco_sra.wdl is able to detect these issues and will throw out those samples without erroring. Other forms of myco are not able to detect these issues.  
+
 It is recommend that you also keep an eye on the total size of your FASTQs. Individual files over subsample_cutoff (default450 MB, -1 disables this check) will be downsampled, but keep an eye on the cumulative size of samples. For example, a sample like SAMEA968096 has 12 run accessions associated with it. Individually, none of these run accessions' FASTQs are over 1 GB in size, but the sum total of these FASTQs could quickly fill up your disk space. (You probably should not be using SAMEA968096 anyway because it is in sample group, which can cause other issues.)
 
 myco_simple expects that the FASTQs you are putting into have already been cleaned and decontaminated, but this isn't a hard requirement. What is a hard requirement is that you have precisely one forward read and one reverse read per sample -- if you have multi-lane samples across various fastqs, they will need to be merged first.
  
-## Quality control
+## Other inputs
+| name | type | myco_sra default | myco_raw default | description |  
+|:---:|:---:|:---:|:---:|  
+| sample_min_q30 | Int | 90 | 80 | Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded. |
+| skip_covstats | Boolean  | true | true | Should we avoid running covstats? Does not affect other forms of QC. |  
+| subsample_cutoff | Int  | 450 | -1 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable). This value will be overwritten to overridden to 500000 (500 GB) is guardrail mode is true. |  
+
+
+
+sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+    # This runs after decontamination, which by default runs after an initial fastp clean, and is therefore sort of influenced by fastp_avg_qual
+    # CDC minimum: 85%. After discussing with CDPH, we're defaulting to 80% instead, because 85% would result in removing so many mostly-good
+    # samples that it'd meaningfully affect TB-D's utility for tracking disease.
+
 
 **NOTE: This section is outdated and does not reflect latest changes. It is still here as the pipeline is undergoing a major refactoring. Documentation will be updated once inputs are more "stable"**
 
@@ -32,7 +47,6 @@ myco_simple expects that the FASTQs you are putting into have already been clean
 |:---:|:---:|:---:|:---:|  
 | covstatsQC_minimum_coverage | Float  | 10 | If covstats thinks coverage is below this, throw out this sample |  
 | covstatsQC_max_percent_unmapped | Float  | 2 | If covstats thinks this percentage (50 = 50%) of data does not map to H37Rv, throw out this sample |  
-| covstatsQC_skip_entirely | Boolean  | false | Should we avoid running covstats? Does not affect other forms of QC. |  
 | diffQC_max_percent_low_coverage | Float  | 0.05 (myco_sra), 0.20 (myco_raw) | If more than this percent (0.5 = 50%) of a sample's sites get masked for being below `diff_min_coverage_per_site`, throw out the whole sample. |  
 | diff_min_coverage_per_site | Int  | 10 | Positions with coverage below this value will be masked in diff files |
 | early_qc_apply_cutoffs | Boolean  | false | If true, run fastp + TBProfiler on decontaminated fastqs and apply cutoffs to determine which samples should be thrown out. |  
@@ -44,53 +58,39 @@ Note that all forms of QC will throw out entire samples, with two exceptions:
   * `diff_min_coverage_per_site` works on a per-site basis, masking individual sites below that value but not throwing out the entire sample (unless so many sites get masked that `diffQC_max_percent_low_coverage` kicks in)
   * `fastqc_on_timeout` will run fastQC if true, but does not parse its output - the samples have already been discarded upstream when they timed out
   
-## Timeouts  
-**NOTE: In myco_raw, this is now handled by guardrail mode.**
-When working with data of unknown quality, it can be helpful to quickly remove samples that are likely low-quality. While developing myco on SRA data, we noticed that if a given sample took an unusually long time in the decontamination or variant calling step, they were likely to end up filtered out by the final quality control steps of the pipeline. This is especially true of the decontamination step -- the more contamination a sample has, the more that step has to do. This heuristic was defined on the default runtime attributes and using Terra as a backend, so straying from those defaults is likely to make the default timeout values less useful. This *includes* changing from SDDs to HDDs! 
-  
-| name | type | myco_sra default | description |  
-|:---:|:---:|:---:|:---:|  
-| timeout_decontam_part1 | Int  | 20<sup>†</sup> | Discard any sample that is still running in clockwork map_reads after this many minutes (set to 0 to never timeout |
-| timeout_decontam_part2 | Int  | 15<sup>†</sup>  | Discard any sample that is still running in clockwork rm_contam after this many minutes (set to 0 to never timeout) |  
-| timeout_variant_caller | Int  | 120<sup>†</sup> | Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout) | 
-
-<sup>†</sup> myco_raw and myco_simple default to not using this heuristic at all, so their defaults are 0.
-
-
-## Variant caller inputs
-**NOTE: In myco_raw, these are once again task-level attributes.**
-Usually, I write WDLs in a way that makes their runtime attributes and rarely-used optional arguments task-level, and everything else workflow-level. However, myco uses some workarounds that require it to technically have three copies of the variant caller task, which means that if I didn't make the variant caller's inputs workflow-level, there would be three sets of task-level inputs for the variant caller.
-
-| name | type | myco_sra default | description |  
-|:---:|:---:|:---:|:---:|  
-| variantcalling_addl_disk        | Int     | 100   | Additional disk size, in GB, on top of auto-scaling disk size. |
-| variantcalling_cpu              | Int     | 16    | Number of CPUs (cores) to request from GCP. |
-| variantcalling_crash_on_error   | Boolean | false | If this task errors out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? Note that errors that crash the VM (such as running out of space on a GCP instance) will stop the whole pipeline regardless of this setting. |  
-| variantcalling_crash_on_timeout | Boolean | false | If this task times out, should it stop the whole pipeline (true), or should we just discard this sample and move on (false)? | 
-| variantcalling_debug            | Boolean | false | Do not clean up any files and be verbose |  
-| variantcalling_mem_height       | Int?    |       | cortex mem_height option. Must match what was used when reference_prepare was run (in other words do not set this variable unless you are also adjusting the reference preparation task) | 
-| variantcalling_memory           | Int     | 32    | Amount of memory, in GB, to request from GCP. |
-| variantcalling_preemptibles     | Int     |  1    | How many times should this task be attempted on a preemptible instance before running on a non-preemptible instance? |  
-| variantcalling_retries          | Int     |  1    | How many times should we retry this task if it fails after it exhausts all uses of preemptibles? | 
-| variantcalling_ssd              | Boolean | true  | If true, use SSDs for this task instead of HDDs  | 
+## Guardrail Mode  
+Guardrail Mode implements timers to certain myco tasks, which help prevent edge case samples from causing runaway cloud costs and pipeline stalling. This is especially important in the decontamination step, as decontamination occurs before most QC checks and requires a long time to complete on extremely contaminated large samples, which are ultimately doomed to fail QC checks anyway. The defaults myco uses for guardrails are relatively lenient to ensure the maximum number of likely-to-pass samples make it through the pipeline. It's recommended to leave this enabled unless your fastqs are huge, or you are running on slow HDDs.
 
   
 ## Miscellanous workflow-level inputs  
+
+| name | type | default | description |  
+|:---:|:---:|:---:|:---:|  
+| call_as_reference_bedfile | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | Bed file of regions to mask as reference when making diff files |  
+| comment | String? |  | Passed directly as a workflow output `tbd_comment`, useful for Terra data tables in some scenarios |  
+
+> [!NOTE]  
+> Regions within call_as_reference_bedfile are called as reference in resulting diff file. In all other scenarios (indels, low coverage, ambigious call) when we refer to a "masked" position, we mean one that is explictly included in the diff file as `-`. There is a minor distinction between "reference" and "masked" with regard to placement of samples on a phylogenetic tree by UShER/[Tree Nine](https://github.com/aofarrel/tree_nine).
+>
+> Be aware that `call_as_reference_bedfile` only applies to the diff file. The VCF is not affected and may call non-referennce variants in those regions.
+
+
 **NOTE: This section is outdated and does not reflect latest changes. It is still here as the pipeline is undergoing a major refactoring. Documentation will be updated once inputs are more "stable"**
 
 | name | type | default | description |  
 |:---:|:---:|:---:|:---:|  
-| diff_force | Boolean  | false | If true and if decorate_tree is false, generate diff files. (Diff files will always be created if decorate_tree is true.) |  
-| diffQC_mask_bedfile | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | Bed file of regions to mask when making diff files |  
-| quick_tasks_disk_size | Int  | 10 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)isk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization |  
-| subsample_cutoff | Int  | 450 | If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable) |  
-| subsample_seed | Int  | 1965 | Seed used for subsampling with seqtk |  
-| tbprofiler_on_bam | Boolean  | varies<sup>†</sup> | If true, run TBProfiler on BAMs |  
-| tree_decoration | Boolean  | false | Should usher, taxonium, and NextStrain trees be generated? |  
-| tree_to_decorate | File? | [this draft tree](https://console.cloud.google.com/storage/browser/_details/topmed_workflow_testing/tb/trees/alldiffs_mask2ref.L.fixed.pb;tab=live_object) | Base tree to use if decorate_tree = true |  
 
-<sup>†</sup> Defaults to true for myco_sra and false for myco_raw for historical reasons
-  
+
+## Deprecated
+
+decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."  
+CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo. This is currently a null op in myco_raw as it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs NTM vs other forms of contamination (which the task currently requires for some outputs). If there is a demand for CDC varpipe I can make this an option again, but I nevertheless gently recommend against using it due to unclear provenance and contents.
+
+subsample_seed: "Seed used for subsampling with seqtk"  
+To reduce the number of inputs, this is now 1965.  
+
+tbprofiler_on_bam: "If true, run TBProfiler on BAMs"
+
 
   
 # Task-level inputs 

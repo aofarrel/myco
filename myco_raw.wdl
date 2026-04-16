@@ -63,12 +63,6 @@ workflow myco {
 		# Fastp defines this as:
 		# "if one read's average quality score <avg_qual, then this read/pair is discarded. Default 0 means no requirement (int [=0])"
 		# What you set this value to you might affect the results of sample_min_q30, but keep in mind that is a whole-sample filter.
-
-		#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
-		# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
-		# This is currently a null op since it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs
-		# NTM vs other forms of contamination (which the task currently requires for some outputs). If there is a demand for CDC varpipe I can
-		# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
 		
 		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
 		# Previously guardrail_mode set TBProfiler's min % masked to 10% and TBProfiler's min depth to 3, but now these use (100 - sample_max_pct_masked)
