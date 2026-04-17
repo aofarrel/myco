@@ -40,7 +40,8 @@ workflow myco {
 		Int     sample_min_q30              = 80
 		Int     site_min_depth              = 10
 		Boolean skip_covstats               = true
-		Int     subsample_cutoff            = -1     # note inconsistency with myco_sra and how guardrail_mode affects this
+		Int     subsample_cutoff            = -1
+		Int     subsample_reads             = 2000000
 	}
 
 	parameter_meta {
@@ -104,8 +105,10 @@ workflow myco {
 		skip_covstats: "Should we skip covstats entirely?"
 		# Covstats might be entirely removed in a future version as the current version of TBProfiler replaces our old use cases for covstats.
 
-		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable, overridden to 500000 (500 GB) if guardrail_mode=True)"
-		# One thing SRA taught me is that there will always be somebody who, with the best of intentions, uploads a terabyte of reads as a single sample
+		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
+		# If only one fastq is above the theshold, both will be downsampled to prevent weird issues
+
+		subsample_reads: "If a fastq file is larger than subsample_cutoff, downsample it to this many reads"
 	}
 
 	# Flip some QC stuff around
@@ -135,7 +138,8 @@ workflow myco {
 				QC_min_q30 = sample_min_q30,
 				strip_all_underscores = strip_all_underscores,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
-				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
+				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
+				subsample_to_this_many_reads = if just_like_2024 then 1000000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0,
 				addldisk = if low_resource_mode then 10 else 100,

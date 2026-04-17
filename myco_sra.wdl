@@ -29,30 +29,25 @@ workflow myco {
 	input {
 		File biosample_accessions
 
-		File?   call_as_reference_bedfile                # default: R00000039_repregions.bed (exists in the Docker image)
+		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
-		Int     fastp_avg_qual          = 29
-		Boolean just_like_2024       = false
-		Boolean guardrail_mode                 = true
-		# No equivalent to myco_raw low_resource_mode
-		
-		Int     sample_min_q30                 =    90  # note inconsistency with myco_raw
-		Int     site_min_depth                 =    10
-		Boolean skip_covstats       = true
-		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
-		
+		Int     fastp_avg_qual              = 29
+		Boolean just_like_2024              = false
+		Boolean guardrail_mode              = true
+		#Boolean low_resource_mode          --> no myco_sra equivalent
+		Int     sample_max_pct_masked       = 20
+		#Int     sample_min_pct_mapped      --> no myco_sra equivalent
+		#Int     sample_min_avg_depth       --> no myco_sra equivalent
+		Int     sample_min_q30              = 90      # note inconsistency with myco_raw
+		Int     site_min_depth              = 10
+		Boolean skip_covstats               = true
+		Int     subsample_cutoff            = 450     # set to -1 to turn off subsampling entirely
+		Int     subsample_reads             = 1000000
 		
 		# QC stuff 
-		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
-		Int     QC_min_mean_coverage           =    10
-		
-		Boolean QC_soft_pct_mapped             = false
-		
-		
-		
-		# shrink large samples
-		
+		Int     QC_min_mean_coverage           =    10  # only applies to covstats, unlike myco_raw
+
 	}
 
 	parameter_meta {
@@ -62,19 +57,25 @@ workflow myco {
 		skip_covstats: "Should we skip covstats entirely?"
 		call_as_reference_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
+		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
-		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
 		site_min_depth: "Positions with coverage below this value will be masked in diff files"
 		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
 	}
+	# Flip some QC stuff around
+	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
+
+	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
+	Boolean QC_soft_pct_mapped = false
+	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; if running one-workflow-many-samples,
+	                                 # increasing this might speed up file localization if you have >5,000 samples
+	# no equivalent to myco_raw strip_all_underscores
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
-	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
-	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
+	
+	
 	Int subsample_seed             = 1965  # if you're trying replicate our results, leave this untouched!
 
 	#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
@@ -84,8 +85,9 @@ workflow myco {
 	# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
 	Boolean decontam_use_CDC_varpipe_ref   = false
 
-	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; if running one-workflow-many-samples,
-	                                 # increasing this might speed up file localization if you have >5,000 samples
+	# Used for some workarounds
+	String pass = "PASS"
+	
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -200,7 +202,7 @@ workflow myco {
 							vcf = vcfs_and_bams.right,
 							min_coverage_per_site = site_min_depth,
 							tbmf = call_as_reference_bedfile,
-							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+							max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 					}
 				}
 			}
@@ -215,7 +217,7 @@ workflow myco {
 					vcf = vcfs_and_bams.right,
 					min_coverage_per_site = site_min_depth,
 					tbmf = call_as_reference_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+					max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 			}
 		}
 		
