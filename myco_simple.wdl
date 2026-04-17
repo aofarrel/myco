@@ -42,7 +42,7 @@ workflow myco {
 		paired_decontaminated_fastq_sets: "Nested array of decontaminated and merged fastq pairs. Each inner array represents one sample; each sample needs precisely one gzipped forward read and one gzipped reverse read."
 		timeout_variant_caller: "Discard any sample that is still running in clockwork variant_call_one_sample after this many minutes (set to 0 to never timeout)"
 	}
-	Float QC_max_pct_low_coverage_sites_float = max_low_coverage_sites / 100.0
+	Float sample_max_pct_masked_float = max_low_coverage_sites / 100.0
 
 	scatter(paired_fastqs in paired_decontaminated_fastq_sets) {
 		if(fastp_clean) {
@@ -70,7 +70,7 @@ workflow myco {
 				bam = vcfs_and_bams.left,
 				vcf = vcfs_and_bams.right,
 				min_coverage_per_site = min_coverage_per_site,
-				max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float,
+				max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float,
 			}
 	}
 

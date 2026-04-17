@@ -29,49 +29,65 @@ workflow myco {
 	input {
 		File biosample_accessions
 
-		Boolean just_like_2024                 = false
-		Int     clean_average_q_score          = 29
-		Boolean covstatsQC_skip_entirely       = true
-		File?   mask_bedfile
-		Boolean decontam_use_CDC_varpipe_ref   = false
+		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
+		String? comment
+		Int     fastp_avg_qual              = 29
+		Boolean just_like_2024              = false
+		Boolean guardrail_mode              = true
+		#Boolean low_resource_mode          --> no myco_sra equivalent
+		Int     sample_max_pct_masked       = 20
+		#Int     sample_min_pct_mapped      --> no myco_sra equivalent
+		#Int     sample_min_avg_depth       --> no myco_sra equivalent
+		Int     sample_min_q30              = 90      # note inconsistency with myco_raw
+		Int     site_min_depth              = 10
+		Boolean skip_covstats               = true
+		Int     subsample_cutoff            = 450     # set to -1 to turn off subsampling entirely
+		Int     subsample_reads             = 1000000
 		
 		# QC stuff 
-		Int     QC_max_pct_low_coverage_sites  =    20
 		Int     QC_max_pct_unmapped            =     2
-		Int     QC_min_mean_coverage           =    10
-		Int     QC_min_q30                     =    90
-		Boolean QC_soft_pct_mapped             = false
-		Int     QC_this_is_low_coverage        =    10
-		Int     quick_tasks_disk_size          =    10 
-		Boolean guardrail_mode                 = true
-		
-		# shrink large samples
-		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
-		Int     subsample_seed          = 1965  # if you're trying replicate our results, leave this untouched!
+		Int     QC_min_mean_coverage           =    10  # only applies to covstats, unlike myco_raw
+
 	}
 
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 
-		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
-		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
-		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
+		skip_covstats: "Should we skip covstats entirely?"
+		call_as_reference_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
-		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
-		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
-		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
-		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+		site_min_depth: "Positions with coverage below this value will be masked in diff files"
 		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
-		subsample_seed: "Seed used for subsampling with seqtk"
 	}
+	# Flip some QC stuff around
+	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
+
+	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
+	Boolean QC_soft_pct_mapped = false
+	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; if running one-workflow-many-samples,
+	                                 # increasing this might speed up file localization if you have >5,000 samples
+	# no equivalent to myco_raw strip_all_underscores
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
-	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
-	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
+	
+	
+	Int subsample_seed             = 1965  # if you're trying replicate our results, leave this untouched!
+
+	#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
+	# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
+	# This is currently a null op in myco_raw as it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs
+	# NTM vs other forms of contamination (which the task currently requires for some outputs). If there is a demand for CDC varpipe I can
+	# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
+	Boolean decontam_use_CDC_varpipe_ref   = false
+
+	# Used for some workarounds
+	String pass = "PASS"
+	
 
 	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
 		input:
@@ -108,7 +124,7 @@ workflow myco {
 				oldschool_docker = just_like_2024,
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
-				fastp_clean_avg_qual = clean_average_q_score,
+				fastp_clean_avg_qual = fastp_avg_qual,
 				QC_min_q30 = QC_min_q30,
 				strip_all_underscores = true,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
@@ -167,7 +183,7 @@ workflow myco {
 	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
-		if(!covstatsQC_skip_entirely) {
+		if(!skip_covstats) {
 	
 			# covstats to check coverage and percent mapped to reference
 			call goleft.covstats as covstats {
@@ -184,24 +200,24 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = QC_this_is_low_coverage,
-							tbmf = mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+							min_coverage_per_site = site_min_depth,
+							tbmf = call_as_reference_bedfile,
+							max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 					}
 				}
 			}
 		}
 		
-		if(covstatsQC_skip_entirely) {
+		if(skip_covstats) {
 		
 			# make diff files
 			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = QC_this_is_low_coverage,
-					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+					min_coverage_per_site = site_min_depth,
+					tbmf = call_as_reference_bedfile,
+					max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 			}
 		}
 		
@@ -356,6 +372,8 @@ workflow myco {
 	output {
 		File       download_report         = merge_reports.outfile
 		File       fastp_decont_report_tsv = fastp_decont_report.tsv
+
+		String?    tbd_comment             = comment
 		
 		# raw files
 		Array[File]  tbd_bais  = final_bais

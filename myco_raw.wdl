@@ -40,7 +40,8 @@ workflow myco {
 		Int     sample_min_q30              = 80
 		Int     site_min_depth              = 10
 		Boolean skip_covstats               = true
-		Int     subsample_cutoff            = -1     # note inconsistency with myco_sra and how guardrail_mode affects this
+		Int     subsample_cutoff            = -1
+		Int     subsample_reads             = 2000000
 	}
 
 	parameter_meta {
@@ -63,12 +64,6 @@ workflow myco {
 		# Fastp defines this as:
 		# "if one read's average quality score <avg_qual, then this read/pair is discarded. Default 0 means no requirement (int [=0])"
 		# What you set this value to you might affect the results of sample_min_q30, but keep in mind that is a whole-sample filter.
-
-		#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
-		# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
-		# This is currently a null op since it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs
-		# NTM vs other forms of contamination (which the task currently requires for some outputs). If there is a demand for CDC varpipe I can
-		# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
 		
 		guardrail_mode: "Implements about a half-dozen safeguards against extremely low-quality samples running for abnormally long times."
 		# Previously guardrail_mode set TBProfiler's min % masked to 10% and TBProfiler's min depth to 3, but now these use (100 - sample_max_pct_masked)
@@ -110,8 +105,10 @@ workflow myco {
 		skip_covstats: "Should we skip covstats entirely?"
 		# Covstats might be entirely removed in a future version as the current version of TBProfiler replaces our old use cases for covstats.
 
-		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable, overridden to 500000 (500 GB) if guardrail_mode=True)"
-		# One thing SRA taught me is that there will always be somebody who, with the best of intentions, uploads a terabyte of reads as a single sample
+		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
+		# If only one fastq is above the theshold, both will be downsampled to prevent weird issues
+
+		subsample_reads: "If a fastq file is larger than subsample_cutoff, downsample it to this many reads"
 	}
 
 	# Flip some QC stuff around
@@ -141,7 +138,8 @@ workflow myco {
 				QC_min_q30 = sample_min_q30,
 				strip_all_underscores = strip_all_underscores,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
-				subsample_cutoff = if guardrail_mode then 500000 else subsample_cutoff,
+				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
+				subsample_to_this_many_reads = if just_like_2024 then 1000000 else subsample_cutoff,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0,
 				addldisk = if low_resource_mode then 10 else 100,
