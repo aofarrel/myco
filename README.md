@@ -12,6 +12,7 @@ Each version of myco largely only differs in how you are passing in FASTQ files.
 For more information please see [./docs/inputs.md](./doc/inputs.md).
 
 ## More information
+**If running with miniwdl, please make sure to update miniwdl >v1.14.2 as older versions have a division error which breaks the final QC check. This does not affect Cromwell, the Dockstore CLI, nor Terra.** 
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
 * Full list of inputs: [inputs.md](./doc/inputs.md)
 * Per-workflow readmes:
