@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/refs/heads/fix-file-extensions/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/refs/heads/fix-file-extensions/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
@@ -34,11 +34,11 @@ workflow myco {
 		Boolean just_like_2024              = false
 		Boolean guardrail_mode              = true
 		Boolean low_resource_mode           = false
-		Int     sample_max_pct_masked       = 20
-		Int     sample_min_pct_mapped       = 90
-		Int     sample_min_avg_depth        = 30
-		Int     sample_min_q30              = 80
-		Int     site_min_depth              = 10
+		Int     sample_max_pct_masked       = 20     # 2024: 20
+		Int     sample_min_pct_mapped       = 90     # 2024: 98
+		Int     sample_min_avg_depth        = 30     # 2024: technically 10 but effectively 0 as only applied to skipped covstats
+		Int     sample_min_q30              = 80     # 2024: 90
+		Int     site_min_depth              = 10     # 2024: 10
 		Boolean skip_covstats               = true
 		Int     subsample_cutoff            = -1     # note inconsistency with myco_sra and how guardrail_mode affects this
 	}
@@ -168,13 +168,15 @@ workflow myco {
 			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.counts_out_tsv]) #!SelectArray
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, decontam_each_sample.counts_out_tsv])
     		
+    		# just_like_2024 is not perfect here because it is setting a median depth threshold on a FQ-derived value instead
+    		# of setting it on tbprofiler_from_bam situation.
 			call tbprofilerFQ_WF.TheiagenTBProfiler as theiagenTBprofilerFQ {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
 					soft_pct_mapped = false,
 					soft_depth = false,
-					minimum_median_depth = if guardrail_mode then 3 else 0, # super low to avoid conflict with avg depth
+					minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
 					minimum_mean_depth = sample_min_avg_depth,
 					minimum_pct_mapped = sample_min_pct_mapped,
 					sample = decontam_each_sample.sample
@@ -531,8 +533,8 @@ workflow myco {
 		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
 
 		# Typically unusued -- these work fine, I just want Terra's UI to be less crowded
-		#Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
-		#Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
 		#Array[File?] tbd_covstats_reports          = covstats.covstatsOutfile
 		#Float? tbd_qc_pct_unmapped_covstats        = percentUnmapped
 
