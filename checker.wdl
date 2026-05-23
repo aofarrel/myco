@@ -20,15 +20,27 @@ workflow checker {
 		String TRUTH_code
 		Array[File] FALLBACK_bai
 		Array[File] FALLBACK_diff
-		Array[File] FALLBACK_report
 		Array[File] FALLBACK_vcf
 		
 		# These are arrays, but they should only contain one (or zero) values
-		Array[File] TRUTH_bai
-		Array[File] TRUTH_diff
-		Array[File] TRUTH_qc
-		Array[File] TRUTH_report  # TODO fix or remove report
-		Array[File] TRUTH_vcf
+
+		# When running myco_raw at default values, these should be the result
+		Array[File] TRUTH_default_bai
+		Array[File] TRUTH_default_diff
+		Array[File] TRUTH_default_qc
+		Array[File] TRUTH_default_vcf
+
+		# When running myco_raw at default values, except just_like_2024 = true
+		Array[File] TRUTH_legacy_clockworkCHM13decon_bai
+		Array[File] TRUTH_legacy_clockworkCHM13decon_diff
+		Array[File] TRUTH_legacy_clockworkCHM13decon_qc
+		Array[File] TRUTH_legacy_clockworkCHM13decon_vcf
+
+		# When running myco_raw at default values, except just_like_2024 = true and use_varpipe = true
+		Array[File] TRUTH_legacy_varpipedecon_bai
+		Array[File] TRUTH_legacy_varpipedecon_diff
+		Array[File] TRUTH_legacy_varpipedecon_qc
+		Array[File] TRUTH_legacy_varpipedecon_vcf
 
 		Int checker_disk_size_override
 	}
