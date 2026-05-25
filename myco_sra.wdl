@@ -2,11 +2,11 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.31/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.31/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
 
 # Copyright (C) 2025 Ash O'Farrell
@@ -42,10 +42,10 @@ workflow myco {
 		Int     site_min_depth              = 10
 		Boolean skip_covstats               = true
 		Int     subsample_cutoff            = 450     # set to -1 to turn off subsampling entirely
-		Int     subsample_reads             = 1000000
+		Int     subsample_reads             = 1000000 # 2000000 in myco_raw
 		
 		# QC stuff 
-		Int     QC_max_pct_unmapped            =     2
+		Int     QC_max_pct_unmapped            =     2  # only applies to covstats
 		Int     QC_min_mean_coverage           =    10  # only applies to covstats, unlike myco_raw
 
 	}
@@ -53,7 +53,7 @@ workflow myco {
 	parameter_meta {
 		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
 
-		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
+		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of sample_min_q30."
 		skip_covstats: "Should we skip covstats entirely?"
 		call_as_reference_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 
@@ -76,7 +76,7 @@ workflow myco {
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
 	
 	
-	Int subsample_seed             = 1965  # if you're trying replicate our results, leave this untouched!
+	Int subsample_seed             = 1965
 
 	#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
 	# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
@@ -100,8 +100,9 @@ workflow myco {
 			input:
 				biosample_accession = biosample_accession,
 				fail_on_invalid = false,
-				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
-				subsample_seed = subsample_seed,
+				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
+				subsample_seed = if just_like_2024 then 1965 else subsample_seed,
+				subsample_to_x_reads = if just_like_2024 then 1000000 else subsample_reads,
 				tar_outputs = false
 		} # output: pull.fastqs
 		if(length(pull.fastqs)>1) {
@@ -125,7 +126,7 @@ workflow myco {
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				fastp_clean_avg_qual = fastp_avg_qual,
-				QC_min_q30 = QC_min_q30,
+				QC_min_q30 = sample_min_q30,
 				strip_all_underscores = true,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				timeout_map_reads = if guardrail_mode then 120 else 0,
@@ -140,7 +141,7 @@ workflow myco {
     		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
 			if(!(TBProf_on_bams_not_fastqs)) {
-				call tbprofilerFQ_WF.ThiagenTBProfiler as theiagenTBprofilerFQ {
+				call tbprofilerFQ_WF.TheiagenTBProfiler as theiagenTBprofilerFQ {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
