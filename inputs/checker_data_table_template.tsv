@@ -1,4 +1,4 @@
-entity:checker_id	extension	BioSample	downsampled	fqs
+entity:checker_id	extension	myco_sra_input_BioSample	downsampled	myco_raw_input_fqs
 multistrain_pass_1	fastq.gz	SAMEA104362188	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA104362188_ERR2184347_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA104362188_ERR2184347_2.fastq.gz"]]
 multistrain_pass_2	fq.gz	SAMEA7546014	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA7546014_ERR4812510_1.fq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA7546014_ERR4812510_2.fq.gz"]]
 multistrain_pass_3	fastq.gz	SAMEA7562370	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA7562370_ERR4829931_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA7562370_ERR4829931_2.fastq.gz"]]
