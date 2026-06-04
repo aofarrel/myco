@@ -4,7 +4,7 @@ multistrain_pass_2	fq.gz	SAMEA7546014	Y	[["gs://ucsc-pathogen-genomics-public/tb
 multistrain_pass_3	fastq.gz	SAMEA7562370	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA7562370_ERR4829931_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA7562370_ERR4829931_2.fastq.gz"]]
 multistrain_pass_4	fastq.gz	SAMN15772665	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMN15772665_SRR12420677_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMN15772665_SRR12420677_2.fastq.gz"]]
 multistrain_pass_5	fastq.gz	SAMN25995062	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMN25995062_SRR19428603_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMN25995062_SRR19428603_2.fastq.gz"]]
-multistrain_pass_6_R1R2	fastq	SAMEA104362488	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA104362488_ERR2184647_R1.fastq", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA104362488_ERR2184647_R2.fastq"]]
+multistrain_pass_6_R1R2	fastq	SAMEA104362488	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/SAMEA104362488_ERR2184647_R1.fastq", "gs://ucsc-pathogen-genomics-public/tb/fq/SAMEA104362488_ERR2184647_R2.fastq"]]
 multistrain_pass_7	fq	SAMEA104600448	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/SAMEA104600448_ERR2307669_1.fq", "gs://ucsc-pathogen-genomics-public/tb/fq/SAMEA104600448_ERR2307669_2.fq"]]
 multistrain_pass_8_R1R2	fq.gz	SAMEA110024222	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA110024222_R1.fq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA110024222_R2.fq.gz"]]
 multistrain_pass_9	fastq.gz	SAMEA110037041	Y	[["gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA110037041_ERR9786506_1.fastq.gz", "gs://ucsc-pathogen-genomics-public/tb/fq/gz/SAMEA110037041_ERR9786506_2.fastq.gz"]]
