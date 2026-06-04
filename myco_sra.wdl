@@ -271,7 +271,7 @@ workflow myco {
 	if(!(length(coerced_bam_strains) == 0)) {
 	
 		# if there is more than one sample, run some tasks to concatenate the outputs
-		if(length(pulled_fastqs) != 1) {
+		if(!(is_single_sample_run)) {
 			Array[String] bam_strains_with_header = flatten([["sample\tsublineage"], coerced_bam_strains])
 			Array[String] bam_resista_with_header = flatten([["sample\tresistance"], coerced_bam_resistances])
 			Array[String] bam_meddept_with_header = flatten([["sample\tmedn_depth"], coerced_bam_depths])
@@ -299,10 +299,12 @@ workflow myco {
 		}
 		
 		# if there is only one sample, there's no need to run tasks
-		if(length(pulled_fastqs) == 1) {
-			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]
-			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0]
-			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]
+		if(is_single_sample_run) {
+			# these are tab-delimited and break Terra data tables, so they're no longer workflow outputs
+			# TODO: either remove tbprof on bam or output its stats to the terra data table too
+			String single_sample_tbprof_bam_samp_tab_depth      = coerced_bam_depths[0]
+			String single_sample_tbprof_bam_samp_tab_resistance = coerced_bam_resistances[0]
+			String single_sample_tbprof_bam_samp_tab_strain     = coerced_bam_strains[0]
 		}
 	}
   	
@@ -317,7 +319,7 @@ workflow myco {
 	if(!(length(coerced_fq_strains) == 0)) {
 	
 		# if there is more than one sample, run some tasks to concatenate the outputs
-		if(length(pulled_fastqs) != 1) {
+		if(is_single_sample_run) {
 			Array[String] fq_strains_with_header = flatten([["sample\tsublineage"], coerced_fq_strains])
 			Array[String] fq_resista_with_header = flatten([["sample\tresistance"], coerced_fq_resistances])
 			Array[String] fq_meddept_with_header = flatten([["sample\tmedn_depth"], coerced_fq_depths])
@@ -344,35 +346,51 @@ workflow myco {
 			}
 		}
 	
-		# if there is only one sample, there's no need to run tasks
-		if(length(pulled_fastqs) == 1) {
-			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]
-			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0]
-			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]
+		# if there is only one sample, there's no need to run tasks, just output directly
+		if(is_single_sample_run) {
+			# these are tab-delimited and break Terra data tables, so they're no longer workflow outputs
+			String single_sample_tbprof_fq_samp_tab_depth      = coerced_fq_depths[0]
+			String single_sample_tbprof_fq_samp_tab_resistance = coerced_fq_resistances[0]
+			String single_sample_tbprof_fq_samp_tab_strain     = coerced_fq_strains[0]
+
+			# these ones are not tab-delimited (nor are they coerced, but I think that's okay)
+			Float?  single_sample_tbprof_fq_median_depth      = theiagenTBprofilerFQ.median_depth[0]
+			Float?  single_sample_tbprof_fq_avg_depth         = theiagenTBprofilerFQ.avg_depth[0]
+			Float?  single_sample_tbprof_fq_pct_mapped        = theiagenTBprofilerFQ.pct_reads_mapped[0]
+			Float?  single_sample_tbprof_fq_pct_covered       = theiagenTBprofilerFQ.pct_genome_covered[0]
+			Int?    single_sample_tbprof_fq_n_dr_variants     = theiagenTBprofilerFQ.n_dr_variants[0]
+			Int?    single_sample_tbprof_fq_n_other_variants  = theiagenTBprofilerFQ.n_other_variants[0]
+			String? single_sample_tbprof_fq_resistance        = theiagenTBprofilerFQ.resistance[0]
+			String? single_sample_tbprof_fq_strain            = theiagenTBprofilerFQ.strain[0]
+
 		}
 	}
 
 	Array[String] columns = ["BioSample","raw_pct_above_q20","raw_pct_above_q30","raw_total_reads","post_cleaning_pct_above_q20","post_cleaning_pct_above_q30","post_decontam_pct_above_q20","post_decontam_pct_above_q30","post_decontam_total_reads","reads_is_contam","reads_TB_reference","reads_NTM","docker","status"]
-	
-	call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
-		input:
-			row_keys = fastp_decontam_check.sample,
-			column_keys = columns,
-			value1 = fastp_decontam_check.q20_in,
-			value2 = fastp_decontam_check.q30_in,
-			value3 = fastp_decontam_check.reads_in,
-			value4 = fastp_decontam_check.q20_postclean,
-			value5 = fastp_decontam_check.q30_postclean,
-			# cleaned_total_reads purposely excluded; it's borked
-			value6 = fastp_decontam_check.q20_postdecon,
-			value7 = fastp_decontam_check.q30_postdecon,
-			value8 = fastp_decontam_check.reads_postdecon_per_fastp,
-			value9 = fastp_decontam_check.reads_contam,
-			value10 = fastp_decontam_check.reads_TB,
-			value11 = fastp_decontam_check.reads_NTM,
-			value12 = fastp_decontam_check.docker_used,
-			value13 = fastp_decontam_check.error_code
+
+	if (!(is_single_sample_run)) {
+			call sranwrp_processing.several_arrays_to_tsv as fastp_decont_report {
+			input:
+				row_keys = fastp_decontam_check.sample,
+				column_keys = columns,
+				value1 = fastp_decontam_check.q20_in,
+				value2 = fastp_decontam_check.q30_in,
+				value3 = fastp_decontam_check.reads_in,
+				value4 = fastp_decontam_check.q20_postclean,
+				value5 = fastp_decontam_check.q30_postclean,
+				# cleaned_total_reads purposely excluded; it's borked
+				value6 = fastp_decontam_check.q20_postdecon,
+				value7 = fastp_decontam_check.q30_postdecon,
+				value8 = fastp_decontam_check.reads_postdecon_per_fastp,
+				value9 = fastp_decontam_check.reads_contam,
+				value10 = fastp_decontam_check.reads_TB,
+				value11 = fastp_decontam_check.reads_NTM,
+				value12 = fastp_decontam_check.docker_used,
+				value13 = fastp_decontam_check.error_code
+		}
 	}
+	
+	
 
 	#########################################
 	# error reporting for Terra data tables #
@@ -470,7 +488,6 @@ workflow myco {
 	output {
 		File?      download_report         = merge_reports.outfile
 		String     tbd_status              = select_first([finalcode, multi_sample_status_code])
-		File       fastp_decont_report_tsv = fastp_decont_report.tsv
 		
 		# raw files
 		Array[File]  tbd_bais  = final_bais
@@ -491,32 +508,27 @@ workflow myco {
 		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
 		
 		# these outputs only exist if there are multiple samples
+		File?        fastp_decont_report_tsv    = fastp_decont_report.tsv
 		File?        tbprof_bam_all_depths      = collate_bam_depth.outfile
 		File?        tbprof_bam_all_strains     = collate_bam_strains.outfile
 		File?        tbprof_bam_all_resistances = collate_bam_resistance.outfile
 		File?        tbprof_fq_all_depths       = collate_fq_depth.outfile
 		File?        tbprof_fq_all_strains      = collate_fq_strains.outfile
 		File?        tbprof_fq_all_resistances  = collate_fq_resistance.outfile
-		
-		# these outputs only exist if we ran on a single sample
-		String?      tbprof_bam_this_depth      = single_sample_tbprof_bam_depth
-		String?      tbprof_bam_this_strain     = single_sample_tbprof_bam_strain
-		String?      tbprof_bam_this_resistance = single_sample_tbprof_bam_resistance
-		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
-		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
-		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
 
 		# not as many stats as myco_raw for now as I'm still figuring out the best way to handle this in the multi-sample case
-		Float   tbd_qc_q30_in = fastp_decontam_check.q30_in[0]
-		Float   tbd_qc_pct_reads_NTM = fastp_decontam_check.pct_reads_NTM[0] # TODO: how to handle for varpipe?
-		Int     tbd_qc_reads_adapter_trimmed = fastp_decontam_check.reads_adapter_trimmed[0]
-		Float?  tbd_qc_median_depth_per_tbprof = theiagenTBprofilerFQ.median_depth[0]
-		Float?  tbd_qc_avg_depth_per_tbprof = theiagenTBprofilerFQ.avg_depth[0]
-		Float?  tbd_qc_pct_mapped_per_tbprof = theiagenTBprofilerFQ.pct_reads_mapped[0]
-		Float?  tbd_qc_pct_genome_covered = theiagenTBprofilerFQ.pct_genome_covered[0]
-		Int?    tbd_n_dr_variants = theiagenTBprofilerFQ.n_dr_variants[0]
-		Int?    tbd_n_other_variants = theiagenTBprofilerFQ.n_other_variants[0]
-		String? tbd_resistance = theiagenTBprofilerFQ.resistance[0]
-		String? tbd_strain_per_tbprof = theiagenTBprofilerFQ.strain[0]
+		# these are also not coerced, unlike the myco_raw versions, so I'm not sure if that means myco_raw and myco_sra will
+		# output different things in the not defined case.
+		#Float   tbd_qc_q30_in                 = fastp_decontam_check.q30_in[0]
+		#Float   tbd_qc_pct_reads_NTM          = fastp_decontam_check.pct_reads_NTM[0] # TODO: how to handle for varpipe?
+		#Int     tbd_qc_reads_adapter_trimmed  = fastp_decontam_check.reads_adapter_trimmed[0]
+		Float?  tbd_qc_median_depth_per_tbprof = single_sample_tbprof_fq_median_depth
+		Float?  tbd_qc_avg_depth_per_tbprof    = single_sample_tbprof_fq_avg_depth
+		Float?  tbd_qc_pct_mapped_per_tbprof   = single_sample_tbprof_fq_pct_mapped
+		Float?  tbd_qc_pct_genome_covered      = single_sample_tbprof_fq_pct_covered
+		Int?    tbd_n_dr_variants              = single_sample_tbprof_fq_n_dr_variants
+		Int?    tbd_n_other_variants           = single_sample_tbprof_fq_n_other_variants
+		String? tbd_resistance                 = single_sample_tbprof_fq_resistance
+		String? tbd_strain_per_tbprof          = single_sample_tbprof_fq_strain
 	}
 }
