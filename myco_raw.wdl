@@ -69,20 +69,25 @@ workflow myco {
 		# Previously guardrail_mode set TBProfiler's min % masked to 10% and TBProfiler's min depth to 3, but now these use (100 - sample_max_pct_masked)
 		# and sample_min_avg_depth instead.
 
-		output_sample_name: "Override ALL sample names with this string instead."
-		# Currently required to deal with certain CDPH edge cases. For Terra data tables, set this to the sample's entity_id column (the one on the far
-		# left that acts like an index).
-		# TODO: This makes the multi-sample-per-workflow case give the same output. All WDL executers I'm aware of put all scattered outs in different folders,
-		# so this won't overwrite per say, but it's not ideal... I need to make sure paired_fastqs being Array[Array[File]] will zip() nicely with an
-		# Array[String] version of output_sample_name.
+		low_resource_mode: "Request less RAM, cores, and storage. GCP/TERRA WARNING: There's a nonzero chance this will actually end up MORE expensive; see docs"
+		# Preemptible machines are BY FAR the best way to save money on quick runs, so this can be a footgun if your samples are large enough.
+		# As of 7.0.10 all non-low_resource_mode values (ie when this is false) match the 2.16.9 version of clockwork-wdl's defaults
+
+		output_sample_name: "Override ALL sample names with this string instead. Do not use this if not running one-sample-per-workflow-instance!"
+		# Currently required to deal with certain CalTBNet edge cases. For Terra data tables, set this to the sample's entity_id column (the one on the
+		# far left that acts like an index).
+		# All WDL executers I'm aware of put all scattered outs in different folders, so if you accidentally set this on a multi-sample-workflow-run,
+		# there will be no overwrites. Also, since arrays retain their order in WDL, you can still recover which samples are which, 
+		# but it's going to be a bit painful (especially if some qc-failing samples dropped out).
 
 		paired_fastq_sets: "Nested array of paired fastqs, each inner array representing one samples worth of paired fastqs"
-		# On a sample-indexed data table on Terra, you'll probably want something like `[[this.read1, this.read2]]`, but you also have the option of running
-		# multiple samples at once thanks to the nesting. For example, if you have three samples:
+		# On a sample-indexed data table on Terra, you'll probably want something like `[[this.read1, this.read2]]`, but you also have the option of 
+		# running multiple samples at once thanks to the nesting. For example, if you have three samples:
 		# [["gs://bucket/foo_1.fq", "gs://bucket/foo_2.fq"], ["gs://bucket/bar_1.fq", "gs://bucket/bar_2.fq"], ["gs://bucket/bizz_1.fq", "gs://bucket/bizz_2.fq"]]
-		# Will be read processed as three different samples using WDL scatter(). It is okay if some samples fail and others pass; the passing samples will complete
-		# the rest of the pipeline (ie generate diff files) even if other samples "drop out" earlier. This requires some special handling in WDL 1.0 however; please
-		# be cautious if you update this pipeline to WDL 1.1 as the workarounds I use for this may require some tinkering under WDL 1.1 standards.
+		# Will be read processed as three different samples using WDL scatter(). It is okay if some samples fail and others pass; passing samples 
+		# will complete the rest of the pipeline (ie generate diff files) even if other samples "drop out" earlier. This requires some special 
+		# handling in WDL 1.0 however; please be cautious if you update this pipeline to WDL 1.1 as the workarounds I use for this may require 
+		# some tinkering under WDL 1.1 standards. There is also a nonzero chance Cromwell will one day introduce a breaking change...
 
 		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
 		# It'd be more accurate to call this sample_pct_below_site_min_depth but that's far too long!
@@ -100,7 +105,7 @@ workflow myco {
 		# samples that it'd meaningfully affect TB-D's utility for tracking disease.
 
 		site_min_depth: "Positions with coverage below this value will be masked in diff files; see also sample_max_pct_masked"
-		# This is explict masking with -, as opposed to "masking to reference"
+		# This is explict masking with -, as opposed to "masking to reference" which essentially, well, calls reference. Doesn't affect VCFs.
 
 		skip_covstats: "Should we skip covstats entirely?"
 		# Covstats might be entirely removed in a future version as the current version of TBProfiler replaces our old use cases for covstats.

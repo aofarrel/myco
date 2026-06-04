@@ -34,7 +34,7 @@ workflow myco {
 		Int     fastp_avg_qual              = 29
 		Boolean just_like_2024              = false
 		Boolean guardrail_mode              = true
-		#Boolean low_resource_mode          --> no myco_sra equivalent
+		Boolean low_resource_mode           = false
 		Int     sample_max_pct_masked       = 20
 		#Int     sample_min_pct_mapped      --> no myco_sra equivalent
 		#Int     sample_min_avg_depth       --> no myco_sra equivalent
@@ -130,7 +130,9 @@ workflow myco {
 				strip_all_underscores = true,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				timeout_map_reads = if guardrail_mode then 120 else 0,
-				timeout_decontam = if guardrail_mode then 300 else 0
+				timeout_decontam = if guardrail_mode then 300 else 0,
+				addldisk = if low_resource_mode then 10 else 100,
+				memory = if low_resource_mode then 8 else 32
 				# no subsample cutoff here because that happens during the pull task
 		}
 
@@ -159,7 +161,10 @@ workflow myco {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						tarball_bams_and_bais = false,
-						timeout = if guardrail_mode then 600 else 0
+						timeout = if guardrail_mode then 600 else 0,
+						addldisk = if low_resource_mode then 10 else 100,
+						cpu = if low_resource_mode then 8 else 16,
+						memory = if low_resource_mode then 8 else 32
 				}
 			}
 		}
