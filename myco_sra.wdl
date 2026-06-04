@@ -97,8 +97,11 @@ workflow myco {
 				tar_outputs = false
 		}
 		if(length(pull.fastqs)>1) {
-    		Array[File] paired_fastqs=select_all(pull.fastqs)
-  		}
+			Array[File] paired_fastqs=select_all(pull.fastqs)
+		}
+		if(!(length(pull.fastqs)>1)) {
+			String pull_ERR = "ERROR_PULLING_FROM_SRA_SEE_DOWNLOAD_REPORT"
+		}
 	}
 
 	if (generate_download_report_file) {
@@ -138,8 +141,8 @@ workflow myco {
 			# kind of random bogus file and use that as the fallback here and elsewhere, or to take the approach in myco_raw,
 			# which in some ways is even more cursed.
 			#
-    		File real_decontaminated_fastq_1=select_first([fastp_decontam_check.decontaminated_fastq_1, biosample_accessions])
-    		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
+			File real_decontaminated_fastq_1=select_first([fastp_decontam_check.decontaminated_fastq_1, biosample_accessions])
+			File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
 			if(!(TBProf_on_bams_not_fastqs)) {
 				call tbprofilerFQ_WF.ThiagenTBProfiler as theiagenTBprofilerFQ {
@@ -307,10 +310,10 @@ workflow myco {
 			String single_sample_tbprof_bam_samp_tab_strain     = coerced_bam_strains[0]
 		}
 	}
-  	
-  	# pull TBProfiler information, if we ran TBProfiler on fastqs
-  	
-  	# coerce optional types into required types (doesn't crash if these are null)
+	
+	# pull TBProfiler information, if we ran TBProfiler on fastqs
+	
+	# coerce optional types into required types (doesn't crash if these are null)
 	Array[String] coerced_fq_strains=select_all(theiagenTBprofilerFQ.sample_and_strain)
 	Array[String] coerced_fq_resistances=select_all(theiagenTBprofilerFQ.sample_and_resistance)
 	Array[String] coerced_fq_depths=select_all(theiagenTBprofilerFQ.sample_and_depth)
@@ -483,7 +486,7 @@ workflow myco {
 		# because covstats_ERR is undefined if !skip_covstats, covstats_ERR should not short-circuit to pass
 		# TODO: because zeroth_sample_pull_code is defined regardless of pass/fail, if it's at the front we will never
 		# get error codes and if it's before pass we will never fall back to pass
-		String finalcode = select_first([decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
+		String finalcode = select_first([pull_ERR, decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
 	}
 	String multi_sample_status_code = "multi-sample run"
 		
