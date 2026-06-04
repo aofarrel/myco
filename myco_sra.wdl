@@ -481,7 +481,9 @@ workflow myco {
 		# final-final-final error code
 		# because skipping FQ TBProfiler via earlyQC_skip_QC is no longer an option, its code is no longer at the end
 		# because covstats_ERR is undefined if !skip_covstats, covstats_ERR should not short-circuit to pass
-		String finalcode = select_first([zeroth_sample_pull_code, decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
+		# TODO: because zeroth_sample_pull_code is defined regardless of pass/fail, if it's at the front we will never
+		# get error codes and if it's before pass we will never fall back to pass
+		String finalcode = select_first([decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
 	}
 	String multi_sample_status_code = "multi-sample run"
 		
