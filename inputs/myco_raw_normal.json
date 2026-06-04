@@ -1,0 +1,5 @@
+{
+  "myco.paired_fastq_sets": [
+    ["./inputs/data/fastqs/ERR7057565_tiny_1.fq", "./inputs/data/fastqs/ERR7057565_tiny_2.fq"],
+    ["./inputs/data/fastqs/SAMN25995139_SRR19428597_1.fastq", "./inputs/data/fastqs/SAMN25995139_SRR19428597_2.fastq"]],
+}
