@@ -32,7 +32,7 @@ workflow myco {
 
 		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
-		Boolean covstatsQC_skip_entirely       = true
+		Boolean skip_covstats                  = true
 		Boolean generate_download_report_file  = true
 		File?   mask_bedfile
 		Boolean decontam_use_CDC_varpipe_ref   = false
@@ -57,7 +57,7 @@ workflow myco {
 		biosample_accession_str: "String of one (1) BioSample accession to pull. Recommended for Terra users. If biosample_accessions_file exists, biosample_accession_str will be ignored."
 
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
-		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
+		skip_covstats: "Should we skip covstats entirely?"
 		generate_download_report_file: "Generate file reporting all pulls (recommended if multi-sample batch that uses biosample_accessions_file)"
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 
@@ -84,7 +84,7 @@ workflow myco {
 				filter_na = true
 		}
 	}
-
+	
 	Array[String] biosample_accessions = select_first([get_sample_IDs.accessions, [biosample_accession_str]])
 	
 	scatter(biosample_accession in biosample_accessions) {
@@ -164,8 +164,11 @@ workflow myco {
 				}
 			}
 		}
-			
+		
 	}
+
+	# Will be used to determine if we need to concatenate QC information into a file or just present as-is
+	Boolean is_single_sample_run = if (length(pulled_fastqs) == 1) then true else false
 
 	Array[File] minos_vcfs = flatten([select_all(variant_calling.adjudicated_vcf)])
 	Array[File] final_bams = flatten([select_all(variant_calling.bam)])
@@ -185,7 +188,7 @@ workflow myco {
 	# ref-included version of the variant caller has an option to output the bams and bais as a tarball. You can use
 	# that to recreate the simplier scatter of version 4.4.1 or earlier of myco. You will need to modify some tasks to
 	# untar things, of course.
-		if(!covstatsQC_skip_entirely) {
+		if(!skip_covstats) {
 	
 			# covstats to check coverage and percent mapped to reference
 			call goleft.covstats as covstats {
@@ -210,7 +213,7 @@ workflow myco {
 			}
 		}
 		
-		if(covstatsQC_skip_entirely) {
+		if(skip_covstats) {
 		
 			# make diff files
 			call diff.make_mask_and_diff as make_mask_and_diff_no_covstats {
@@ -370,9 +373,103 @@ workflow myco {
 			value12 = fastp_decontam_check.docker_used,
 			value13 = fastp_decontam_check.error_code
 	}
+
+	#########################################
+	# error reporting for Terra data tables #
+	#########################################
+	#
+	# When running on a Terra data table, one instance of the workflow is created for every sample. (As opposed to running one
+	# one instance of the workflow that handles multiple samples, which is what we did for NCBI SRA samples.) In the one-instance
+	# case, we can return an error code for an individual sample as workflow-level output, which gets written to the Terra data table.
+	
+	# is there only one sample?
+	if(is_single_sample_run) {
+
+		String zeroth_sample_pull_code = pull.results[0]
+
+		# did the decontamination step actually run? (note that defined() is not a robust check, but since this is the first task
+		# in the workflow this should be okay for now)
+		if(defined(fastp_decontam_check.error_code)) {
+		
+			# Sidenote: If you have a task taking in fastp_decontam_check.error_code, even after this defined check, it will fail
+			# command instantiation with "Cannot interpolate Array[String?] into a command string with attribute set 
+			# [PlaceholderAttributeSet(None,None,None,Some( ))]".
+		
+			# get the first (0th) value, eg only value since there's just one sample, and coerce it into type String
+			String coerced_decontam_errorcode = select_first([fastp_decontam_check.error_code[0], "WORKFLOW_ERROR_1_REPORT_TO_DEV"])
+			
+			# did the decontamination step return an error?
+			if(!(coerced_decontam_errorcode == pass)) {          
+				String decontam_ERR = coerced_decontam_errorcode
+			}
+		}
+		
+		# handle Theiagen TBPRofiler, which serves as earlyQC (if it ran at all)
+		
+		Array[String] earlyQC_array_coerced = select_all(theiagenTBprofilerFQ.status_code)
+		Array[String] earlyQC_errorcode_array = flatten([earlyQC_array_coerced, ["PASS"]]) # will fall back to PASS if earlyQC was skipped
+		if(!(earlyQC_errorcode_array[0] == pass)) {          
+			String earlyQC_ERR = earlyQC_errorcode_array[0]
+		}
+
+		# The WDL 1.0 spec does not say what happens if you give select_all() an array that only has optional values, but
+		# the WDL 1.1 spec says you get an empty array. Thankfully, Cromwell handles 1.0-select_all() like the 1.1 spec.
+		Array[String] errorcode_if_earlyQC = select_all(variant_calling.errorcode)
+		
+		# if the variant caller did not run, the fallback pass will be selected, even though the sample shouldn't be considered a pass, so
+		# the final-final-final error code needs to have decontam's error come before the variant caller error.
+		Array[String] varcall_errorcode_array = flatten([errorcode_if_earlyQC, ["PASS"]])
+		if(!(varcall_errorcode_array[0] == pass)) {          
+				String varcall_ERR = varcall_errorcode_array[0]
+		}
+		
+		# handle covstats
+		if (!skip_covstats) {
+			if (varcall_errorcode_array[0] == "PASS") {
+				if(length(covstats.percentUnmapped) > 0) {
+					# cannot use defined(covstats.percentUnmapped) as it is always true, so we instead
+					# check if there are more than zero values in the output array for covstats
+					Array[Float] percentsUnmapped = select_all(covstats.percentUnmapped)
+					Float        percentUnmapped = percentsUnmapped[0]
+					Array[Float] meanCoverages = select_all(covstats.coverage)
+					Float        meanCoverage = meanCoverages[0]
+					
+					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})"
+						if(meanCoverage < QC_min_mean_coverage) {
+							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+						} 
+					}
+					if(meanCoverage < QC_min_mean_coverage) {
+						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					}
+				}
+			}
+			String coerced_covstats_error = select_first([double_bad, too_low_coverage, too_many_unmapped, "PASS"])
+			if(!(coerced_covstats_error == pass)) {          
+					String covstats_ERR = coerced_covstats_error
+			}
+		}
+		
+		# handle vcf to diff
+		# will use the same workaround as the variant caller
+		Array[String] vcfdiff_errorcode_if_covstats = select_all(make_mask_and_diff_after_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_if_no_covstats = select_all(make_mask_and_diff_no_covstats.errorcode)
+		Array[String] vcfdiff_errorcode_array = flatten([vcfdiff_errorcode_if_covstats, vcfdiff_errorcode_if_no_covstats, ["PASS"]])
+		if(!(vcfdiff_errorcode_array[0] == pass)) {          
+				String vcfdiff_ERR = vcfdiff_errorcode_array[0]
+		}
+		
+		# final-final-final error code
+		# because skipping FQ TBProfiler via earlyQC_skip_QC is no longer an option, its code is no longer at the end
+		# because covstats_ERR is undefined if !skip_covstats, covstats_ERR should not short-circuit to pass
+		String finalcode = select_first([zeroth_sample_pull_code, decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
+	}
+	String multi_sample_status_code = "multi-sample run"
 		
 	output {
 		File?      download_report         = merge_reports.outfile
+		String     tbd_status              = select_first([finalcode, multi_sample_status_code])
 		File       fastp_decont_report_tsv = fastp_decont_report.tsv
 		
 		# raw files
@@ -408,5 +505,18 @@ workflow myco {
 		String?      tbprof_fq_this_depth       = single_sample_tbprof_fq_depth
 		String?      tbprof_fq_this_strain      = single_sample_tbprof_fq_strain
 		String?      tbprof_fq_this_resistance  = single_sample_tbprof_fq_resistance
+
+		# not as many stats as myco_raw for now as I'm still figuring out the best way to handle this in the multi-sample case
+		Float   tbd_qc_q30_in = fastp_decontam_check.q30_in[0]
+		Float   tbd_qc_pct_reads_NTM = fastp_decontam_check.pct_reads_NTM[0] # TODO: how to handle for varpipe?
+		Int     tbd_qc_reads_adapter_trimmed = fastp_decontam_check.reads_adapter_trimmed[0]
+		Float?  tbd_qc_median_depth_per_tbprof = theiagenTBprofilerFQ.median_depth[0]
+		Float?  tbd_qc_avg_depth_per_tbprof = theiagenTBprofilerFQ.avg_depth[0]
+		Float?  tbd_qc_pct_mapped_per_tbprof = theiagenTBprofilerFQ.pct_reads_mapped[0]
+		Float?  tbd_qc_pct_genome_covered = theiagenTBprofilerFQ.pct_genome_covered[0]
+		Int?    tbd_n_dr_variants = theiagenTBprofilerFQ.n_dr_variants[0]
+		Int?    tbd_n_other_variants = theiagenTBprofilerFQ.n_other_variants[0]
+		String? tbd_resistance = theiagenTBprofilerFQ.resistance[0]
+		String? tbd_strain_per_tbprof = theiagenTBprofilerFQ.strain[0]
 	}
 }

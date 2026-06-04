@@ -129,6 +129,9 @@ workflow myco {
 	# Used for some workarounds
 	String pass = "PASS"
 
+	# Will be used to determine if we need to concatenate QC information into a file or just present as-is
+	Boolean is_single_sample_run = if (length(paired_fastq_sets) == 1) then true else false
+
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
@@ -300,7 +303,7 @@ workflow myco {
 	if(!(length(coerced_bam_strains) == 0)) {
 	
 		# 3. Determine if we are running on one sample or multiple samples
-		if(length(paired_fastq_sets) != 1) {
+		if(!(is_single_sample_run)) {
 	
 			call sranwrp_processing.cat_strings as collate_bam_strains {      #!UnusedCall
 				input:
@@ -326,7 +329,7 @@ workflow myco {
 		
 		# if there is only one sample, there's no need to run tasks
 		# currently not output and unusued, but I'm leaving them here in case someone needs it later
-		if(length(paired_fastq_sets) == 1) {
+		if((is_single_sample_run)) {
 			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]      #!UnusedDeclaration
 			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0] #!UnusedDeclaration
 			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]     #!UnusedDeclaration
@@ -342,7 +345,7 @@ workflow myco {
 	if(!(length(coerced_fq_strains) == 0)) {
 	
 		# 3. Determine if we are running on one sample or multiple samples
-		if(length(paired_fastq_sets) != 1) {
+		if(is_single_sample_run) {
 
 			call sranwrp_processing.cat_strings as collate_fq_strains {     #!UnusedCall
 				input:
@@ -367,7 +370,7 @@ workflow myco {
 		}
 	
 		# if there is only one sample, there's no need to run tasks
-		if(length(paired_fastq_sets) == 1) {
+		if(is_single_sample_run) {
 			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]      #!UnusedDeclaration
 			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0] #!UnusedDeclaration
 			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]     #!UnusedDeclaration
@@ -459,8 +462,9 @@ workflow myco {
 		}
 		
 		# final-final-final error code
-		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
-		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
+		# because skipping FQ TBProfiler via earlyQC_skip_QC is no longer an option, its code is no longer at the end
+		# because covstats_ERR is undefined if !skip_covstats, covstats_ERR should not short-circuit to pass
+		String finalcode = select_first([decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
 	}
 	
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.
@@ -533,8 +537,8 @@ workflow myco {
 		Array[File?] tbd_tbprof_fq_lims            = theiagenTBprofilerFQ.tbprofiler_lims_report_csv
 
 		# Typically unusued -- these work fine, I just want Terra's UI to be less crowded
-		Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
-		Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
+		#Array[File?] tbd_tbprof_bam_jsons          = profile_bam.tbprofiler_json
+		#Array[File?] tbd_tbprof_bam_summaries      = profile_bam.tbprofiler_txt
 		#Array[File?] tbd_covstats_reports          = covstats.covstatsOutfile
 		#Float? tbd_qc_pct_unmapped_covstats        = percentUnmapped
 
