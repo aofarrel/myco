@@ -2,8 +2,8 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/pull_fastqs.wdl" as sranwrp_pull
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/pull_fastqs.wdl" as sranwrp_pull
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -27,7 +27,8 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 
 workflow myco {
 	input {
-		File biosample_accessions
+		File? biosample_accessions_file
+		String biosample_accession_str   # if using biosample_accessions_file this can be an empty string
 
 		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
@@ -51,7 +52,8 @@ workflow myco {
 	}
 
 	parameter_meta {
-		biosample_accessions: "File of BioSample accessions to pull, one accession per line"
+		biosample_accessions_file: "File of multiple BioSample accessions to pull, one accession per line. Recommended for non-Terra users. Overrides biosample_accession_str."
+		biosample_accession_str: "String of one (1) BioSample accession to pull. Recommended for Terra users. If biosample_accessions_file exists, biosample_accession_str will be ignored."
 
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
@@ -73,13 +75,17 @@ workflow myco {
 	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
 	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
 
-	call sranwrp_processing.extract_accessions_from_file as get_sample_IDs {
-		input:
-			accessions_file = biosample_accessions,
-			filter_na = true
+	if (defined(biosample_accessions_file)) {
+		call sranwrp_processing.extract_accessions_from_file_with_fake_optional_input as get_sample_IDs {
+			input:
+				accessions_file = biosample_accessions_file,
+				filter_na = true
+		}
 	}
 
-	scatter(biosample_accession in get_sample_IDs.accessions) {
+	Array[String] biosample_accessions = select_first([get_sample_IDs.accessions, [biosample_accession_str]])
+	
+	scatter(biosample_accession in biosample_accessions) {
 		call sranwrp_pull.pull_fq_from_biosample as pull {
 			input:
 				biosample_accession = biosample_accession,
@@ -87,7 +93,7 @@ workflow myco {
 				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
 				subsample_seed = subsample_seed,
 				tar_outputs = false
-		} # output: pull.fastqs
+		}
 		if(length(pull.fastqs)>1) {
     		Array[File] paired_fastqs=select_all(pull.fastqs)
   		}
@@ -120,6 +126,14 @@ workflow myco {
 		if(defined(fastp_decontam_check.decontaminated_fastq_1)) {
 			# This region only executes if decontaminated fastqs exist. We can use this to coerce File? into File by using
 			# select_first() where the first element is the File? we know must exist, and the second element is bogus.
+			#
+			# NOTE: biosample_accessions used to be an always-defined file, now it is an always-defined Array[String], so this
+			# will warn FileCoercion in miniwdl check. However, it passes womtool, and as stated above the fallback is never
+			# actually used, so we currently can get away with this. But if Cromwell's type checker ever becomes even stricter,
+			# this might one day throw an error. If that happens, the easiest workaround is to force the user to input some
+			# kind of random bogus file and use that as the fallback here and elsewhere, or to take the approach in myco_raw,
+			# which in some ways is even more cursed.
+			#
     		File real_decontaminated_fastq_1=select_first([fastp_decontam_check.decontaminated_fastq_1, biosample_accessions])
     		File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
