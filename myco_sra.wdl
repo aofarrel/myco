@@ -486,7 +486,8 @@ workflow myco {
 		# because covstats_ERR is undefined if !skip_covstats, covstats_ERR should not short-circuit to pass
 		# TODO: because zeroth_sample_pull_code is defined regardless of pass/fail, if it's at the front we will never
 		# get error codes and if it's before pass we will never fall back to pass
-		String finalcode = select_first([pull_ERR, decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
+		# --> Adding pull_ERR throws "unable to unify array types," unsure why, maybe it needs to be coerced non-optional?
+		String finalcode = select_first([decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
 	}
 	String multi_sample_status_code = "multi-sample run"
 		
