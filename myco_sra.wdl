@@ -33,6 +33,7 @@ workflow myco {
 		Boolean just_like_2024                 = false
 		Int     clean_average_q_score          = 29
 		Boolean covstatsQC_skip_entirely       = true
+		Boolean generate_download_report_file  = true
 		File?   mask_bedfile
 		Boolean decontam_use_CDC_varpipe_ref   = false
 		
@@ -57,6 +58,7 @@ workflow myco {
 
 		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
 		covstatsQC_skip_entirely: "Should we skip covstats entirely?"
+		generate_download_report_file: "Generate file reporting all pulls (recommended if multi-sample batch that uses biosample_accessions_file)"
 		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 
 		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
@@ -99,11 +101,13 @@ workflow myco {
   		}
 	}
 
-	call sranwrp_processing.cat_strings as merge_reports {
-		input:
-			strings = pull.results,
-			out = "pull_reports.txt",
-			disk_size = quick_tasks_disk_size
+	if (generate_download_report_file) {
+		call sranwrp_processing.cat_strings as merge_reports {
+			input:
+				strings = pull.results,
+				out = "pull_reports.txt",
+				disk_size = quick_tasks_disk_size
+		}
 	}
 
 	Array[Array[File]] pulled_fastqs = select_all(paired_fastqs)
@@ -368,7 +372,7 @@ workflow myco {
 	}
 		
 	output {
-		File       download_report         = merge_reports.outfile
+		File?      download_report         = merge_reports.outfile
 		File       fastp_decont_report_tsv = fastp_decont_report.tsv
 		
 		# raw files
