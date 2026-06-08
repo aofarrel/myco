@@ -26,7 +26,7 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-		String output_sample_name
+		String? output_sample_name                  # ONLY DEFINE THIS IF RUNNING ONE-WORKFLOW-PER-SAMPLE (ie, sample-indexed Terra data table)
 
 		File?   call_as_reference_bedfile           # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
