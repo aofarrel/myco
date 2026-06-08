@@ -1,7 +1,9 @@
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
-import "./myco_raw.wdl" as myco_raw
-import "./myco_sra.wdl" as myco_sra
+#import "/myco_raw.wdl" as myco_raw
+#import "./myco_sra.wdl" as myco_sra
+import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_raw.wdl" as myco_raw
+import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_sra.wdl" as myco_sra
 
 # This workflow is designed to run on a data table in Terra. You can run it locally, but you'll need
 # to run it each row of checker_data_table as a separate workflow.
@@ -19,19 +21,11 @@ import "./myco_sra.wdl" as myco_sra
 workflow checker {
 	input {
 		
-		# In Terra: myco_raw_paired_fastq_sets = [[this.myco_raw_input_fqs]]
+		# In Terra: myco_raw_paired_fastq_sets = [this.myco_raw_input_fqs]
 		Array[Array[File]] myco_raw_paired_fastq_sets
 
-		# In Terra: myco_sra_biosample = [[this.myco_sra_input_BioSample]]
+		# In Terra: myco_sra_biosample = this.myco_sra_input_BioSample
 		String myco_sra_biosample
-
-		# In most instances we are only testing one sample per instance of the checker workflow,
-		# but myco_raw supports running on multiple samples at once, so we have some rows in the
-		# checker data table that can launch myco_raw in multiple samples mode. As such, some
-		# truth values here are arrays. Usually they will be arrays of just one file.
-		
-		Array[String] TRUTH_mycoraw_code
-		String TRUTH_mycosra_code
 
 		# Fallback file for known QC-failing samples. A QC-failing sample will give no output,
 		# so in order to run a checker on it, select_first([expected_output, fallback]). In the
@@ -42,22 +36,21 @@ workflow checker {
 		# error to flag the mismatch.
 		File fallback
 		
-		# These are arrays, but except for myco_raw multi sample test cases, they should only 
-		# contain one value. If expecting no file (ie known QC fail) then that file will be the
-		# fallback file.
+		# These are arrays, but except for myco_raw multi sample test cases (currently not included),
+		# they should only contain one value. If expecting no file (ie known QC fail) then that file 
+		# will be the fallback file.
 
 		# When running myco_raw at default values, these should be the result
 		Array[File] TRUTH_mycoraw_default_bai
 		Array[File] TRUTH_mycoraw_default_diff
-		Array[File] TRUTH_mycoraw_default_mask
-		Array[File] TRUTH_mycoraw_default_report # tbd_decontam_reports
+		Array[File] TRUTH_mycoraw_default_diff_report
+		Array[File] TRUTH_mycoraw_default_decontam_report
 
 		# When running myco_sra at default values, these should be the result
-		# TODO: Can't really do this well until myco_sra supports string inputs again
-		#Array[File] TRUTH_mycosra_default_bai
-		#Array[File] TRUTH_mycosra_default_diff
-		#Array[File] TRUTH_mycoraw_default_mask
-		#Array[File] TRUTH_mycoraw_default_report # tbd_decontam_reports
+		Array[File] TRUTH_mycosra_default_bai
+		Array[File] TRUTH_mycosra_default_diff
+		Array[File] TRUTH_mycosra_default_diff_report
+		Array[File] TRUTH_mycosra_default_decontam_report
 
 		# When running myco_raw at default values, except just_like_2024 = true
 		# TODO: Compare these outputs to the actual "publication reproducibility" branch
@@ -88,8 +81,8 @@ workflow checker {
 	
 	Array[File] TEST_mycoraw_default_bai = select_first([myco_raw_default.tbd_bais, fallback_array])
 	Array[File] TEST_mycoraw_default_diff = select_first([myco_raw_default.tbd_diffs, fallback_array])
-	Array[File] TEST_mycoraw_default_mask = select_first([myco_raw_default.tbd_masks, fallback_array])
-	Array[File] TEST_mycoraw_default_report = select_first([select_all(myco_raw_default.tbd_decontam_reports), fallback_array])
+	Array[File] TEST_mycoraw_default_diff_report = select_first([select_all(myco_raw_default.tbd_diff_reports), fallback_array])
+	Array[File] TEST_mycoraw_default_decontam_report = select_first([select_all(myco_raw_default.tbd_decontam_reports), fallback_array])
 
 	call verify_array.arraycheck_classic as check_myco_raw_default_bai {
 		input:
@@ -105,22 +98,59 @@ workflow checker {
 			disk_size_override = checker_disk_size_override
 	}
 
-	call verify_array.arraycheck_classic as check_myco_raw_default_mask {
+	call verify_array.arraycheck_classic as check_myco_raw_default_diff_report {
 		input:
-			test = TEST_mycoraw_default_mask,
-			truth = TRUTH_mycoraw_default_mask,
+			test = TEST_mycoraw_default_diff_report,
+			truth = TRUTH_mycoraw_default_diff_report,
 			disk_size_override = checker_disk_size_override
 	}
 
-	call verify_array.arraycheck_classic as check_myco_raw_default_report {
+	call verify_array.arraycheck_classic as check_myco_raw_default_decontam_report {
 		input:
-			test = TEST_mycoraw_default_report,
-			truth = TRUTH_mycoraw_default_report,
+			test = TEST_mycoraw_default_decontam_report,
+			truth = TRUTH_mycoraw_default_decontam_report,
 			disk_size_override = checker_disk_size_override
 	}
 
+	# Now do myco_sra
+	call myco_sra.myco as myco_sra_default {
+		input:
+			biosample_accession_str = myco_sra_biosample
+	}
+
+	Array[File] TEST_mycosra_default_bai = select_first([myco_sra_default.tbd_bais, fallback_array])
+	Array[File] TEST_mycosra_default_diff = select_first([myco_sra_default.tbd_diffs, fallback_array])
+	Array[File] TEST_mycosra_default_diff_report = select_first([select_all(myco_sra_default.tbd_diff_reports), fallback_array])
+	Array[File] TEST_mycosra_default_decontam_report = select_first([select_all(myco_sra_default.tbd_decontam_reports), fallback_array])
 
 
+	call verify_array.arraycheck_classic as check_myco_sra_default_bai {
+		input:
+			test = TEST_mycosra_default_bai,
+			truth = TRUTH_mycosra_default_bai,
+			disk_size_override = checker_disk_size_override
+	}
+
+	call verify_array.arraycheck_classic as check_myco_sra_default_diff {
+		input:
+			test = TEST_mycosra_default_diff,
+			truth = TRUTH_mycosra_default_diff,
+			disk_size_override = checker_disk_size_override
+	}
+
+	call verify_array.arraycheck_classic as check_myco_sra_default_diff_report {
+		input:
+			test = TEST_mycosra_default_diff_report,
+			truth = TRUTH_mycosra_default_diff_report,
+			disk_size_override = checker_disk_size_override
+	}
+
+	call verify_array.arraycheck_classic as check_myco_sra_default_decontam_report {
+		input:
+			test = TEST_mycoraw_default_decontam_report,
+			truth = TRUTH_mycosra_default_decontam_report,
+			disk_size_override = checker_disk_size_override
+	}
 
 
 	
