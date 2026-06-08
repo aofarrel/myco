@@ -6,7 +6,7 @@ import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/pull_fas
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
 
 # Copyright (C) 2025 Ash O'Farrell
@@ -30,52 +30,68 @@ workflow myco {
 		File? biosample_accessions_file
 		String biosample_accession_str   # if using biosample_accessions_file this can be an empty string
 
+		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
+		String? comment
+		Int     fastp_avg_qual                 = 29
 		Boolean just_like_2024                 = false
-		Int     clean_average_q_score          = 29
+    Boolean generate_download_report_file  = true
+		Boolean guardrail_mode                 = true
+		Boolean low_resource_mode              = false
+		Int     sample_max_pct_masked          = 20
+		#Int     sample_min_pct_mapped         --> no myco_sra equivalent
+		#Int     sample_min_avg_depth          --> no myco_sra equivalent
+		Int     sample_min_q30                 = 90      # note inconsistency with myco_raw
+		Int     site_min_depth                 = 10
 		Boolean skip_covstats                  = true
-		Boolean generate_download_report_file  = true
-		File?   mask_bedfile
-		Boolean decontam_use_CDC_varpipe_ref   = false
+		Int     subsample_cutoff               = 450     # set to -1 to turn off subsampling entirely
+		Int     subsample_reads                = 1000000 # 2000000 in myco_raw
 		
 		# QC stuff 
-		Int     QC_max_pct_low_coverage_sites  =    20
-		Int     QC_max_pct_unmapped            =     2
-		Int     QC_min_mean_coverage           =    10
-		Int     QC_min_q30                     =    90
-		Boolean QC_soft_pct_mapped             = false
-		Int     QC_this_is_low_coverage        =    10
-		Int     quick_tasks_disk_size          =    10 
-		Boolean guardrail_mode                 = true
-		
-		# shrink large samples
-		Int     subsample_cutoff        =  450  # set to -1 to turn off subsampling entirely
-		Int     subsample_seed          = 1965  # if you're trying replicate our results, leave this untouched!
+		Int     QC_max_pct_unmapped            =     2  # only applies to covstats
+		Int     QC_min_mean_coverage           =    10  # only applies to covstats, unlike myco_raw
+
 	}
 
 	parameter_meta {
 		biosample_accessions_file: "File of multiple BioSample accessions to pull, one accession per line. Recommended for non-Terra users. Overrides biosample_accession_str."
 		biosample_accession_str: "String of one (1) BioSample accession to pull. Recommended for Terra users. If biosample_accessions_file exists, biosample_accession_str will be ignored."
 
-		clean_average_q_score: "Trim reads with an average quality score below this value. Independent of QC_min_q30."
-		skip_covstats: "Should we skip covstats entirely?"
+    call_as_reference_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		generate_download_report_file: "Generate file reporting all pulls (recommended if multi-sample batch that uses biosample_accessions_file)"
-		mask_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
-
-		QC_max_pct_low_coverage_sites: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below QC_this_is_low_coverage will be discarded"
+		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of sample_min_q30."
+		skip_covstats: "Should we skip covstats entirely?"
+		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
 		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
 		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
-		QC_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
-		QC_soft_pct_mapped: "If true, a sample failing a percent mapped check (guardrail mode's TBProfiler check and/or covstats' check as per QC_max_pct_unmapped) will throw a non-fatal warning."
-		QC_this_is_low_coverage: "Positions with coverage below this value will be masked in diff files"
-		quick_tasks_disk_size: "Disk size in GB to use for quick file-processing tasks; increasing this might slightly speed up file localization"
+		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
+		site_min_depth: "Positions with coverage below this value will be masked in diff files"
 		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
-		subsample_seed: "Seed used for subsampling with seqtk"
+    subsample_reads: "When subsampling per subsample_cutoff, downsample to this many reads"
 	}
+	# Flip some QC stuff around
+	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
+
+	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
+	Boolean QC_soft_pct_mapped = false
+	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; if running one-workflow-many-samples,
+	                                 # increasing this might speed up file localization if you have >5,000 samples
+	# no equivalent to myco_raw strip_all_underscores
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
-	String pass = "PASS" # used later... much later
-	Float QC_max_pct_low_coverage_sites_float = QC_max_pct_low_coverage_sites / 100.0
-	Int guardrail_subsample_cutoff = if guardrail_mode then 30000 else -1 # overridden by subsample_cutoff
+	
+	
+	Int subsample_seed             = 1965
+
+	#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
+	# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
+	# This is currently a null op in myco_raw as it'd require I maintain double the number of Docker images, and it doesn't delineate between human vs
+	# NTM vs other forms of contamination (which the task currently requires for some outputs). If there is a demand for CDC varpipe I can
+	# make this an option again, but I nevertheless gently recommend against using it due to unclear provenance.
+	Boolean decontam_use_CDC_varpipe_ref   = false
+
+	# Used for some workarounds
+	String pass = "PASS"
+	
 
 	if (defined(biosample_accessions_file)) {
 		call sranwrp_processing.extract_accessions_from_file_with_fake_optional_input as get_sample_IDs {
@@ -92,8 +108,9 @@ workflow myco {
 			input:
 				biosample_accession = biosample_accession,
 				fail_on_invalid = false,
-				subsample_cutoff = select_first([subsample_cutoff, guardrail_subsample_cutoff]),
-				subsample_seed = subsample_seed,
+				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
+				subsample_seed = if just_like_2024 then 1965 else subsample_seed,
+				subsample_to_x_reads = if just_like_2024 then 1000000 else subsample_reads,
 				tar_outputs = false
 		}
 		if(length(pull.fastqs)>1) {
@@ -121,12 +138,14 @@ workflow myco {
 				oldschool_docker = just_like_2024,
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
-				fastp_clean_avg_qual = clean_average_q_score,
-				QC_min_q30 = QC_min_q30,
+				fastp_clean_avg_qual = fastp_avg_qual,
+				QC_min_q30 = sample_min_q30,
 				strip_all_underscores = true,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				timeout_map_reads = if guardrail_mode then 120 else 0,
-				timeout_decontam = if guardrail_mode then 300 else 0
+				timeout_decontam = if guardrail_mode then 300 else 0,
+				addldisk = if low_resource_mode then 10 else 100,
+				memory = if low_resource_mode then 8 else 32
 				# no subsample cutoff here because that happens during the pull task
 		}
 
@@ -145,7 +164,7 @@ workflow myco {
 			File real_decontaminated_fastq_2=select_first([fastp_decontam_check.decontaminated_fastq_2, biosample_accessions])
 
 			if(!(TBProf_on_bams_not_fastqs)) {
-				call tbprofilerFQ_WF.ThiagenTBProfiler as theiagenTBprofilerFQ {
+				call tbprofilerFQ_WF.TheiagenTBProfiler as theiagenTBprofilerFQ {
 					input:
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
@@ -163,7 +182,10 @@ workflow myco {
 					input:
 						reads_files = [real_decontaminated_fastq_1, real_decontaminated_fastq_2],
 						tarball_bams_and_bais = false,
-						timeout = if guardrail_mode then 600 else 0
+						timeout = if guardrail_mode then 600 else 0,
+						addldisk = if low_resource_mode then 10 else 100,
+						cpu = if low_resource_mode then 8 else 16,
+						memory = if low_resource_mode then 8 else 32
 				}
 			}
 		}
@@ -208,9 +230,9 @@ workflow myco {
 						input:
 							bam = vcfs_and_bams.left[0],
 							vcf = vcfs_and_bams.right,
-							min_coverage_per_site = QC_this_is_low_coverage,
-							tbmf = mask_bedfile,
-							max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+							min_coverage_per_site = site_min_depth,
+							tbmf = call_as_reference_bedfile,
+							max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 					}
 				}
 			}
@@ -223,9 +245,9 @@ workflow myco {
 				input:
 					bam = vcfs_and_bams.left[0],
 					vcf = vcfs_and_bams.right,
-					min_coverage_per_site = QC_this_is_low_coverage,
-					tbmf = mask_bedfile,
-					max_ratio_low_coverage_sites_per_sample = QC_max_pct_low_coverage_sites_float
+					min_coverage_per_site = site_min_depth,
+					tbmf = call_as_reference_bedfile,
+					max_ratio_low_coverage_sites_per_sample = sample_max_pct_masked_float
 			}
 		}
 		
@@ -494,6 +516,7 @@ workflow myco {
 	output {
 		File?      download_report         = merge_reports.outfile
 		String     tbd_status              = select_first([finalcode, multi_sample_status_code])
+		String?    tbd_comment             = comment
 		
 		# raw files
 		Array[File]  tbd_bais  = final_bais
