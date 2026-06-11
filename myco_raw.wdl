@@ -147,7 +147,7 @@ workflow myco {
 				strip_all_underscores = strip_all_underscores,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
-				subsample_to_this_many_reads = if just_like_2024 then 1000000 else subsample_cutoff,
+				subsample_to_this_many_reads = if just_like_2024 then 1000000 else subsample_reads,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0,
 				addldisk = if low_resource_mode then 10 else 100,
