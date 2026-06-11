@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/combined_decontamination.wdl" as clckwrk_combonation
-import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.9/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/combined_decontamination.wdl" as clckwrk_combonation
+import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
@@ -34,11 +34,11 @@ workflow myco {
 		Boolean just_like_2024              = false
 		Boolean guardrail_mode              = true
 		Boolean low_resource_mode           = false
-		Int     sample_max_pct_masked       = 20
-		Int     sample_min_pct_mapped       = 90
-		Int     sample_min_avg_depth        = 30
-		Int     sample_min_q30              = 80
-		Int     site_min_depth              = 10
+		Int     sample_max_pct_masked       = 20     # 2024: 20
+		Int     sample_min_pct_mapped       = 90     # 2024: 98
+		Int     sample_min_avg_depth        = 30     # 2024: technically 10 but effectively 0 as only applied to skipped covstats
+		Int     sample_min_q30              = 80     # 2024: 90
+		Int     site_min_depth              = 10     # 2024: 10
 		Boolean skip_covstats               = true
 		Int     subsample_cutoff            = -1
 		Int     subsample_reads             = 2000000
@@ -131,6 +131,9 @@ workflow myco {
 	# Used for some workarounds
 	String pass = "PASS"
 
+	# Will be used to determine if we need to concatenate QC information into a file or just present as-is
+	Boolean is_single_sample_run = if (length(paired_fastq_sets) == 1) then true else false
+
 	scatter(paired_fastqs in paired_fastq_sets) {
 		call clckwrk_combonation.clean_and_decontam_and_check as decontam_each_sample {
 			input:
@@ -171,13 +174,15 @@ workflow myco {
 			File real_decontaminated_fastq_1=select_first([decontam_each_sample.decontaminated_fastq_1, decontam_each_sample.counts_out_tsv]) #!SelectArray
 			File real_decontaminated_fastq_2=select_first([decontam_each_sample.decontaminated_fastq_2, decontam_each_sample.counts_out_tsv])
     		
+    		# just_like_2024 is not perfect here because it is setting a median depth threshold on a FQ-derived value instead
+    		# of setting it on tbprofiler_from_bam situation.
 			call tbprofilerFQ_WF.TheiagenTBProfiler as theiagenTBprofilerFQ {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
 					soft_pct_mapped = false,
 					soft_depth = false,
-					minimum_median_depth = if guardrail_mode then 3 else 0, # super low to avoid conflict with avg depth
+					minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
 					minimum_mean_depth = sample_min_avg_depth,
 					minimum_pct_mapped = sample_min_pct_mapped,
 					sample = decontam_each_sample.sample
@@ -301,7 +306,7 @@ workflow myco {
 	if(!(length(coerced_bam_strains) == 0)) {
 	
 		# 3. Determine if we are running on one sample or multiple samples
-		if(length(paired_fastq_sets) != 1) {
+		if(!(is_single_sample_run)) {
 	
 			call sranwrp_processing.cat_strings as collate_bam_strains {      #!UnusedCall
 				input:
@@ -327,7 +332,7 @@ workflow myco {
 		
 		# if there is only one sample, there's no need to run tasks
 		# currently not output and unusued, but I'm leaving them here in case someone needs it later
-		if(length(paired_fastq_sets) == 1) {
+		if((is_single_sample_run)) {
 			String single_sample_tbprof_bam_depth      = coerced_bam_depths[0]      #!UnusedDeclaration
 			String single_sample_tbprof_bam_resistance = coerced_bam_resistances[0] #!UnusedDeclaration
 			String single_sample_tbprof_bam_strain     = coerced_bam_strains[0]     #!UnusedDeclaration
@@ -343,7 +348,7 @@ workflow myco {
 	if(!(length(coerced_fq_strains) == 0)) {
 	
 		# 3. Determine if we are running on one sample or multiple samples
-		if(length(paired_fastq_sets) != 1) {
+		if(is_single_sample_run) {
 
 			call sranwrp_processing.cat_strings as collate_fq_strains {     #!UnusedCall
 				input:
@@ -368,7 +373,7 @@ workflow myco {
 		}
 	
 		# if there is only one sample, there's no need to run tasks
-		if(length(paired_fastq_sets) == 1) {
+		if(is_single_sample_run) {
 			String single_sample_tbprof_fq_depth      = coerced_fq_depths[0]      #!UnusedDeclaration
 			String single_sample_tbprof_fq_resistance = coerced_fq_resistances[0] #!UnusedDeclaration
 			String single_sample_tbprof_fq_strain     = coerced_fq_strains[0]     #!UnusedDeclaration
@@ -460,8 +465,9 @@ workflow myco {
 		}
 		
 		# final-final-final error code
-		# earlyQC is at the end (but before PASS) to account for earlyQC_skip_QC = true
-		String finalcode = select_first([decontam_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, earlyQC_ERR, pass])
+		# because skipping FQ TBProfiler via earlyQC_skip_QC is no longer an option, its code is no longer at the end
+		# because covstats_ERR is undefined if !skip_covstats, covstats_ERR should not short-circuit to pass
+		String finalcode = select_first([decontam_ERR, earlyQC_ERR, varcall_ERR, covstats_ERR, vcfdiff_ERR, pass])
 	}
 	
 	# miniwdl check will allow using just one flatten() here, but womtool will not. per the spec, flatten() isn't recursive.

@@ -1,70 +1,145 @@
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
-import "./myco_raw.wdl" as myco_raw
+#import "/myco_raw.wdl" as myco_raw
+#import "./myco_sra.wdl" as myco_sra
+import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_raw.wdl" as myco_raw
+import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_sra.wdl" as myco_sra
 
-# Unlike myco raw, this checker workflow is designed to run as seperate workflow instances.
-# To restate: To run myco_raw on n samples, you can either:
-# a) Use a Terra data table where each row represents one sample --> launches n instances of 
-#    myco_raw where each instance is only 'aware' of a single sample
-# b) Define multiple inner arrays where each inner array is one sample's fastqs --> launches 
-#    one instance of myco_raw and that instance is 'aware' of all n samples
-# This checker workflow IS NOT LIKE THAT! Only option (a) will work as expected. A Terra data
-# table with open-access data and truth files has been provided for this reason.
+# This workflow is designed to run on a data table in Terra. You can run it locally, but you'll need
+# to run it each row of checker_data_table as a separate workflow.
+#
+# Terra instructions:
+# 1) Import this checker workflow
+# 2) Import the checker_data_table as a TSV to create a Terra data table
+# 3) In workflows tab, select checker workflow
+# 4) Select "Run workflow(s) with inputs defined by data table"
+# 5) Select the checker workflow data table
+# 6) Fill in inputs
+# 7) Optional: Set a workflow cost threshold
+# 8) Launch
 
 workflow checker {
 	input {
-		# inner array is one sample's fastqs. length of inner array can be any even number above 0.
-		# length of outer array can only be one (since this is a single-sample workflow).
-		Array[Array[File]] paired_fastq_sets
 		
-		String TRUTH_code
-		Array[File] FALLBACK_bai
-		Array[File] FALLBACK_diff
-		Array[File] FALLBACK_report
-		Array[File] FALLBACK_vcf
+		# In Terra: myco_raw_paired_fastq_sets = [this.myco_raw_input_fqs]
+		Array[Array[File]] myco_raw_paired_fastq_sets
+
+		# In Terra: myco_sra_biosample = this.myco_sra_input_BioSample
+		String myco_sra_biosample
+
+		# Fallback file for known QC-failing samples. A QC-failing sample will give no output,
+		# so in order to run a checker on it, select_first([expected_output, fallback]). In the
+		# expected success case, the comparison will be against expected_output and the actual
+		# pipeline out. In the expected failure case, the comparison will be against two
+		# instances of the fallback file. If it fails when success expected or succeeds when
+		# fail expected, one will be the fallback file and the other won't, resulting in (correct)
+		# error to flag the mismatch.
+		File fallback
 		
-		# These are arrays, but they should only contain one (or zero) values
-		Array[File] TRUTH_bai
-		Array[File] TRUTH_diff
-		Array[File] TRUTH_qc
-		Array[File] TRUTH_report  # TODO fix or remove report
-		Array[File] TRUTH_vcf
+		# These are arrays, but except for myco_raw multi sample test cases (currently not included),
+		# they should only contain one value. If expecting no file (ie known QC fail) then that file 
+		# will be the fallback file.
+
+		# When running myco_raw at default values, these should be the result
+		Array[File] TRUTH_mycoraw_default_diff
+		Array[File] TRUTH_mycoraw_default_diff_report
+		Array[File] TRUTH_mycoraw_default_decontam_report
+
+		# When running myco_sra at default values, these should be the result
+		Array[File] TRUTH_mycosra_default_diff
+		Array[File] TRUTH_mycosra_default_diff_report
+		Array[File] TRUTH_mycosra_default_decontam_report
+
+		# When running myco_raw at default values, except just_like_2024 = true
+		# TODO: Compare these outputs to the actual "publication reproducibility" branch
+		#Array[File] TRUTH_mycoraw_legacy_clockworkCHM13decon_bai
+		#Array[File] TRUTH_mycoraw_legacy_clockworkCHM13decon_diff
+		#Array[File] TRUTH_mycosra_legacy_clockworkCHM13decon_bai
+		#Array[File] TRUTH_mycosra_legacy_clockworkCHM13decon_diff
+
+		# When running myco_raw at default values, except just_like_2024 = true and use_varpipe = true
+		# Deprioritized, nobody uses varpipe
+		#Array[File] TRUTH_legacy_varpipedecon_bai
+		#Array[File] TRUTH_legacy_varpipedecon_diff
 
 		Int checker_disk_size_override
 	}
 
+	# Turn fallback into a one-element array so it can be used as a fallback for constructing Array[File]
+	Array[File] fallback_array = [fallback]
+
 	# Default settings -- this should also catch if any meaningful default settings changed
 	call myco_raw.myco as myco_raw_default {
 		input:
-			paired_fastq_sets = paired_fastq_sets
+			paired_fastq_sets = myco_raw_paired_fastq_sets
 	}
+
+	# Most of these are considered Array[File] (even though they can be empty) so we can just select_first()
+	# tbd_decontam_reports is considered Array[File?] so it needs to be chained with select_all first
 	
-	Array[File] TEST_bai = flatten(select_all([myco_raw_default.tbd_bais, TRUTH_bai, FALLBACK_bai]))
-	Array[File] TEST_diff = flatten(select_all([myco_raw_default.tbd_diffs, TRUTH_diff, FALLBACK_diff]))
-	#File TEST_qc = myco_raw_default.qc_csv
-	Array[File] TEST_report = select_all(select_first([myco_raw_default.tbd_diff_reports, TRUTH_report, FALLBACK_report])) # awkward due to being Array[File?]
-	Array[File] TEST_vcf = flatten(select_all([myco_raw_default.tbd_vcfs, TRUTH_vcf, FALLBACK_vcf]))
-	
-	call verify_array.arraycheck_classic as check_myco_raw_default {
+	Array[File] TEST_mycoraw_default_diff = select_first([myco_raw_default.tbd_diffs, fallback_array])
+	Array[File] TEST_mycoraw_default_diff_report = select_first([select_all(myco_raw_default.tbd_diff_reports), fallback_array])
+	Array[File] TEST_mycoraw_default_decontam_report = select_first([select_all(myco_raw_default.tbd_decontam_reports), fallback_array])
+
+	call verify_array.arraycheck_classic as check_myco_raw_default_diff {
 		input:
-			#test = flatten([TEST_bai, TEST_diff, [TEST_qc], TEST_report, TEST_vcf]),
-			test = flatten([TEST_bai, TEST_diff, TEST_report, TEST_vcf]),
-			truth = flatten(select_all([TRUTH_bai, TRUTH_diff, TRUTH_qc, TRUTH_report, TRUTH_vcf])),
-			#truth = flatten(select_all([TRUTH_bai, TRUTH_diff, TRUTH_qc, TRUTH_report, TRUTH_vcf])),
+			test = TEST_mycoraw_default_diff,
+			truth = TRUTH_mycoraw_default_diff,
 			disk_size_override = checker_disk_size_override
 	}
+
+	call verify_array.arraycheck_classic as check_myco_raw_default_diff_report {
+		input:
+			test = TEST_mycoraw_default_diff_report,
+			truth = TRUTH_mycoraw_default_diff_report,
+			disk_size_override = checker_disk_size_override
+	}
+
+	call verify_array.arraycheck_classic as check_myco_raw_default_decontam_report {
+		input:
+			test = TEST_mycoraw_default_decontam_report,
+			truth = TRUTH_mycoraw_default_decontam_report,
+			disk_size_override = checker_disk_size_override
+	}
+
+	# Now do myco_sra
+	call myco_sra.myco as myco_sra_default {
+		input:
+			biosample_accession_str = myco_sra_biosample
+	}
+
+	Array[File] TEST_mycosra_default_diff = select_first([myco_sra_default.tbd_diffs, fallback_array])
+	Array[File] TEST_mycosra_default_diff_report = select_first([select_all(myco_sra_default.tbd_diff_reports), fallback_array])
+	Array[File] TEST_mycosra_default_decontam_report = select_first([select_all(myco_sra_default.tbd_decontam_reports), fallback_array])
+
+	call verify_array.arraycheck_classic as check_myco_sra_default_diff {
+		input:
+			test = TEST_mycosra_default_diff,
+			truth = TRUTH_mycosra_default_diff,
+			disk_size_override = checker_disk_size_override
+	}
+
+	call verify_array.arraycheck_classic as check_myco_sra_default_diff_report {
+		input:
+			test = TEST_mycosra_default_diff_report,
+			truth = TRUTH_mycosra_default_diff_report,
+			disk_size_override = checker_disk_size_override
+	}
+
+	call verify_array.arraycheck_classic as check_myco_sra_default_decontam_report {
+		input:
+			test = TEST_mycosra_default_decontam_report,
+			truth = TRUTH_mycosra_default_decontam_report,
+			disk_size_override = checker_disk_size_override
+	}
+
+
 	
     # Extremely strict QC
     #call myco_raw.myco as myco_raw_strict {
 	#	input:
 	#		paired_fastq_sets = paired_fastq_sets
 	#		# TODO: define what strict actually means!
-	#}
-
-	#call verify_file.filecheck as check_myco_raw_strict {
-	#	input:
-	#		test = myco_raw_strict.qc_csv,
-	#		truth = truth_myco_raw_strict
 	#}
 	
 	# Extremely strict QC (basically a forced failure)

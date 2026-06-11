@@ -1,5 +1,5 @@
 # myco 
-myco is group of pipelines built for phylogenic analysis of the _Mycobacterium tuberculosis_ complex (MBTC). It builds upon existing tools such as [clockwork](https://github.com/iqbal-lab-org/clockwork) and [UShER](https://www.nature.com/articles/s41588-021-00862-7) to accomplish this task.
+myco is a group of _Mycobacterium tuberculosis_ complex (MBTC) sample processing pipelines built upon [clockwork](https://github.com/iqbal-lab-org/clockwork), [TBProfiler](https://github.com/jodyphelan/TBProfiler), and other tools. Earlier versions of myco included [UShER](https://www.nature.com/articles/s41588-021-00862-7)-powered phylogenetics and clustering, which has now been moved to [Tree Nine](https://github.com/aofarrel/tree_nine). You can still feed the outputs of myco directly into Tree Nine for a full FQ-to-tree pipeline.
 
 In an amusing repeat of [somewhat questionable naming decisions made in 1896](https://wwwnc.cdc.gov/eid/article/14/3/et-1403_article), myco should not be confused with the similiarly-named fungal pathogen pipeline [MycoSNP](https://github.com/CDCgov/mycosnp-nf).
 
@@ -12,6 +12,7 @@ Each version of myco largely only differs in how you are passing in FASTQ files.
 For more information please see [./docs/inputs.md](./doc/inputs.md).
 
 ## More information
+If not running on Terra, it is recommend to run with miniwdl due to miniwdl's better handling of non-cloud compute resources. **If using miniwdl, make sure to update miniwdl to v1.14.2 or later as older versions [have a bug](https://github.com/chanzuckerberg/miniwdl/issues/840) which breaks the final QC check (this does not affect Cromwell, the Dockstore CLI, nor Terra).** 
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
 * Full list of inputs: [inputs.md](./doc/inputs.md)
 * Per-workflow readmes:
