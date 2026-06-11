@@ -186,7 +186,7 @@ workflow myco {
 					soft_depth = false,
 					minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
 					minimum_mean_depth = if just_like_2024 then 0 else sample_min_avg_depth,
-					minimum_pct_mapped = if just_like_224 then 98 else sample_min_pct_mapped,
+					minimum_pct_mapped = if just_like_2024 then 98 else sample_min_pct_mapped,
 					sample = decontam_each_sample.sample
 			}
 			# if this sample passes...

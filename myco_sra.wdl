@@ -58,8 +58,6 @@ workflow myco {
 		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of sample_min_q30."
 		skip_covstats: "Should we skip covstats entirely?"
 		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
-		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
 		site_min_depth: "Positions with coverage below this value will be masked in diff files"
 		
@@ -67,6 +65,7 @@ workflow myco {
 		subsample_reads: "When subsampling per subsample_cutoff, downsample to this many reads"
 	}
 	# Flip some QC stuff around
+	Int   sample_max_pct_unmapped = 100 - sample_min_pct_mapped
 	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
 
 	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
@@ -165,7 +164,7 @@ workflow myco {
 						soft_depth = false,
 						minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
 						minimum_mean_depth = if just_like_2024 then 0 else sample_min_avg_depth,
-						minimum_pct_mapped = if just_like_224 then 98 else sample_min_pct_mapped,
+						minimum_pct_mapped = if just_like_2024 then 98 else sample_min_pct_mapped,
 						sample = fastp_decontam_check.sample
 				}
 			}
@@ -216,8 +215,8 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if((covstats.percentUnmapped < QC_max_pct_unmapped) || QC_soft_pct_mapped) {
-				if(covstats.coverage > QC_min_mean_coverage) {
+			if((covstats.percentUnmapped < sample_max_pct_unmapped) || QC_soft_pct_mapped) {
+				if(covstats.coverage > sample_min_avg_depth) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
@@ -471,14 +470,14 @@ workflow myco {
 					Array[Float] meanCoverages = select_all(covstats.coverage)
 					Float        meanCoverage = meanCoverages[0]
 					
-					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
-						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})"
-						if(meanCoverage < QC_min_mean_coverage) {
-							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					if((percentUnmapped > sample_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${sample_max_pct_unmapped})"
+						if(meanCoverage < sample_min_avg_depth) {
+							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${sample_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${sample_min_avg_depth})"
 						} 
 					}
-					if(meanCoverage < QC_min_mean_coverage) {
-						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					if(meanCoverage < sample_min_avg_depth) {
+						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${sample_min_avg_depth})"
 					}
 				}
 			}
