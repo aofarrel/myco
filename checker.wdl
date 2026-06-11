@@ -147,7 +147,7 @@ workflow checker {
 
 	call verify_array.arraycheck_classic as check_myco_sra_default_decontam_report {
 		input:
-			test = TEST_mycoraw_default_decontam_report,
+			test = TEST_mycosra_default_decontam_report,
 			truth = TRUTH_mycosra_default_decontam_report,
 			disk_size_override = checker_disk_size_override
 	}
