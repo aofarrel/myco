@@ -45,11 +45,6 @@ workflow myco {
 		Boolean skip_covstats                  = true
 		Int     subsample_cutoff               = 450     # set to -1 to turn off subsampling entirely
 		Int     subsample_reads                = 1000000 # 2000000 in myco_raw
-		
-		# QC stuff 
-		Int     QC_max_pct_unmapped            =     2  # only applies to covstats
-		Int     QC_min_mean_coverage           =    10  # only applies to covstats, unlike myco_raw
-
 	}
 
 	parameter_meta {
