@@ -45,6 +45,8 @@ workflow myco {
 		Boolean skip_covstats                  = true
 		Int     subsample_cutoff               = 450     # set to -1 to turn off subsampling entirely
 		Int     subsample_reads                = 1000000 # 2000000 in myco_raw
+
+		# just_like_2024 ignores AVERAGE depth and instead checks MEDIAN depth is at least 10
 	}
 
 	parameter_meta {
