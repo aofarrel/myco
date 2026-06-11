@@ -4,9 +4,9 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/c
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
 
 # Copyright (C) 2025 Ash O'Farrell
@@ -28,20 +28,20 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		File? biosample_accessions_file
-		String biosample_accession_str   # if using biosample_accessions_file this can be an empty string
+		String biosample_accession_str          # if using biosample_accessions_file this should be an empty string
 
-		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
+		File?   call_as_reference_bedfile       # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
 		Int     fastp_avg_qual                 = 29
 		Boolean just_like_2024                 = false
 		Boolean generate_download_report_file  = true
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
-		Int     sample_max_pct_masked          = 20
-		#Int     sample_min_pct_mapped         --> no myco_sra equivalent
-		#Int     sample_min_avg_depth          --> no myco_sra equivalent
-		Int     sample_min_q30                 = 90      # note inconsistency with myco_raw
-		Int     site_min_depth                 = 10
+		Int     sample_max_pct_masked          = 20     # 2024: 20
+		Int     sample_min_pct_mapped          = 90     # 2024: 98
+		Int     sample_min_avg_depth           = 30     # 2024: technically 10 but effectively 0 as only applied to skipped covstats
+		Int     sample_min_q30                 = 80     # 2024: 90
+		Int     site_min_depth                 = 10     # 2024: 10
 		Boolean skip_covstats                  = true
 		Int     subsample_cutoff               = 450     # set to -1 to turn off subsampling entirely
 		Int     subsample_reads                = 1000000 # 2000000 in myco_raw
@@ -78,9 +78,6 @@ workflow myco {
 									 # increasing this might speed up file localization if you have >5,000 samples
 	# no equivalent to myco_raw strip_all_underscores
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
-	
-	
-	Int subsample_seed             = 1965
 
 	#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
 	# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
@@ -109,7 +106,6 @@ workflow myco {
 				biosample_accession = biosample_accession,
 				fail_on_invalid = false,
 				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
-				subsample_seed = if just_like_2024 then 1965 else subsample_seed,
 				subsample_to_x_reads = if just_like_2024 then 1000000 else subsample_reads,
 				tar_outputs = false
 		}
@@ -169,9 +165,10 @@ workflow myco {
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
 						soft_pct_mapped = QC_soft_pct_mapped,
-						soft_depth = if guardrail_mode then false else true,
-						minimum_depth = if guardrail_mode then 3 else 0,
-						minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
+						soft_depth = false,
+						minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
+						minimum_mean_depth = sample_min_avg_depth,
+						minimum_pct_mapped = sample_min_pct_mapped,
 						sample = fastp_decontam_check.sample
 				}
 			}

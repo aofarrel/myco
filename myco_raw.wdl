@@ -2,7 +2,7 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -26,9 +26,9 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-		String? output_sample_name                  # ONLY DEFINE THIS IF RUNNING ONE-WORKFLOW-PER-SAMPLE (ie, sample-indexed Terra data table)
+		String? output_sample_name                   # ONLY DEFINE THIS IF RUNNING ONE-WORKFLOW-PER-SAMPLE (ie, sample-indexed Terra data table)
 
-		File?   call_as_reference_bedfile           # default: R00000039_repregions.bed (exists in the Docker image)
+		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
 		Int     fastp_avg_qual              = 29
 		Boolean just_like_2024              = false
@@ -180,7 +180,7 @@ workflow myco {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
-					soft_pct_mapped = false,
+					soft_pct_mapped = QC_soft_pct_mapped,
 					soft_depth = false,
 					minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
 					minimum_mean_depth = sample_min_avg_depth,
