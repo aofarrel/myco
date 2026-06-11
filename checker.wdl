@@ -41,13 +41,11 @@ workflow checker {
 		# will be the fallback file.
 
 		# When running myco_raw at default values, these should be the result
-		#Array[File] TRUTH_mycoraw_default_bai
 		Array[File] TRUTH_mycoraw_default_diff
 		Array[File] TRUTH_mycoraw_default_diff_report
 		Array[File] TRUTH_mycoraw_default_decontam_report
 
 		# When running myco_sra at default values, these should be the result
-		#Array[File] TRUTH_mycosra_default_bai
 		Array[File] TRUTH_mycosra_default_diff
 		Array[File] TRUTH_mycosra_default_diff_report
 		Array[File] TRUTH_mycosra_default_decontam_report
@@ -79,17 +77,9 @@ workflow checker {
 	# Most of these are considered Array[File] (even though they can be empty) so we can just select_first()
 	# tbd_decontam_reports is considered Array[File?] so it needs to be chained with select_all first
 	
-	#Array[File] TEST_mycoraw_default_bai = select_first([myco_raw_default.tbd_bais, fallback_array])
 	Array[File] TEST_mycoraw_default_diff = select_first([myco_raw_default.tbd_diffs, fallback_array])
 	Array[File] TEST_mycoraw_default_diff_report = select_first([select_all(myco_raw_default.tbd_diff_reports), fallback_array])
 	Array[File] TEST_mycoraw_default_decontam_report = select_first([select_all(myco_raw_default.tbd_decontam_reports), fallback_array])
-
-	#call verify_array.arraycheck_classic as check_myco_raw_default_bai {
-	#	input:
-	#		test = TEST_mycoraw_default_bai,
-	#		truth = TRUTH_mycoraw_default_bai,
-	#		disk_size_override = checker_disk_size_override
-	#}
 
 	call verify_array.arraycheck_classic as check_myco_raw_default_diff {
 		input:
@@ -118,18 +108,9 @@ workflow checker {
 			biosample_accession_str = myco_sra_biosample
 	}
 
-	#Array[File] TEST_mycosra_default_bai = select_first([myco_sra_default.tbd_bais, fallback_array])
 	Array[File] TEST_mycosra_default_diff = select_first([myco_sra_default.tbd_diffs, fallback_array])
 	Array[File] TEST_mycosra_default_diff_report = select_first([select_all(myco_sra_default.tbd_diff_reports), fallback_array])
 	Array[File] TEST_mycosra_default_decontam_report = select_first([select_all(myco_sra_default.tbd_decontam_reports), fallback_array])
-
-
-	#call verify_array.arraycheck_classic as check_myco_sra_default_bai {
-	#	input:
-	#		test = TEST_mycosra_default_bai,
-	#		truth = TRUTH_mycosra_default_bai,
-	#		disk_size_override = checker_disk_size_override
-	#}
 
 	call verify_array.arraycheck_classic as check_myco_sra_default_diff {
 		input:
