@@ -34,7 +34,7 @@ workflow myco {
 		String? comment
 		Int     fastp_avg_qual                 = 29
 		Boolean just_like_2024                 = false
-    Boolean generate_download_report_file  = true
+		Boolean generate_download_report_file  = true
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
 		Int     sample_max_pct_masked          = 20
@@ -56,7 +56,7 @@ workflow myco {
 		biosample_accessions_file: "File of multiple BioSample accessions to pull, one accession per line. Recommended for non-Terra users. Overrides biosample_accession_str."
 		biosample_accession_str: "String of one (1) BioSample accession to pull. Recommended for Terra users. If biosample_accessions_file exists, biosample_accession_str will be ignored."
 
-    call_as_reference_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
+		call_as_reference_bedfile: "Bed file of regions to mask when making diff files (default: R00000039_repregions.bed)"
 		generate_download_report_file: "Generate file reporting all pulls (recommended if multi-sample batch that uses biosample_accessions_file)"
 		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of sample_min_q30."
 		skip_covstats: "Should we skip covstats entirely?"
@@ -67,7 +67,7 @@ workflow myco {
 		site_min_depth: "Positions with coverage below this value will be masked in diff files"
 		
 		subsample_cutoff: "If a fastq file is larger than than size in MB, subsample it with seqtk (set to -1 to disable)"
-    subsample_reads: "When subsampling per subsample_cutoff, downsample to this many reads"
+		subsample_reads: "When subsampling per subsample_cutoff, downsample to this many reads"
 	}
 	# Flip some QC stuff around
 	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
@@ -75,7 +75,7 @@ workflow myco {
 	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
 	Boolean QC_soft_pct_mapped = false
 	Int quick_tasks_disk_size  = 10  # disk size in GB for file-processing tasks; if running one-workflow-many-samples,
-	                                 # increasing this might speed up file localization if you have >5,000 samples
+									 # increasing this might speed up file localization if you have >5,000 samples
 	# no equivalent to myco_raw strip_all_underscores
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
 	
