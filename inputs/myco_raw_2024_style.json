@@ -1,8 +1,5 @@
 {
   "myco.paired_fastq_sets": [
     ["./inputs/data/fastqs/SAMN25995139_SRR19428597_1.fastq", "./inputs/data/fastqs/SAMN25995139_SRR19428597_2.fastq"]],
-  "myco.just_like_2024": true,
-  "myco.sample_min_avg_depth": 0,
-  "myco.sample_min_q30": 90,
-  "myco.sample_min_pct_mapped": 98
+  "myco.just_like_2024": true
 }

@@ -34,11 +34,11 @@ workflow myco {
 		Boolean just_like_2024              = false
 		Boolean guardrail_mode              = true
 		Boolean low_resource_mode           = false
-		Int     sample_max_pct_masked       = 20     # 2024: 20
-		Int     sample_min_pct_mapped       = 90     # 2024: 98
-		Int     sample_min_avg_depth        = 30     # 2024: technically 10 but effectively 0 as only applied to skipped covstats
-		Int     sample_min_q30              = 80     # 2024: 90
-		Int     site_min_depth              = 10     # 2024: 10
+		Int     sample_max_pct_masked       = 20
+		Int     sample_min_pct_mapped       = 90     # just_like_2024 override: 98
+		Int     sample_min_avg_depth        = 30     # just_like_2024 override:  0
+		Int     sample_min_q30              = 80     # just_like_2024 override: 90
+		Int     site_min_depth              = 10
 		Boolean skip_covstats               = true
 		Int     subsample_cutoff            = -1
 		Int     subsample_reads             = 2000000
@@ -143,7 +143,7 @@ workflow myco {
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = fastp_avg_qual,
-				QC_min_q30 = sample_min_q30,
+				QC_min_q30 = if just_like_2024 then 90 else sample_min_q30,
 				strip_all_underscores = strip_all_underscores,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
@@ -183,8 +183,8 @@ workflow myco {
 					soft_pct_mapped = QC_soft_pct_mapped,
 					soft_depth = false,
 					minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
-					minimum_mean_depth = sample_min_avg_depth,
-					minimum_pct_mapped = sample_min_pct_mapped,
+					minimum_mean_depth = if just_like_2024 then 0 else sample_min_avg_depth,
+					minimum_pct_mapped = if just_like_224 then 98 else sample_min_pct_mapped,
 					sample = decontam_each_sample.sample
 			}
 			# if this sample passes...
