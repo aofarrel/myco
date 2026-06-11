@@ -1,9 +1,7 @@
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
-#import "/myco_raw.wdl" as myco_raw
-#import "./myco_sra.wdl" as myco_sra
-import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_raw.wdl" as myco_raw
-import "https://raw.githubusercontent.com/aofarrel/myco/main/myco_sra.wdl" as myco_sra
+import "/myco_raw.wdl" as myco_raw
+import "./myco_sra.wdl" as myco_sra
 
 # This workflow is designed to run on a data table in Terra. You can run it locally, but you'll need
 # to run it each row of checker_data_table as a separate workflow.
