@@ -2,7 +2,7 @@ version 1.0
 
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/combined_decontamination.wdl" as clckwrk_combonation
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
-import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.1.24/tasks/processing_tasks.wdl" as sranwrp_processing
+import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/processing_tasks.wdl" as sranwrp_processing
 import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
 import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
@@ -26,22 +26,24 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		Array[Array[File]] paired_fastq_sets
-		String? output_sample_name                  # ONLY DEFINE THIS IF RUNNING ONE-WORKFLOW-PER-SAMPLE (ie, sample-indexed Terra data table)
+		String? output_sample_name                   # ONLY DEFINE THIS IF RUNNING ONE-WORKFLOW-PER-SAMPLE (ie, sample-indexed Terra data table)
 
-		File?   call_as_reference_bedfile           # default: R00000039_repregions.bed (exists in the Docker image)
+		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
 		Int     fastp_avg_qual              = 29
 		Boolean just_like_2024              = false
 		Boolean guardrail_mode              = true
 		Boolean low_resource_mode           = false
-		Int     sample_max_pct_masked       = 20     # 2024: 20
-		Int     sample_min_pct_mapped       = 90     # 2024: 98
-		Int     sample_min_avg_depth        = 30     # 2024: technically 10 but effectively 0 as only applied to skipped covstats
-		Int     sample_min_q30              = 80     # 2024: 90
-		Int     site_min_depth              = 10     # 2024: 10
+		Int     sample_max_pct_masked       = 20
+		Int     sample_min_pct_mapped       = 90     # just_like_2024 override: 98
+		Int     sample_min_avg_depth        = 30     # just_like_2024 override:  0
+		Int     sample_min_q30              = 80     # just_like_2024 override: 90
+		Int     site_min_depth              = 10
 		Boolean skip_covstats               = true
 		Int     subsample_cutoff            = -1
 		Int     subsample_reads             = 2000000
+
+		# just_like_2024 ignores AVERAGE depth and instead checks MEDIAN depth is at least 10
 	}
 
 	parameter_meta {
@@ -143,11 +145,11 @@ workflow myco {
 				force_rename_out = output_sample_name,
 				reads_files = paired_fastqs,
 				fastp_clean_avg_qual = fastp_avg_qual,
-				QC_min_q30 = sample_min_q30,
+				QC_min_q30 = if just_like_2024 then 90 else sample_min_q30,
 				strip_all_underscores = strip_all_underscores,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
-				subsample_to_this_many_reads = if just_like_2024 then 1000000 else subsample_cutoff,
+				subsample_to_this_many_reads = if just_like_2024 then 1000000 else subsample_reads,
 				timeout_map_reads = if guardrail_mode then 300 else 0,
 				timeout_decontam = if guardrail_mode then 600 else 0,
 				addldisk = if low_resource_mode then 10 else 100,
@@ -180,11 +182,11 @@ workflow myco {
 				input:
 					fastq1 = real_decontaminated_fastq_1,
 					fastq2 = real_decontaminated_fastq_2,
-					soft_pct_mapped = false,
+					soft_pct_mapped = QC_soft_pct_mapped,
 					soft_depth = false,
 					minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
-					minimum_mean_depth = sample_min_avg_depth,
-					minimum_pct_mapped = sample_min_pct_mapped,
+					minimum_mean_depth = if just_like_2024 then 0 else sample_min_avg_depth,
+					minimum_pct_mapped = if just_like_2024 then 98 else sample_min_pct_mapped,
 					sample = decontam_each_sample.sample
 			}
 			# if this sample passes...

@@ -1,5 +1,6 @@
 version 1.0
 import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
+import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/add-stringcheck/checker_tasks/stringcheck_task.wdl" as verify_string
 import "./myco_raw.wdl" as myco_raw
 import "./myco_sra.wdl" as myco_sra
 
@@ -42,11 +43,13 @@ workflow checker {
 		Array[File] TRUTH_mycoraw_default_diff
 		Array[File] TRUTH_mycoraw_default_diff_report
 		Array[File] TRUTH_mycoraw_default_decontam_report
+		String TRUTH_mycoraw_default_status
 
 		# When running myco_sra at default values, these should be the result
 		Array[File] TRUTH_mycosra_default_diff
 		Array[File] TRUTH_mycosra_default_diff_report
 		Array[File] TRUTH_mycosra_default_decontam_report
+		String TRUTH_mycosra_default_status
 
 		# When running myco_raw at default values, except just_like_2024 = true
 		# TODO: Compare these outputs to the actual "publication reproducibility" branch
@@ -79,21 +82,27 @@ workflow checker {
 	Array[File] TEST_mycoraw_default_diff_report = select_first([select_all(myco_raw_default.tbd_diff_reports), fallback_array])
 	Array[File] TEST_mycoraw_default_decontam_report = select_first([select_all(myco_raw_default.tbd_decontam_reports), fallback_array])
 
-	call verify_array.arraycheck_classic as check_myco_raw_default_diff {
+	call verify_string.stringcheck as status_myco_raw_default {
+		input:
+			test = myco_raw_default.tbd_status,
+			truth = TRUTH_mycoraw_default_status
+	}
+
+	call verify_array.arraycheck_classic as diff_myco_raw_default {
 		input:
 			test = TEST_mycoraw_default_diff,
 			truth = TRUTH_mycoraw_default_diff,
 			disk_size_override = checker_disk_size_override
 	}
 
-	call verify_array.arraycheck_classic as check_myco_raw_default_diff_report {
+	call verify_array.arraycheck_classic as diffreport_myco_raw_default {
 		input:
 			test = TEST_mycoraw_default_diff_report,
 			truth = TRUTH_mycoraw_default_diff_report,
 			disk_size_override = checker_disk_size_override
 	}
 
-	call verify_array.arraycheck_classic as check_myco_raw_default_decontam_report {
+	call verify_array.arraycheck_classic as decontam_myco_raw_default {
 		input:
 			test = TEST_mycoraw_default_decontam_report,
 			truth = TRUTH_mycoraw_default_decontam_report,
@@ -110,21 +119,27 @@ workflow checker {
 	Array[File] TEST_mycosra_default_diff_report = select_first([select_all(myco_sra_default.tbd_diff_reports), fallback_array])
 	Array[File] TEST_mycosra_default_decontam_report = select_first([select_all(myco_sra_default.tbd_decontam_reports), fallback_array])
 
-	call verify_array.arraycheck_classic as check_myco_sra_default_diff {
+	call verify_string.stringcheck as status_myco_sra_default {
+		input:
+			test = myco_sra_default.tbd_status,
+			truth = TRUTH_mycosra_default_status
+	}
+
+	call verify_array.arraycheck_classic as diff_myco_sra_default {
 		input:
 			test = TEST_mycosra_default_diff,
 			truth = TRUTH_mycosra_default_diff,
 			disk_size_override = checker_disk_size_override
 	}
 
-	call verify_array.arraycheck_classic as check_myco_sra_default_diff_report {
+	call verify_array.arraycheck_classic as diffreport_myco_sra_default {
 		input:
 			test = TEST_mycosra_default_diff_report,
 			truth = TRUTH_mycosra_default_diff_report,
 			disk_size_override = checker_disk_size_override
 	}
 
-	call verify_array.arraycheck_classic as check_myco_sra_default_decontam_report {
+	call verify_array.arraycheck_classic as decontam_myco_sra_default {
 		input:
 			test = TEST_mycosra_default_decontam_report,
 			truth = TRUTH_mycosra_default_decontam_report,

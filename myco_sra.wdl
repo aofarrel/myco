@@ -4,9 +4,9 @@ import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/c
 import "https://raw.githubusercontent.com/aofarrel/clockwork-wdl/2.16.10/tasks/variant_call_one_sample.wdl" as clckwrk_var_call
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/pull_fastqs.wdl" as sranwrp_pull
 import "https://raw.githubusercontent.com/aofarrel/SRANWRP/v1.2.2/tasks/processing_tasks.wdl" as sranwrp_processing
-import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.3/vcf_to_diff.wdl" as diff
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.0/tbprofiler_tasks.wdl" as profiler
-import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.1/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
+import "https://raw.githubusercontent.com/aofarrel/vcf_to_diff_wdl/0.0.5/vcf_to_diff.wdl" as diff
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/tbprofiler_tasks.wdl" as profiler
+import "https://raw.githubusercontent.com/aofarrel/tb_profiler/0.3.2/theiagen_tbprofiler.wdl" as tbprofilerFQ_WF # fka earlyQC
 import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_functions.wdl" as goleft
 
 # Copyright (C) 2025 Ash O'Farrell
@@ -28,28 +28,25 @@ import "https://raw.githubusercontent.com/aofarrel/goleft-wdl/0.1.3/goleft_funct
 workflow myco {
 	input {
 		File? biosample_accessions_file
-		String biosample_accession_str   # if using biosample_accessions_file this can be an empty string
+		String biosample_accession_str          # if using biosample_accessions_file this should be an empty string
 
-		File?   call_as_reference_bedfile            # default: R00000039_repregions.bed (exists in the Docker image)
+		File?   call_as_reference_bedfile       # default: R00000039_repregions.bed (exists in the Docker image)
 		String? comment
 		Int     fastp_avg_qual                 = 29
 		Boolean just_like_2024                 = false
 		Boolean generate_download_report_file  = true
 		Boolean guardrail_mode                 = true
 		Boolean low_resource_mode              = false
-		Int     sample_max_pct_masked          = 20
-		#Int     sample_min_pct_mapped         --> no myco_sra equivalent
-		#Int     sample_min_avg_depth          --> no myco_sra equivalent
-		Int     sample_min_q30                 = 90      # note inconsistency with myco_raw
-		Int     site_min_depth                 = 10
+		Int     sample_max_pct_masked          = 20     # 2024: 20
+		Int     sample_min_pct_mapped          = 90     # just_like_2024 override: 98
+		Int     sample_min_avg_depth           = 30     # just_like_2024 override:  0
+		Int     sample_min_q30                 = 80     # just_like_2024 override: 90
+		Int     site_min_depth                 = 10     # 2024: 10
 		Boolean skip_covstats                  = true
 		Int     subsample_cutoff               = 450     # set to -1 to turn off subsampling entirely
 		Int     subsample_reads                = 1000000 # 2000000 in myco_raw
-		
-		# QC stuff 
-		Int     QC_max_pct_unmapped            =     2  # only applies to covstats
-		Int     QC_min_mean_coverage           =    10  # only applies to covstats, unlike myco_raw
 
+		# just_like_2024 ignores AVERAGE depth and instead checks MEDIAN depth is at least 10
 	}
 
 	parameter_meta {
@@ -61,8 +58,6 @@ workflow myco {
 		fastp_avg_qual: "Trim reads with an average quality score below this value. Independent of sample_min_q30."
 		skip_covstats: "Should we skip covstats entirely?"
 		sample_max_pct_masked: "Samples who have more than this percent (as int, 50 = 50%) of positions with coverage below site_min_depth will be discarded"
-		QC_min_mean_coverage: "If covstats thinks MEAN coverage is below this, throw out this sample - not to be confused with TBProfiler MEDIAN coverage"
-		QC_max_pct_unmapped: "If covstats thinks more than this percent of your sample (after decontam and cleaning) fails to map to H37Rv, throw out this sample."
 		sample_min_q30: "Decontaminated samples with less than this percent (as int, 50 = 50%) of reads above qual score of 30 will be discarded."
 		site_min_depth: "Positions with coverage below this value will be masked in diff files"
 		
@@ -70,6 +65,7 @@ workflow myco {
 		subsample_reads: "When subsampling per subsample_cutoff, downsample to this many reads"
 	}
 	# Flip some QC stuff around
+	Int   sample_max_pct_unmapped = 100 - sample_min_pct_mapped
 	Float sample_max_pct_masked_float = sample_max_pct_masked / 100.0
 
 	# Some variables we no longer have adjustable by the user to reduce the amount of variable spam on Terra's workflow page
@@ -78,9 +74,6 @@ workflow myco {
 									 # increasing this might speed up file localization if you have >5,000 samples
 	# no equivalent to myco_raw strip_all_underscores
 	Boolean TBProf_on_bams_not_fastqs = just_like_2024
-	
-	
-	Int subsample_seed             = 1965
 
 	#decontam_use_CDC_varpipe_ref: "If true, use CDC varpipe decontamination reference. If false, use CRyPTIC decontamination reference."
 	# CDC uses their own version of clockwork's decontamination reference, which I call "CDC varpipe" since I pulled it from the varpipe repo.
@@ -109,7 +102,6 @@ workflow myco {
 				biosample_accession = biosample_accession,
 				fail_on_invalid = false,
 				subsample_cutoff = if just_like_2024 then 450 else subsample_cutoff,
-				subsample_seed = if just_like_2024 then 1965 else subsample_seed,
 				subsample_to_x_reads = if just_like_2024 then 1000000 else subsample_reads,
 				tar_outputs = false
 		}
@@ -139,7 +131,7 @@ workflow myco {
 				unsorted_sam = true,
 				reads_files = pulled_fastq,
 				fastp_clean_avg_qual = fastp_avg_qual,
-				QC_min_q30 = sample_min_q30,
+				QC_min_q30 = if just_like_2024 then 90 else sample_min_q30,
 				strip_all_underscores = true,
 				preliminary_min_q30 = if guardrail_mode then 20 else 1,
 				timeout_map_reads = if guardrail_mode then 120 else 0,
@@ -169,9 +161,10 @@ workflow myco {
 						fastq1 = real_decontaminated_fastq_1,
 						fastq2 = real_decontaminated_fastq_2,
 						soft_pct_mapped = QC_soft_pct_mapped,
-						soft_depth = if guardrail_mode then false else true,
-						minimum_depth = if guardrail_mode then 3 else 0,
-						minimum_pct_mapped = if guardrail_mode then 10 else 0, # unlike covstats, this is a MINIMUM of % MAPPED
+						soft_depth = false,
+						minimum_median_depth = if just_like_2024 then 10 else (if guardrail_mode then 3 else 0),
+						minimum_mean_depth = if just_like_2024 then 0 else sample_min_avg_depth,
+						minimum_pct_mapped = if just_like_2024 then 98 else sample_min_pct_mapped,
 						sample = fastp_decontam_check.sample
 				}
 			}
@@ -222,8 +215,8 @@ workflow myco {
 					allInputIndexes = [vcfs_and_bams.left[1]]
 			}
 			
-			if((covstats.percentUnmapped < QC_max_pct_unmapped) || QC_soft_pct_mapped) {
-				if(covstats.coverage > QC_min_mean_coverage) {
+			if((covstats.percentUnmapped < sample_max_pct_unmapped) || QC_soft_pct_mapped) {
+				if(covstats.coverage > sample_min_avg_depth) {
 					
 					# make diff files
 					call diff.make_mask_and_diff as make_mask_and_diff_after_covstats {
@@ -477,14 +470,14 @@ workflow myco {
 					Array[Float] meanCoverages = select_all(covstats.coverage)
 					Float        meanCoverage = meanCoverages[0]
 					
-					if((percentUnmapped > QC_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
-						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})"
-						if(meanCoverage < QC_min_mean_coverage) {
-							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${QC_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					if((percentUnmapped > sample_max_pct_unmapped) && !(QC_soft_pct_mapped)) { 
+						String too_many_unmapped = "COVSTATS_${percentUnmapped}_UNMAPPED_(MAX_${sample_max_pct_unmapped})"
+						if(meanCoverage < sample_min_avg_depth) {
+							String double_bad = "COVSTATS_BOTH_${percentUnmapped}_UNMAPPED_(MAX_${sample_max_pct_unmapped})_AND_${meanCoverage}_MEAN_COVERAGE_(MIN_${sample_min_avg_depth})"
 						} 
 					}
-					if(meanCoverage < QC_min_mean_coverage) {
-						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${QC_min_mean_coverage})"
+					if(meanCoverage < sample_min_avg_depth) {
+						String too_low_coverage = "COVSTATS_${meanCoverage}_MEAN_COVERAGE_(MIN_${sample_min_avg_depth})"
 					}
 				}
 			}
