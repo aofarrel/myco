@@ -1,4 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 # Override .pb files being considered PureBasic
-*/*.pb -linguist-detectable
+*.pb linguist-generated=true
