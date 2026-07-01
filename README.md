@@ -54,11 +54,10 @@ myco imports almost all of its code from other repos. Please see those specific 
 #### seqtk
 > https://github.com/lh3/seqtk
 
-#### TBProfiler (version 4.4.2, database 2023-Mar-27)
+#### TBProfiler
 > Phelan, Jody E., Denise M. O’Sullivan, Diana Machado, Jorge Ramos, Yaa E. A. Oppong, Susana Campino, Justin O’Grady, et al. “Integrating Informatics Tools and Portable Sequencing Technology for Rapid Detection of Resistance to Anti-Tuberculous Drugs.” Genome Medicine 11, no. 1 (December 2019): 41. https://doi.org/10.1186/s13073-019-0650-x.
 
-Note that some versions of this pipeline specifically uses Thiagen's fork of TBProfiler. The pinned version of this fork that I use itself uses TBProfiler version 4.4.2, database 2023-Jan-19.
-
+More recent versions of the pipeline use Theiagen's fork of TBProfiler, which is included in TheiaProk.
 > Libuit, Kevin G., Emma L. Doughty, James R. Otieno, Frank Ambrosio, Curtis J. Kapsak, Emily A. Smith, Sage M. Wright, et al. 2023. “Accelerating Bioinformatics Implementation in Public Health.” Microbial Genomics 9 (7). https://doi.org/10.1099/mgen.0.001051.
 
 #### Trimmomatic
