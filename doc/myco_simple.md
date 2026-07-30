@@ -1,4 +1,6 @@
 # myco_simple
+**This version of the pipeline is not actively maintained.**
+
 myco_simple is the version of myco to use if you already have a bunch of fastqs, divided on a per-sample basis. It assumes you do not want to decontaminate your fastqs at all -- perhaps they are non-tuberculosis mycobacteria or already decontaminated -- but it does offer the option of cleaning with fastp.
 
 Each sample's read direction must be an individual gzipped file, e.g. SRR1173122_1.fq.gz and SRR1173122_2.fq.gz representing sample SRR1173122. Something like SRR1173122.gz which contains two fastqs would not work. Unlike more flexible versions of myco, the inputs to myco_simple **strictly** must be individually gzipped due to limitations of the variant caller.
