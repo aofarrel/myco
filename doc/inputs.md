@@ -31,7 +31,7 @@ Some samples on NCBI SRA are corrupted, improperly tagged, "broken", very large,
 
 An exception: A small number of BioSamples such as [SAMEA968096](https://www.ncbi.nlm.nih.gov/sra/?term=SAMEA968096) are in "sample pools." Such samples will return all run accessions for all BioSamples in that sample pool, often including a generic barcode sample. This may cause issues with downstream analysis; such samples should likely be avoided. There does not appear to be a consistent way to detect sample groups using fasterq-dump, which is why this currently is not handled automatically, but samples within a sample pool are marked on SRA's UI: <img width="382" height="26" alt="Screenshot 2026-08-06 at 3 21 58 PM" src="https://github.com/user-attachments/assets/2622ba59-3040-4492-a442-4638f83fee8f" />
 
-[I have a compiled a denylist of all problematic MTBC samples that I'm aware of]([https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists), including samples within sample pools, but there may be more out there.
+[I have a compiled denylists of all problematic MTBC samples that I'm aware of](https://github.com/aofarrel/SRANWRP/tree/main/inputs/denylists), including samples within sample pools, but there may be more out there.
  
 ## Other inputs
 *This is just a brief overview. Please see myco_sra and myco_raw's respective parameter_meta sections within their WDLs for more information.*  
