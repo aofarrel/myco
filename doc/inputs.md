@@ -40,7 +40,7 @@ Samples with extremely large FASTQs or samples [such as SAMN17359332 which have 
 |:---:|:---:|:---:|:---:|:---:|    
 | call_as_reference_bedfile | File? | [this CRyPTIC mask file](https://github.com/iqbal-lab-org/cryptic_tb_callable_mask/blob/44f884558bea4ee092ce7c5c878561200fcee92f/R00000039_repregions.bed) | same as myco_raw | Bed file of regions to mask as reference when making diff files **(be aware the VCF is not affected by this file, only the final MAPLE diff)** |  
 | comment | String? |  |  | Passed directly as a workflow output `tbd_comment`, useful for Terra data tables in some scenarios |  
-| guardrail_mode | Boolean | true | true | Implements safeguards, see section below for more information | 
+| guardrail_mode | Boolean | true | true | Implements safeguards, [see here for more info](https://github.com/aofarrel/myco/blob/main/doc/guardrail_mode.md) | 
 | just_like_2024 | Boolean | false | false | Override a bunch of QC metrics, as well as `subsample_cutoff` and `subsample_reads` [to match what was used to build UCSC's SRA tree](10.1101/2025.07.22.25331806) **(do not enable this unless you know what you're doing; this exists in the name of publication reproducibility)** | 
 | sample_max_pct_masked | Int | 20 | 20 | Samples who have more than this percent (as int, so 20 = 20%) of positions with coverage below site_min_depth will be discarded |
 | sample_min_q30 | Int | 80 | 80 | Decontaminated samples with less than this percent (as int, so 80 = 80%) of reads above qual score of 30 will be discarded (intentionally lower than CDC's preferred 85% as in our experience 85% cutoff removes too CalTBNet samples) |
@@ -53,12 +53,6 @@ Samples with extremely large FASTQs or samples [such as SAMN17359332 which have 
 
 > [!NOTE]  
 > Regions within call_as_reference_bedfile are called as reference in resulting diff file, which is to say, they are not mentioned at all (in the same way a VCF doesn't mention every site that is reference). In all other scenarios (indels, low coverage as per `site_min_depth`, ambiguous call) when we refer to a "masked" position, we mean one that is explicitly included in the diff file as `-`. There is a minor distinction between "reference" and "masked" with regard to placement of samples on a phylogenetic tree by UShER/[Tree Nine](https://github.com/aofarrel/tree_nine).
-
-## Guardrail Mode  
-Guardrail Mode implements timers to certain myco tasks, which help prevent edge case samples from causing runaway cloud costs and pipeline stalling. This is especially important in the decontamination step, as decontamination occurs before most QC checks and requires a long time to complete on extremely contaminated large samples, which are ultimately doomed to fail QC checks anyway. The defaults myco uses for guardrails are relatively lenient to ensure the maximum number of likely-to-pass samples make it through the pipeline. It's recommended to leave this enabled unless your fastqs are huge, or you are running on slow HDDs.
-
-In previous versions, `subsample_cutoff` was in some cases overwritten by a default if `guardrail_mode` = True. In this version, this is no longer the case. subsample_cutoff will always be respected regardless of the value of guardrail_mode. That being said, it is one of the best possible guardrails against bad data, so consider leaving it to the default value.
-
 
 ## Removed from recent(ish) versions
 
