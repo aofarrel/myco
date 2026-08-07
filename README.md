@@ -17,7 +17,7 @@ For more information please see [./docs/inputs.md](./doc/inputs.md), the per-wor
 * Non-Terra Cromwell (including the Dockstore CLI) is supported, but be aware Cromwell has serious problems with handling hardware resources that can make it to crash in situations where miniwdl would not. You can make non-Terra Cromwell much more stable by setting concurrent-job-limit to 1 in the Cromwell config, but this will make processing multiple samples at once slower. Worry not, this kind of crash does not occur on Terra due to differences in how Cromwell requests resources in "cloud mode."
 * myco_raw has been reported to work on HPCs that use Singularity instead of Docker with some adjustments, but this is not officially supported
 
-## Additional, arguably excessive documentation
+## Additional documentation
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
 * Pipeline inputs: [/doc/inputs.md](./doc/inputs.md)
 * Per-workflow readmes:
