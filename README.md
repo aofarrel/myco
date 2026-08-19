@@ -19,14 +19,15 @@ If not running on Terra, it is recommend to run with miniwdl due to miniwdl's be
   * [myco_raw](./doc/myco_raw.md)
   * [myco_simple](./doc/myco_simple.md)
   * [myco_sra](./doc/myco_sra.md)
-  * [wrapper_example](.doc/wrapper_example.md)
 
 myco imports almost all of its code from other repos. Please see those specific repos for support with different parts of the myco pipeline:
 * Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)
 * Decontamination and calling variants: [clockwork-wdl](https://github.com/aofarrel/clockwork-wdl)
 * Turning VCFs into diff files: [parsevcf](https://github.com/lilymaryam/parsevcf)
+
+Although not imported by myco, you may also be interested in:
 * Building UShER, Taxonium, and Nextstrain/Auspice trees: [tree-nine](https://github.com/aofarrel/tree-nine)
-* Determining why your sample spent 20 hours in the decontamination task: [FastQC-wdl](https://qa.dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)
+* Running FastQC in addition to fastp: [FastQC-wdl](https://qa.dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)
 
 ## Citations
 

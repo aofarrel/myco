@@ -1,5 +1,5 @@
 # myco_sra
-myco_sra is the [SRA](https://www.ncbi.nlm.nih.gov/sra) version of myco. Use this version of myco if you want to analysze fastqs from SRA. This is powered by [SRANWRP](https://github.com/aofarrel/SRANWRP), most notably the [pull-FASTQs-from-biosample](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/pull_FASTQs_from_SRA_by_biosample:main?tab=info) workflow. (For the sake of simplicity this readme calls the part of myco_sra that downloads from SRA "SRANWRP", even thought SRANWRP contains a few additional utility functions and workflows.)
+myco_sra is the [SRA](https://www.ncbi.nlm.nih.gov/sra) version of myco. Use this version of myco if you want to analyze fastqs from SRA. This is powered by [SRANWRP](https://github.com/aofarrel/SRANWRP), most notably the [pull-FASTQs-from-biosample](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/pull_FASTQs_from_SRA_by_biosample:main?tab=info) workflow. (For the sake of simplicity this readme calls the part of myco_sra that downloads from SRA "SRANWRP", even thought SRANWRP contains a few additional utility functions and workflows.)
 
 ## Notable inputs
 biosample_accessions -- a single text File which contains BioSample accessions, one BioSample accession per line, ex:
@@ -37,7 +37,7 @@ Accessions belonging to "sample groups" are not supported, as it isn't very clea
 
 Samples with a very large number of run accessions could be problematic on a GCP backend. GCP backends require you request a certain amount of disk size before runtime, which can get dicey when what you want to do at runtime is download an unknown number of files of unknown size. As such, SRANWRP requests more disk size than you *probably* need, but there could come a time that guess doesn't prove to be enough.
 
-The only other accessions known to fail SRANWRP are ones which break prefetch or fasterq-dump. Usually this means the fastqs themselves are invalid (ex: SAMEA1877221, SAMEA2609926, SAMEA2609935) or were not fully processed by NCBI (ex: ERR760606, although SAMEA3231653 has two other run accessions which do work fine).
+The only other accessions known to fail SRANWRP are ones which break `prefetch` or `fasterq-dump` of sra-tools. Usually this means the fastqs themselves are invalid (ex: SAMEA1877221, SAMEA2609926, SAMEA2609935) or were not fully processed by NCBI (ex: ERR760606, although SAMEA3231653 has two other run accessions which do work fine).
 
 ## What if an SRA accession passes SRANWRP, but isn't good enough for the rest of the pipeline?
 We can't always tell that data isn't up to our standards until later down the pipeline. myco (including myco_sra) will filter out samples which:
@@ -59,7 +59,7 @@ This task pulls all fastqs for a given BioSample accession using [SRANWRP](https
 
 There are some samples that return no valid fastqs. There is an additional task that keeps track of every sample's run accessions, and the result of trying to pull fastqs from each run accession. The "pull report" is a workflow-level output.
 
-### [3] Run fastp and decontaminate
+### [3] Clean and decontaminate
 This task is based on [clockwork's decontamination process](https://github.com/iqbal-lab-org/clockwork/wiki/Walkthrough-scripts-only#decontaminate-the-reads), which runs clockwork map_reads and clockwork remove_contam in a single WDL task. In recent updates, it has also been merged with [fastp](https://github.com/OpenGene/fastp) as a preliminary cleaning and QC step. On default settings, this is the order of events:
 1. Cleaning of the reads via fastp
 2. clockwork map_reads to map reads to the decontamination reference
@@ -74,21 +74,18 @@ Part three of this process will merge FASTQs if a single sample has more than on
 
 The decontamination step will output a single pair: SAMN02599053_1.fastq and SAMN02599053_2.fastq
 
-### [4] (optional) Run TBProfiler
-If `TBProf_on_bams_not_fastqs` is false, TBProfiler will be run on the fastqs here. This form of TBProfiler is a fork by Thiagen Genomics that features some improvements to its database and generates special outputs for LHJs. Because myco_sra's use case is different from that of myco_raw, this step is optional in order to save money.
+### [4] (technically optional) Run TBProfiler
+If `TBProf_on_bams_not_fastqs` is false, TBProfiler will be run on the fastqs here. This form of TBProfiler is a fork by Theiagen Genomics that features some improvements to its database and generates special outputs for LHJs. Because myco_sra's use case is different from that of myco_raw, this step is optional in order to save money.
 
 ### [5] Call variants
 Based on clockwork variant_call_single, which itself combines samtools, cortex, and minos. For each sample, the output is a single VCF file and a BAM file.
 
-### [6] (optional) Run covstats
+### [6] (deprecated, optional) Run covstats
 Covstats checks how much of a sample ends up unmapped, and the average coverage. This takes some time to calculate, so it's optional, but it also gives us two additional QC metrics.
 
 ### [7] Mask the outputs create diff files
-When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and optionally creates a diff file, one per sample, which can be used to make some happy little trees.
+When feeding outputs into UShER (not included in myco anymore but now in [Tree Nine](https://github.com/aofarrel/tree_nine), we want to make use of MAPLE-formatted diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task creates a diff file, one per sample, which can be used to make some happy little trees.
 
 ### [8] Collate QC information
 This pipeline generates a large amount of metadata and intermediate files. This task summarizes QC information into a single file for easy reference.
-
-### [9] (optional) Generate UShER, Taxonium, newick, and NextStrain trees
-If decorate_trees = true, and an input tree is passed in, each sample will be placed on the tree by UShER. The resulting tree will then be converted to Taxonium format, allowing it to be viewed in taxonium. NextStrain subtree JSONs will also be generated.
 
