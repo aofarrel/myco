@@ -5,16 +5,18 @@ import "./myco_raw.wdl" as myco_raw
 import "./myco_sra.wdl" as myco_sra
 
 # This workflow is designed to run on a data table in Terra. You can run it locally, but you'll need
-# to run it each row of checker_data_table as a separate workflow.
+# to run each row of checker_data_table as a separate workflow.
 #
 # Terra instructions:
 # 1) Import this checker workflow
-# 2) Import the checker_data_table as a TSV to create a Terra data table
-# 3) In workflows tab, select checker workflow
+#    - if using Dockstore, the relative imports should work as-is
+#    - if using Broad Methods Repository, change the myco imports to raw github URLs
+# 2) Import the appropriate checker_data_table (see /inputs in myco repo) as a TSV to create a Terra data table
+# 3) In workflows tab, select this checker workflow
 # 4) Select "Run workflow(s) with inputs defined by data table"
 # 5) Select the checker workflow data table
-# 6) Fill in inputs
-# 7) Optional: Set a workflow cost threshold
+# 6) Fill in inputs with /inputs/checker_terra.json
+# 7) Optional: Set a workflow cost threshold ($20 should be plenty)
 # 8) Launch
 
 workflow checker {

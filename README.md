@@ -1,33 +1,41 @@
 # myco 
-myco is a group of _Mycobacterium tuberculosis_ complex (MBTC) sample processing pipelines built upon [clockwork](https://github.com/iqbal-lab-org/clockwork), [TBProfiler](https://github.com/jodyphelan/TBProfiler), and other tools. Earlier versions of myco included [UShER](https://www.nature.com/articles/s41588-021-00862-7)-powered phylogenetics and clustering, which has now been moved to [Tree Nine](https://github.com/aofarrel/tree_nine). You can still feed the outputs of myco directly into Tree Nine for a full FQ-to-tree pipeline.
+myco is a group of _Mycobacterium tuberculosis_ complex (MBTC) sample processing pipelines built upon [clockwork](https://github.com/iqbal-lab-org/clockwork), [TBProfiler](https://github.com/jodyphelan/TBProfiler), and other tools. You input fastq files (or NCBI BioSample accessions), and you end up with TBProfiler reports, VCFs, and MAPLE diff files. Earlier versions of myco included [UShER](https://www.nature.com/articles/s41588-021-00862-7)-powered phylogenetics and clustering, which has now been moved to [Tree Nine](https://github.com/aofarrel/tree_nine). You can still feed the outputs of myco directly into Tree Nine for a full FQ-to-tree pipeline.
 
 In an amusing repeat of [somewhat questionable naming decisions made in 1896](https://wwwnc.cdc.gov/eid/article/14/3/et-1403_article), myco should not be confused with the similiarly-named fungal pathogen pipeline [MycoSNP](https://github.com/CDCgov/mycosnp-nf).
 
 ## Which workflow should I use?
-Each version of myco largely only differs in how you are passing in FASTQ files. **In all cases, your FASTQs must be paired-end Illumina reads.**
-* [myco_simple](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects decontaminated, gzipped FASTQs 
-* [myco_raw](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated and may or may not be merged
-* [myco_sra](https://qa.dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
+The main difference in the three flavors of myco are how you want to get FASTQ files into the workflow. In all cases, your FASTQs must be paired-end Illumina reads.
+* [myco_raw](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated **<--- If you are CalTBNet, this is the one!!**
+* [myco_sra](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
+* [myco_simple](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects decontaminated, gzipped FASTQs 
 
-For more information please see [./docs/inputs.md](./doc/inputs.md).
+For more information please see [./docs/inputs.md](./doc/inputs.md), the per-workflow readmes, and the WDL file's respective parameter_meta section.
 
-## More information
-If not running on Terra, it is recommend to run with miniwdl due to miniwdl's better handling of non-cloud compute resources. **If using miniwdl, make sure to update miniwdl to v1.14.2 or later as older versions [have a bug](https://github.com/chanzuckerberg/miniwdl/issues/840) which breaks the final QC check (this does not affect Cromwell, the Dockstore CLI, nor Terra).** 
+## Tips
+* If running on Terra, it is recommended to use [data tables](https://support.terra.bio/hc/en-us/articles/360025758392-Managing-data-with-tables) for your input, one sample per row
+* If not running on Terra, it is recommend to run with miniwdl due to miniwdl's better handling of non-cloud compute resources, but you must use v1.14.2 or later as older versions [have a bug](https://github.com/chanzuckerberg/miniwdl/issues/840) which breaks the final QC check
+* Non-Terra Cromwell (including the Dockstore CLI) is supported, but be aware Cromwell has serious problems with handling hardware resources that can make it to crash in situations where miniwdl would not. You can make non-Terra Cromwell much more stable by setting concurrent-job-limit to 1 in the Cromwell config, but this will make processing multiple samples at once slower. Worry not, this kind of crash does not occur on Terra due to differences in how Cromwell requests resources in "cloud mode."
+* myco_raw has been reported to work on HPCs that use Singularity instead of Docker with some adjustments, but this is not officially supported
+
+## Additional documentation
 * How to use WDL workflows: [UCSC's guide on running WDLs](https://github.com/ucsc-cgp/training-resources/blob/main/WDL/running_a_wdl.md)
-* Full list of inputs: [inputs.md](./doc/inputs.md)
+* Pipeline inputs: [/doc/inputs.md](./doc/inputs.md)
 * Per-workflow readmes:
   * [myco_raw](./doc/myco_raw.md)
   * [myco_simple](./doc/myco_simple.md)
   * [myco_sra](./doc/myco_sra.md)
+* How sites, variants, and entire samples get filtered: [/doc/qc_and_filtering.md](./doc/qc_and_filtering.md)
+* How to run on [underpowered backends](./doc/low_resource_mode.md) and with [safety guardrails against runaway cloud costs](./doc/guardrail_mode.md)
+* A list of [status codes](./doc/status_codes.md) and [available/recommended reference genomes](./doc/reference_genomes.md)
 
 myco imports almost all of its code from other repos. Please see those specific repos for support with different parts of the myco pipeline:
-* Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)
+* Downloading reads from SRA (myco_sra only): [SRANWRP](https://github.com/aofarrel/SRANWRP)
 * Decontamination and calling variants: [clockwork-wdl](https://github.com/aofarrel/clockwork-wdl)
-* Turning VCFs into diff files: [parsevcf](https://github.com/lilymaryam/parsevcf)
+* Turning VCFs into MAPLE-formatted diff files: [vcf_to_diff_wdl](https://github.com/aofarrel/vcf_to_diff_wdl) and [parsevcf](https://github.com/lilymaryam/parsevcf)
 
 Although not imported by myco, you may also be interested in:
 * Building UShER, Taxonium, and Nextstrain/Auspice trees: [tree-nine](https://github.com/aofarrel/tree-nine)
-* Running FastQC in addition to fastp: [FastQC-wdl](https://qa.dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)
+* Full FastQC reports, if you're more used to those instead of fastp's more concise ones: [FastQC-wdl](https://dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)
 
 ## Citations
 
@@ -55,11 +63,10 @@ Although not imported by myco, you may also be interested in:
 #### seqtk
 > https://github.com/lh3/seqtk
 
-#### TBProfiler (version 4.4.2, database 2023-Mar-27)
+#### TBProfiler
 > Phelan, Jody E., Denise M. O’Sullivan, Diana Machado, Jorge Ramos, Yaa E. A. Oppong, Susana Campino, Justin O’Grady, et al. “Integrating Informatics Tools and Portable Sequencing Technology for Rapid Detection of Resistance to Anti-Tuberculous Drugs.” Genome Medicine 11, no. 1 (December 2019): 41. https://doi.org/10.1186/s13073-019-0650-x.
 
-Note that some versions of this pipeline specifically uses Thiagen's fork of TBProfiler. The pinned version of this fork that I use itself uses TBProfiler version 4.4.2, database 2023-Jan-19.
-
+More recent versions of the pipeline use Theiagen's fork of TBProfiler, which is included in TheiaProk.
 > Libuit, Kevin G., Emma L. Doughty, James R. Otieno, Frank Ambrosio, Curtis J. Kapsak, Emily A. Smith, Sage M. Wright, et al. 2023. “Accelerating Bioinformatics Implementation in Public Health.” Microbial Genomics 9 (7). https://doi.org/10.1099/mgen.0.001051.
 
 #### Trimmomatic

@@ -1,19 +1,8 @@
 # Guardrail Mode
-Guardrail mode is designed to filter out problematic samples that may cause the pipeline to take several hours longer than expected and/or crash. This is done by setting several "safeguards" which will discard a sample if it's really, really bad. To make it easier for users, safeguards are not directly adjustable by the user -- instead, the user simply turns guardrail mode on or off.
+Guardrail mode is designed to quietly filter out problematic edge-case samples, which would otherwise cause runaway cloud costs, pipeline stalling, or hard crashes. Although guardrail mode is arguably a type of QC filter, it is an extremely lenient one that is designed to remove only samples which cannot be meaningfully analyzed. That is to say: Guardrail mode is designed to coexist with other QC filters in the pipeline, including ones adjustable by the user. It's recommended to leave it enabled unless your fastqs are truly massive, or you are running on slow HDDs (it includes timers).
 
-Guardrail mode is **not** a replacement for QC. It is arguably a type of QC filter, yes, but it is an extremely lenient one that is designed to remove only samples which cannot be meaningfully analyzed.
+Guardrail mode was developed [while building the MTBC tree](https://www.taxonium.org/tuberculosis/SRA) to help deal with the small-but-not-insignificant number of NCBI SRA samples that are really, really, really bad. The timers and cutoffs it implements are based on observations; for example, the decomtamination timer is set to 300 for myco_sra (600 minutes for myco_raw, as those samples are typically not downsampled) as we found essentially all samples that took >300 minutes end up getting filtered out later in the pipeline anyway.
 
+In previous versions, subsample_cutoff was in some cases overwritten by a default if guardrail_mode = True. In current versions, this is no longer the case. subsample_cutoff will always be respected regardless of the value of guardrail_mode. That being said, it is one of the best possible guardrails against bad data, so consider leaving it to the default value.
 
-## Filters
-When guardrail mode is active, if any of these are true about a sample, the sample will be removed.
-* TBProfiler thinks the median coverage is less than 3x or that more than 10% of the data can't map to H37Rv
-* Mapping reads to the decontamination reference takes more than 300 minutes
-* Decontaminating takes more than 600 minutes
-* Variant calling takes more 600 minutes
-* fastp determines that a less than 20% of the sample has a q score above 30, as measured before fastp cleaning and before decontam
-
-Additionally, if any input fastq is larger than 30 GB, it will be heavily downsampled.
-
-
-## Are there really samples out there that would fail these filters?
-All filters implemented by Guardrail mode represent actual issues found when running on data submitted to NCBI SRA.
+Some of the cutoffs are slightly different between myco_sra and myco_raw, but can easily be gleaned by searching `guardrail_mode` on the respective workflow WDL file.
