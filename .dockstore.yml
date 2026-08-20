@@ -6,6 +6,12 @@ workflows:
     readMePath: /doc/myco_raw.md
     authors:
       - orcid: 0000-0003-4896-1858
+    testParameterFiles:
+      - /inputs/myco_raw_gs.json
+      - /inputs/myco_raw_nromal.json
+      - /inputs/myco_raw_terra_datatable.json
+    latestTagAsDefault: true
+    topic: "Genomic analysis of Mycobacterium tuberculosis complex (MTBC) powered by clockwork and TBProfiler. Supports direct input of FASTQ files (for SRA accessions, see myco_sra instead)."
   - name: myco_sra
     subclass: WDL
     primaryDescriptorPath: /myco_sra.wdl
@@ -15,15 +21,13 @@ workflows:
       - /inputs/myco_sra_local.json
     authors:
       - orcid: 0000-0003-4896-1858
+    latestTagAsDefault: true
+    topic: "Genomic analysis of Mycobacterium tuberculosis complex (MTBC) powered by clockwork and TBProfiler. Supports pulling directly from NCBI SRA (for inputting FASTQ files, see myco_raw instead)."
   - name: myco_simple
     subclass: WDL
     primaryDescriptorPath: /myco_simple.wdl
     readMePath: /doc/myco_simple.md
     authors:
       - orcid: 0000-0003-4896-1858
-  - name: myco_wrapper_example
-    subclass: WDL
-    primaryDescriptorPath: /wrapper_example.wdl
-    readMePath: /doc/wrapper_example.md
-    authors:
-      - orcid: 0000-0003-4896-1858
+    latestTagAsDefault: true
+    topic: "Minimal version of myco_raw that skips decontamination and TBProfiler for quick variant calling of Mycobacterium tuberculosis complex (MTBC) FASTQs."

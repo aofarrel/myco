@@ -36,16 +36,13 @@ The decontamination step will output a single pair: SAMN02599053_1.fastq and SAM
 Additionally, this step will by default run fastp before decontamination takes place in order to clean the reads and perform some basic QC checks. You can flip to cleaning after decontamination by setting `clean_before_decontam` to false and `clean_after_decontam` to true. You can avoid fastp cleaning entirely by setting both of these to false, but post-decontamination QC -- as in, checking to make sure the entire sample is valid -- will run regardless.
 
 ### [2] Run TBProfiler
-Runs [a sub-workflow wrapper](https://github.com/aofarrel/tb_profiler/blob/main/thiagen_tbprofiler.wdl) of [Thiagen's fork of TBProfiler](https://github.com/theiagen/public_health_bioinformatics). 
+Runs [a sub-workflow wrapper](https://github.com/aofarrel/tb_profiler/blob/main/thiagen_tbprofiler.wdl) of [Theiagen's fork of TBProfiler](https://github.com/theiagen/public_health_bioinformatics). 
 
 ### [3] Call variants
 Based on clockwork variant_call_single, which itself combines samtools, cortex, and minos. For each sample, the output is a single VCF file and a BAM file.
 
-### [4] Run covstats
+### [4] (deprecated, optional) Run covstats
 Run covstats (from the goleft software bundle) to determine mean coverage.
 
 ### [5] Mask the outputs and optionally create diff files
-When feeding outputs into UShER, we want to make use of diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task cleans up our outputs and optionally creates a diff file, one per sample, which can be used to make some happy little trees.
-
-### [6] (optional) Generate UShER, Taxonium, and NextStrain trees
-If decorate_trees = true, and an input tree is passed in, each sample will be placed on the tree by UShER. The resulting tree will then be converted to Taxonium format, allowing it to be viewed in taxonium. NextStrain subtree JSONs will also be generated.
+When feeding outputs into UShER (not included in myco anymore but now in [Tree Nine](https://github.com/aofarrel/tree_nine), we want to make use of MAPLE-formatted diff files. But first, we perform a little bit of data processing -- it common for some regions of the TB genome to be masked. We want to avoid those problematic regions in our final output, as well as any regions without much coverage. This task creates a diff file, one per sample, which can be used to make some happy little trees.

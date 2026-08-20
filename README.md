@@ -24,16 +24,18 @@ For more information please see [./docs/inputs.md](./doc/inputs.md), the per-wor
   * [myco_raw](./doc/myco_raw.md)
   * [myco_simple](./doc/myco_simple.md)
   * [myco_sra](./doc/myco_sra.md)
-  * [wrapper_example](.doc/wrapper_example.md)
 * How sites, variants, and entire samples get filtered: [/doc/qc_and_filtering.md](./doc/qc_and_filtering.md)
 * How to run on [underpowered backends](./doc/low_resource_mode.md) and with [safety guardrails against runaway cloud costs](./doc/guardrail_mode.md)
 * A list of [status codes](./doc/status_codes.md) and [available/recommended reference genomes](./doc/reference_genomes.md)
 
 myco imports almost all of its code from other repos. Please see those specific repos for support with different parts of the myco pipeline:
-* Downloading reads from SRA: [SRANWRP](https://github.com/aofarrel/SRANWRP)
+* Downloading reads from SRA (myco_sra only): [SRANWRP](https://github.com/aofarrel/SRANWRP)
 * Decontamination and calling variants: [clockwork-wdl](https://github.com/aofarrel/clockwork-wdl)
-* Turning VCFs into diff files: [parsevcf](https://github.com/lilymaryam/parsevcf)
-* Building UShER, Taxonium, and Nextstrain/Auspice trees: [tree-nine](https://github.com/aofarrel/tree-nine), which is now a separate workflow and no longer included in any flavor of myco
+* Turning VCFs into MAPLE-formatted diff files: [vcf_to_diff_wdl](https://github.com/aofarrel/vcf_to_diff_wdl) and [parsevcf](https://github.com/lilymaryam/parsevcf)
+
+Although not imported by myco, you may also be interested in:
+* Building UShER, Taxonium, and Nextstrain/Auspice trees: [tree-nine](https://github.com/aofarrel/tree-nine)
+* Full FastQC reports, if you're more used to those instead of fastp's more concise ones: [FastQC-wdl](https://dockstore.org/workflows/github.com/aofarrel/fastqc-wdl/fastqc)
 
 ## Citations
 
