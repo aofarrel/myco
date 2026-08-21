@@ -36,6 +36,10 @@ workflow checker {
 		# fail expected, one will be the fallback file and the other won't, resulting in (correct)
 		# error to flag the mismatch.
 		File fallback
+
+		# Checker tasks that need to localize files will be allocated this much disk space in GB
+		# This usually only matters on GCP backends, including Terra
+		Int checker_task_disk_size = 10
 		
 		# These are arrays, but except for myco_raw multi sample test cases (currently not included),
 		# they should only contain one value. If expecting no file (ie known QC fail) then that file 
@@ -64,8 +68,6 @@ workflow checker {
 		# Deprioritized, nobody uses varpipe
 		#Array[File] TRUTH_legacy_varpipedecon_bai
 		#Array[File] TRUTH_legacy_varpipedecon_diff
-
-		Int checker_disk_size_override
 	}
 
 	# Turn fallback into a one-element array so it can be used as a fallback for constructing Array[File]
@@ -94,21 +96,21 @@ workflow checker {
 		input:
 			test = TEST_mycoraw_default_diff,
 			truth = TRUTH_mycoraw_default_diff,
-			disk_size_override = checker_disk_size_override
+			disk_size_override = checker_task_disk_size
 	}
 
 	call verify_array.arraycheck_classic as diffreport_myco_raw_default {
 		input:
 			test = TEST_mycoraw_default_diff_report,
 			truth = TRUTH_mycoraw_default_diff_report,
-			disk_size_override = checker_disk_size_override
+			disk_size_override = checker_task_disk_size
 	}
 
 	call verify_array.arraycheck_classic as decontam_myco_raw_default {
 		input:
 			test = TEST_mycoraw_default_decontam_report,
 			truth = TRUTH_mycoraw_default_decontam_report,
-			disk_size_override = checker_disk_size_override
+			disk_size_override = checker_task_disk_size
 	}
 
 	# Now do myco_sra
@@ -131,21 +133,21 @@ workflow checker {
 		input:
 			test = TEST_mycosra_default_diff,
 			truth = TRUTH_mycosra_default_diff,
-			disk_size_override = checker_disk_size_override
+			disk_size_override = checker_task_disk_size
 	}
 
 	call verify_array.arraycheck_classic as diffreport_myco_sra_default {
 		input:
 			test = TEST_mycosra_default_diff_report,
 			truth = TRUTH_mycosra_default_diff_report,
-			disk_size_override = checker_disk_size_override
+			disk_size_override = checker_task_disk_size
 	}
 
 	call verify_array.arraycheck_classic as decontam_myco_sra_default {
 		input:
 			test = TEST_mycosra_default_decontam_report,
 			truth = TRUTH_mycosra_default_decontam_report,
-			disk_size_override = checker_disk_size_override
+			disk_size_override = checker_task_disk_size
 	}
 
 
