@@ -2,7 +2,12 @@
 myco_sra is the [SRA](https://www.ncbi.nlm.nih.gov/sra) version of myco. Use this version of myco if you want to analyze fastqs from SRA. This is powered by [SRANWRP](https://github.com/aofarrel/SRANWRP), most notably the [pull-FASTQs-from-biosample](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/pull_FASTQs_from_SRA_by_biosample:main?tab=info) workflow. (For the sake of simplicity this readme calls the part of myco_sra that downloads from SRA "SRANWRP", even thought SRANWRP contains a few additional utility functions and workflows.)
 
 ## Notable inputs
-biosample_accessions -- a single text File which contains BioSample accessions, one BioSample accession per line, ex:
+SAME, SAMN, SRS, ERS, and numeric BioSample accessions are all supported, as well as any combination of these formats. **Run accessions (SRR, ERR, DRR) are not supported, [but you can use this workflow to convert your run accessions to BioSample accessions](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info).**
+
+There are two ways to feed BioSample accessions into myco_sra. Choose one or the other, not both. All other, non-BioSample inputs are documented here: [inputs.md](./inputs.md)
+
+### Option A: BioSamples listed on a text file
+You may enter a single text File (`biosample_accessions_file`) which contains BioSample accessions, one BioSample accession per line, like so:
 ```
 SAMEA10030079
 SAMEA10030285
@@ -12,12 +17,18 @@ SAMEA104390589
 SAMEA110024138
 SAMEA111556114
 ```
+Assuming more than one accession gets pulled successfully, your workflow will run with scattered tasks.
 
-SAME, SAMN, SRS, ERS, and numeric BioSample accessions are all supported, as well as any combination of these formats. **Run accessions (SRR, ERR, DRR) are not supported, [but you can use this workflow to convert your run accessions to BioSample accessions](https://dockstore.org/workflows/github.com/aofarrel/SRANWRP/get_biosample_accessions_from_run_accessions:main?tab=info).**
+Due to limitations of the WDL language, if you go with option, you must still define `biosample_accession_str`, but it needs to an empty string: `""`
 
-All other inputs are documented here: [inputs.md](./inputs.md)
+### Option B: BioSamples passed in as a String
+You may enter **precisely one** BioSample accession as a String via `biosample_accession_str`. Your workflow will pull just that one BioSample.
 
-## How does the fastq downloading part differ from similar workflows?
+Due to limitations of the WDL language, if you go with option, you must leave `biosample_accessions_file` **undefined**.
+
+Option B is designed for Terra Data tables. If you have a 10,000 row data table in Terra where each row has one BioSample accession in one of its columns, you can simultaneously run 10,000 instances of the myco_sra workflow, each one processing one sample. On Terra, this scales better than using scatter() like Option A.
+
+## How does myco_sra's fastq downloader differ from similar workflows?
 There are several existing workflows which can pull from SRA, such as [SRA Fetch](https://dockstore.org/workflows/github.com/theiagen/terra_utilities/SRA_Fetch:v1.4.1?tab=info) and [DownloadFromSRA](https://dockstore.org/workflows/github.com/broadinstitute/long-read-pipelines/DownloadFromSRA:kvg_update_downloaders?tab=info). If you need your reads downloaded with no processing, need PacBio reads downloaded, or need your fastqs saved to a specific GCS directory, these workflows might be better suited to your needs than SRANWRP. **SRANWRP assumes you only want paired-end Illumina data while also making no assumptions that the BioSamples you are giving it actually have any paired-end Illumina data.**
 
 ## How does myco_sra handle "weird" data?/What checks does it perform?
