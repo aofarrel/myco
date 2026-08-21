@@ -1,6 +1,6 @@
 version 1.0
-import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/disk-size-override/checker_tasks/arraycheck_task.wdl" as verify_array
-import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/add-stringcheck/checker_tasks/stringcheck_task.wdl" as verify_string
+import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/v1.1.1-ash/checker_tasks/arraycheck_task.wdl" as verify_array
+import "https://raw.githubusercontent.com/aofarrel/checker-WDL-templates/v1.1.1-ash/checker_tasks/stringcheck_task.wdl" as verify_string
 import "./myco_raw.wdl" as myco_raw
 import "./myco_sra.wdl" as myco_sra
 
