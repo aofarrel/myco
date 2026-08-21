@@ -6,14 +6,14 @@ In an amusing repeat of [somewhat questionable naming decisions made in 1896](ht
 ## Which workflow should I use?
 The main difference in the three flavors of myco are how you want to get FASTQ files into the workflow. In all cases, your FASTQs must be paired-end Illumina reads.
 * [myco_raw](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_raw) expects FASTQs which have not been decontaminated **<--- If you are CalTBNet, this is the one!!**
-* [myco_sra](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects a text file listing BioSample accessions you wish to pull FASTQs from
-* [myco_simple](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects decontaminated, gzipped FASTQs 
+* [myco_sra](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_sra) expects BioSample accessions, either as a text file or directly input as a string
+* [myco_simple](https://dockstore.org/workflows/github.com/aofarrel/myco/myco_simple) expects gzipped FASTQs which ideally were already decontaminated previously
 
 For more information please see [./docs/inputs.md](./doc/inputs.md), the per-workflow readmes, and the WDL file's respective parameter_meta section.
 
 ## Tips
 * If running on Terra, it is recommended to use [data tables](https://support.terra.bio/hc/en-us/articles/360025758392-Managing-data-with-tables) for your input, one sample per row
-* If not running on Terra, it is recommend to run with miniwdl due to miniwdl's better handling of non-cloud compute resources, but you must use v1.14.2 or later as older versions [have a bug](https://github.com/chanzuckerberg/miniwdl/issues/840) which breaks the final QC check
+* If not running on Terra, it is recommend to run with miniwdl due to miniwdl's better handling of non-cloud compute resources, but you must use v1.14.2 or later as older versions of miniwdl [have a bug](https://github.com/chanzuckerberg/miniwdl/issues/840) which breaks the final QC check
 * Non-Terra Cromwell (including the Dockstore CLI) is supported, but be aware Cromwell has serious problems with handling hardware resources that can make it to crash in situations where miniwdl would not. You can make non-Terra Cromwell much more stable by setting concurrent-job-limit to 1 in the Cromwell config, but this will make processing multiple samples at once slower. Worry not, this kind of crash does not occur on Terra due to differences in how Cromwell requests resources in "cloud mode."
 * myco_raw has been reported to work on HPCs that use Singularity instead of Docker with some adjustments, but this is not officially supported
 
